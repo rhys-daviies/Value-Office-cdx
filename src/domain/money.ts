@@ -32,3 +32,31 @@ export function toDbMoney(value: Money): string {
 export function toMillions(value: Money, dp = 1): string {
   return value.dividedBy(1_000_000).toFixed(dp);
 }
+
+const INPUT_MULTIPLIERS: Record<string, string> = { k: "1000", m: "1000000", bn: "1000000000", b: "1000000000" };
+
+/**
+ * Parses consultant-typed amounts: "4800000", "4,800,000.00", "$4.8m", "-250k", "(1.2m)".
+ * Returns a canonical 2dp decimal string, or throws RangeError if the amount is
+ * ambiguous or finer than cents after scaling.
+ */
+export function parseMoneyInput(raw: string): string {
+  let s = raw.trim().toLowerCase().replace(/[\s,]/g, "");
+  let negative = false;
+  if (/^\(.*\)$/.test(s)) {
+    negative = true;
+    s = s.slice(1, -1);
+  }
+  if (s.startsWith("-")) {
+    negative = !negative;
+    s = s.slice(1);
+  }
+  s = s.replace(/^[a-z]{0,3}\$|^[£€¥]/, ""); // leading symbol, e.g. $, NZ$, US$, £
+  const match = /^(\d+(?:\.\d+)?)(k|m|bn|b)?$/.exec(s);
+  if (!match) throw new RangeError(`"${raw}" is not an amount (examples: 4800000, 4,800,000.00, 4.8m, -250k)`);
+  let value = new MoneyDecimal(match[1]!);
+  if (match[2]) value = value.times(INPUT_MULTIPLIERS[match[2]]!);
+  if (!value.times(100).isInteger()) throw new RangeError(`"${raw}" has more precision than cents`);
+  if (negative) value = value.negated();
+  return toDbMoney(value);
+}
