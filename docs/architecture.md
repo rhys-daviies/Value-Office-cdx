@@ -8,10 +8,13 @@ One Next.js application, one PostgreSQL database. No separate API, workers, queu
 
 ```
 src/
-  app/              UI routes (server components). Reads via queries, writes via commands only.
+  app/              UI routes (server components). Reads via queries, writes via server actions only.
+  ui/               Presentation: components, labels, formatting (money via Decimal, never floats).
   domain/           Pure rules and values: money, status vocabularies, errors. No I/O.
   server/
     auth/           Authentication seam: getCurrentActor(). Only place that knows how identity is established.
+    actions/        Server actions: parse FormData → call a command as the current actor → revalidate.
+                    Map DomainError to consultant-facing messages. No business rules here.
     commands/       Named commands — the only way authoritative data changes.
     queries/        Read models (totals are derived here, never stored).
     db/             Drizzle schema + client.
@@ -35,6 +38,15 @@ UI / script → command(actor, input)
 `defineCommand(name, zodSchema, handler)` in `src/server/commands/run.ts`. Command names live in
 `src/server/commands/names.ts`. Database rule violations are raised as `VO_<CODE>: message` and surface as
 `DomainError(code)`.
+
+### UI mutation path
+
+```
+<ActionForm> (client) → server action → command → transaction + audit → revalidatePath(project)
+```
+
+`ActionForm` submits without React's automatic form reset so values survive validation errors; field errors come
+from Zod issue paths or known constraint names (`src/server/actions/errors.ts`).
 
 ## Audit
 
@@ -68,6 +80,13 @@ UI / script → command(actor, input)
 - Totals are derived from driver versions; nothing stores a total except V0's `stated_total_value`, which
   records the headline figure of the inherited Business Case (which may not be decomposed into drivers).
 
+### Phase 1 presentation rules
+
+- Authority is colour-coded consistently: inherited V0 slate · draft amber · proposed sky · authorised emerald.
+- Non-financial drivers (`financial_value` null) are labelled and excluded from totals. Negative values are allowed.
+- Status summaries are counts only — no scores or readiness measures (that would be methodology).
+- No forecast terminology exists in Phase 1.
+
 ## Money
 
 `numeric(18,2)` in the database, decimal strings at boundaries, `decimal.js` for arithmetic
@@ -93,5 +112,5 @@ When added: `src/ai/` produces suggestions into its own table; consultants accep
 
 ## Deliberately not built yet
 
-Assurance reviews, value positions, leakage, scenarios, recommendations, decisions, Value Changes (V2+),
+Assurance reviews, value positions (forecast/realised), gap, leakage, scenarios, recommendations, decisions, Value Changes (V2+),
 reports/PDF, charts, AI, client portal, production auth, binary document storage.

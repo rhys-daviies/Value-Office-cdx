@@ -25,12 +25,22 @@ npx playwright install chromium   # once, for e2e tests
 
 ## Environment variables
 
-| Variable            | Required | Purpose                                                                         |
-| ------------------- | -------- | ------------------------------------------------------------------------------- |
-| `DATABASE_URL`      | yes      | Application database                                                            |
-| `TEST_DATABASE_URL` | tests    | Test database. **Reset on every test run**; name must end in `_test`            |
-| `VO_DEV_USER_EMAIL` | dev      | Development identity (consultant). Ignored — and refused — in production builds |
-| `VO_DEV_USER_NAME`  | no       | Display name for the dev identity                                               |
+| Variable            | Required | Purpose                                                                                  |
+| ------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `DATABASE_URL`      | yes      | Application database                                                                     |
+| `TEST_DATABASE_URL` | tests    | Test database. **Reset on every test run**; name must end in `_test`                     |
+| `E2E_DATABASE_URL`  | e2e      | Playwright database. **Created if missing and reset every run**; name must end in `_e2e` |
+| `VO_DEV_USER_EMAIL` | dev      | Development identity (consultant). Ignored — and refused — in production builds          |
+| `VO_DEV_USER_NAME`  | no       | Display name for the dev identity                                                        |
+
+## Consultant workflow (Phase 1)
+
+`/projects` → create project → **Setup** (context, Value Basis, key dates, stakeholders, VCO, document references) →
+**Information Request** → **Value Case** (capture and record inherited V0) → **Evidence** → **Re-Qualification**
+(draft V1 against V0, edit drivers, propose, record VCO authorisation) → **Authorised V1**. **History** shows the audit
+trail per command. `/status` is an operational check.
+
+> Next.js allows one `next dev` per checkout: stop your own dev server before `npm run test:e2e`.
 
 ## Database and migrations
 
@@ -42,17 +52,17 @@ npx playwright install chromium   # once, for e2e tests
 
 ## Scripts
 
-| Script                    | What it does                                                          |
-| ------------------------- | --------------------------------------------------------------------- |
-| `npm run dev`             | Dev server                                                            |
-| `npm run build` / `start` | Production build / serve                                              |
-| `npm run typecheck`       | Route typegen + `tsc --noEmit`                                        |
-| `npm run lint`            | ESLint, including architecture-boundary rules                         |
-| `npm run format[:check]`  | Prettier                                                              |
-| `npm test`                | Vitest: domain + database invariant tests against `TEST_DATABASE_URL` |
-| `npm run test:e2e`        | Playwright smoke tests (starts a dev server on :3100)                 |
-| `npm run db:migrate`      | Apply migrations to `DATABASE_URL`                                    |
-| `npm run db:seed:horizon` | Seed Project Horizon through the public commands (idempotent)         |
-| `npm run verify`          | typecheck + lint + format + tests + build                             |
+| Script                    | What it does                                                                                                          |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`             | Dev server                                                                                                            |
+| `npm run build` / `start` | Production build / serve                                                                                              |
+| `npm run typecheck`       | Route typegen + `tsc --noEmit`                                                                                        |
+| `npm run lint`            | ESLint, including architecture-boundary rules                                                                         |
+| `npm run format[:check]`  | Prettier                                                                                                              |
+| `npm test`                | Vitest: domain + database invariant tests against `TEST_DATABASE_URL`                                                 |
+| `npm run test:e2e`        | Playwright: smoke, Horizon UI acceptance, consultant golden path (own dev server on :3100 against `E2E_DATABASE_URL`) |
+| `npm run db:migrate`      | Apply migrations to `DATABASE_URL`                                                                                    |
+| `npm run db:seed:horizon` | Seed Project Horizon through the public commands (idempotent)                                                         |
+| `npm run verify`          | typecheck + lint + format + tests + build                                                                             |
 
 CI (`.github/workflows/ci.yml`) runs all of the above against a fresh PostgreSQL 16 service.
