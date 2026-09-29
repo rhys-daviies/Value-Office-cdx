@@ -45,7 +45,8 @@ export function defineCommand<S extends z.ZodType, R>(
   return async (actor, raw) => {
     const parsed = input.safeParse(raw);
     if (!parsed.success) {
-      throw new DomainError("VO_INVALID_INPUT", z.prettifyError(parsed.error));
+      const issues = parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
+      throw new DomainError("VO_INVALID_INPUT", z.prettifyError(parsed.error), { issues });
     }
     return runCommand(name, actor, (ctx) => handler(ctx, parsed.data));
   };
@@ -67,7 +68,11 @@ function toDomainError(err: unknown): DomainError | undefined {
   const rule = DB_RULE.exec(pg.message);
   if (rule) return new DomainError(rule[1]!, rule[2]!);
   const code = pg.code && CONSTRAINT_CODES[pg.code];
-  if (code) return new DomainError(code, pg.constraint ? `${pg.message} (${pg.constraint})` : pg.message);
+  if (code) {
+    return new DomainError(code, pg.constraint ? `${pg.message} (${pg.constraint})` : pg.message, {
+      constraint: pg.constraint,
+    });
+  }
   return undefined;
 }
 

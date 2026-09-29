@@ -94,7 +94,7 @@ export async function seedHorizon(actor: Actor, opts: { projectCode?: string; au
     clientId: client.id,
     code: opts.projectCode ?? "HORIZON",
     name: "Project Horizon",
-    context: `${PLACEHOLDER} Canonical acceptance fixture. Project context not yet specified.`,
+    context: `${PLACEHOLDER} Canonical acceptance fixture. Project context not yet specified. Currency USD is a placeholder: the brief states "$" without naming a currency.`,
     currency: "USD", // PLACEHOLDER: brief states "$" without a currency.
   });
   await setProjectValueBasis(actor, {

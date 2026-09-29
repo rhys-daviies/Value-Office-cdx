@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
@@ -6,7 +6,7 @@ import { schema } from "@/server/db/client";
 
 import { COMMANDS } from "./names";
 import { defineCommand } from "./run";
-import { nonBlank, optionalText, uuid } from "./schemas";
+import { clearableText, nonBlank, optionalText, uuid } from "./schemas";
 
 /** Records a client-side person and adds them as a stakeholder on the project. */
 export const addStakeholder = defineCommand(
@@ -61,5 +61,37 @@ export const setValueCaseOwner = defineCommand(
       .returning();
     if (!row) throw new DomainError("VO_NOT_FOUND", "Value Case not found");
     return row;
+  },
+);
+
+/** Edits a stakeholder's identifying details and project role. */
+export const updateStakeholder = defineCommand(
+  COMMANDS.updateStakeholder,
+  z.object({
+    projectId: uuid,
+    personId: uuid,
+    name: nonBlank.optional(),
+    title: clearableText,
+    organisation: clearableText,
+    email: z.email().nullable().optional(),
+    roleDescription: clearableText,
+  }),
+  async ({ tx }, { projectId, personId, roleDescription, ...person }) => {
+    const onProject = and(
+      eq(schema.projectStakeholder.projectId, projectId),
+      eq(schema.projectStakeholder.personId, personId),
+    );
+    const [stakeholder] =
+      roleDescription === undefined
+        ? await tx.select().from(schema.projectStakeholder).where(onProject)
+        : await tx.update(schema.projectStakeholder).set({ roleDescription }).where(onProject).returning();
+    if (!stakeholder) throw new DomainError("VO_NOT_FOUND", "Stakeholder not found on this project");
+
+    const changes = Object.fromEntries(Object.entries(person).filter(([, v]) => v !== undefined));
+    const [row] =
+      Object.keys(changes).length === 0
+        ? await tx.select().from(schema.person).where(eq(schema.person.id, personId))
+        : await tx.update(schema.person).set(changes).where(eq(schema.person.id, personId)).returning();
+    return { person: row!, stakeholder };
   },
 );

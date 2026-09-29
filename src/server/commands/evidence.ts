@@ -1,10 +1,13 @@
+import { eq } from "drizzle-orm";
 import { z } from "zod";
+
+import { DomainError } from "@/domain/errors";
 
 import { schema } from "@/server/db/client";
 
 import { COMMANDS } from "./names";
 import { defineCommand } from "./run";
-import { isoDate, nonBlank, optionalText, uuid } from "./schemas";
+import { clearableDate, clearableText, clearableUuid, isoDate, nonBlank, optionalText, uuid } from "./schemas";
 
 /**
  * Phase 1 documents are references: where the document lives, where it came
@@ -48,6 +51,8 @@ export const recordEvidence = defineCommand(
     evidenceDate: isoDate.optional(),
     receivedOn: isoDate.optional(),
     supersedesEvidenceId: uuid.optional(),
+    isMaterialChange: z.boolean().optional(),
+    materialChangeNote: optionalText,
   }),
   async ({ tx, actor }, input) => {
     const [row] = await tx
@@ -55,5 +60,30 @@ export const recordEvidence = defineCommand(
       .values({ ...input, recordedBy: actor.userId })
       .returning();
     return row!;
+  },
+);
+
+/**
+ * Edits evidence metadata. The database refuses edits to evidence relied on by a
+ * locked (proposed/recorded/authorised) version — record superseding evidence instead.
+ */
+export const updateEvidence = defineCommand(
+  COMMANDS.updateEvidence,
+  z.object({
+    evidenceId: uuid,
+    title: nonBlank.optional(),
+    summary: clearableText,
+    documentId: clearableUuid,
+    sourcePersonId: clearableUuid,
+    evidenceDate: clearableDate,
+    receivedOn: clearableDate,
+    supersedesEvidenceId: clearableUuid,
+    isMaterialChange: z.boolean().optional(),
+    materialChangeNote: clearableText,
+  }),
+  async ({ tx }, { evidenceId, ...fields }) => {
+    const [row] = await tx.update(schema.evidence).set(fields).where(eq(schema.evidence.id, evidenceId)).returning();
+    if (!row) throw new DomainError("VO_NOT_FOUND", "Evidence not found");
+    return row;
   },
 );

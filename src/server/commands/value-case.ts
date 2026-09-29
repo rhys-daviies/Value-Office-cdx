@@ -7,6 +7,11 @@ import { schema, type Tx } from "@/server/db/client";
 import { COMMANDS } from "./names";
 import { defineCommand } from "./run";
 import {
+  clearableDate,
+  clearableMetric,
+  clearableMoney,
+  clearableText,
+  clearableUuid,
   evidenceStatus,
   isoDate,
   metricString,
@@ -253,9 +258,31 @@ export const addValueDriver = defineCommand(
   },
 );
 
+/**
+ * Edits a driver version in a draft. `null` clears a field: a cleared
+ * financial value makes the driver non-financial (excluded from the total).
+ */
 export const updateDriverVersion = defineCommand(
   COMMANDS.updateDriverVersion,
-  driverFields.partial().extend({ driverVersionId: uuid }),
+  z.object({
+    driverVersionId: uuid,
+    name: nonBlank.optional(),
+    description: clearableText,
+    metric: clearableText,
+    metricUnit: clearableText,
+    baselineValue: clearableMetric,
+    targetValue: clearableMetric,
+    calculationRationale: clearableText,
+    financialValue: clearableMoney,
+    timingDescription: clearableText,
+    benefitStartDate: clearableDate,
+    benefitFullDate: clearableDate,
+    avoPersonId: clearableUuid,
+    qualificationStatus: qualificationStatus.optional(),
+    evidenceStatus: evidenceStatus.optional(),
+    notes: clearableText,
+    sortOrder: z.number().int().optional(),
+  }),
   async ({ tx }, { driverVersionId, ...fields }) => {
     const [row] = await tx
       .update(schema.valueDriverVersion)
@@ -264,6 +291,29 @@ export const updateDriverVersion = defineCommand(
       .returning();
     if (!row) throw new DomainError("VO_NOT_FOUND", "Driver version not found");
     return row;
+  },
+);
+
+/**
+ * Removes a driver from a draft version (its assumptions and links cascade).
+ * The driver identity is deleted too unless another version still uses it.
+ */
+export const removeValueDriver = defineCommand(
+  COMMANDS.removeValueDriver,
+  z.object({ driverVersionId: uuid }),
+  async ({ tx }, input) => {
+    const [removed] = await tx
+      .delete(schema.valueDriverVersion)
+      .where(eq(schema.valueDriverVersion.id, input.driverVersionId))
+      .returning();
+    if (!removed) throw new DomainError("VO_NOT_FOUND", "Driver version not found");
+    const [stillUsed] = await tx
+      .select({ id: schema.valueDriverVersion.id })
+      .from(schema.valueDriverVersion)
+      .where(eq(schema.valueDriverVersion.valueDriverId, removed.valueDriverId))
+      .limit(1);
+    if (!stillUsed) await tx.delete(schema.valueDriver).where(eq(schema.valueDriver.id, removed.valueDriverId));
+    return removed;
   },
 );
 
@@ -316,6 +366,75 @@ export const linkEvidence = defineCommand(
         assumptionId: input.assumptionId,
         relevanceNote: input.relevanceNote,
       })
+      .returning();
+    return row!;
+  },
+);
+
+export const updateAssumption = defineCommand(
+  COMMANDS.updateAssumption,
+  z.object({
+    assumptionId: uuid,
+    statement: nonBlank.optional(),
+    evidenceStatus: evidenceStatus.optional(),
+    notes: clearableText,
+  }),
+  async ({ tx }, { assumptionId, ...fields }) => {
+    const [row] = await tx
+      .update(schema.assumption)
+      .set(fields)
+      .where(eq(schema.assumption.id, assumptionId))
+      .returning();
+    if (!row) throw new DomainError("VO_NOT_FOUND", "Assumption not found");
+    return row;
+  },
+);
+
+export const removeAssumption = defineCommand(
+  COMMANDS.removeAssumption,
+  z.object({ assumptionId: uuid }),
+  async ({ tx }, input) => {
+    const [row] = await tx.delete(schema.assumption).where(eq(schema.assumption.id, input.assumptionId)).returning();
+    if (!row) throw new DomainError("VO_NOT_FOUND", "Assumption not found");
+    return row;
+  },
+);
+
+export const unlinkEvidence = defineCommand(
+  COMMANDS.unlinkEvidence,
+  z.object({ evidenceLinkId: uuid }),
+  async ({ tx }, input) => {
+    const [row] = await tx
+      .delete(schema.evidenceLink)
+      .where(eq(schema.evidenceLink.id, input.evidenceLinkId))
+      .returning();
+    if (!row) throw new DomainError("VO_NOT_FOUND", "Evidence link not found");
+    return row;
+  },
+);
+
+/** Title, summary and (V0 only) stated headline total, while the version is draft. */
+export const updateVersionDetails = defineCommand(
+  COMMANDS.updateVersionDetails,
+  z.object({
+    versionId: uuid,
+    title: nonBlank.optional(),
+    summary: clearableText,
+    statedTotalValue: clearableMoney,
+  }),
+  async ({ tx }, { versionId, ...fields }) => {
+    const version = await getVersion(tx, versionId);
+    requireDraft(version);
+    if (fields.statedTotalValue !== undefined && version.kind !== "inherited_business_case") {
+      throw new DomainError(
+        "VO_INVALID_INPUT",
+        "Only the inherited Business Case has a stated total; Value Case totals are derived from drivers",
+      );
+    }
+    const [row] = await tx
+      .update(schema.valueCaseVersion)
+      .set(fields)
+      .where(eq(schema.valueCaseVersion.id, versionId))
       .returning();
     return row!;
   },
