@@ -42,6 +42,22 @@ export const COMMANDS = {
   linkAssuranceEvidence: "assurance.linkEvidence",
   unlinkAssuranceEvidence: "assurance.unlinkEvidence",
   finaliseAssuranceReview: "assurance.finaliseReview", // trigger-checked
+  createLeakage: "leakage.create",
+  updateLeakage: "leakage.update",
+  setLeakageDrivers: "leakage.setDrivers",
+  assessLeakage: "leakage.assess",
+  upsertScenario: "options.upsertScenario",
+  removeScenario: "options.removeScenario",
+  saveRecommendation: "options.saveRecommendation",
+  issueRecommendation: "options.issueRecommendation", // trigger-checked
+  recordDecision: "options.recordDecision",
+  createValueChange: "valueChange.create", // trigger-checked
+  updateValueChange: "valueChange.update",
+  proposeValueChange: "valueChange.propose", // trigger-checked
+  returnValueChange: "valueChange.return", // trigger-checked
+  authoriseValueChange: "valueChange.authorise", // trigger-checked
+  rejectValueChange: "valueChange.reject", // trigger-checked
+  withdrawValueChange: "valueChange.withdraw", // trigger-checked
 } as const;
 
 export type CommandName = (typeof COMMANDS)[keyof typeof COMMANDS];

@@ -307,22 +307,26 @@ describe("authorised versions are immutable", () => {
       createDraftVersion(actor, { projectId: project.id, title: "V2", basedOnVersionId: v1.id }),
       "VO_VALUE_CHANGE_REQUIRED",
     );
-    // Even if a V2 row is forced in beneath the command layer, the initial path cannot authorise it.
-    const [v2] = await asCommand(actor, COMMANDS.createDraftVersion, (tx) =>
-      tx
-        .insert(schema.valueCaseVersion)
-        .values({
-          valueCaseId: v1.valueCaseId,
-          projectId: project.id,
-          versionNumber: 2,
-          kind: "value_case",
-          title: "V2",
-          createdBy: actor.userId,
-        })
-        .returning(),
+    // Beneath the command layer, a V2 row cannot even be inserted outside a Value Change…
+    const v2Row = {
+      valueCaseId: v1.valueCaseId,
+      projectId: project.id,
+      versionNumber: 2,
+      kind: "value_case" as const,
+      title: "V2",
+      createdBy: actor.userId,
+    };
+    await expectDomainError(
+      asCommand(actor, COMMANDS.createDraftVersion, (tx) => tx.insert(schema.valueCaseVersion).values(v2Row)),
+      "VO_VALUE_CHANGE_REQUIRED",
+    );
+    // …and even if forced in under the Value Change command name without a Value Change,
+    // the initial V1 path can neither propose nor authorise it.
+    const [v2] = await asCommand(actor, COMMANDS.createValueChange, (tx) =>
+      tx.insert(schema.valueCaseVersion).values(v2Row).returning(),
     );
     await addValueDriver(actor, { versionId: v2!.id, code: "VD-02", name: "D2" });
-    await proposeVersion(actor, { versionId: v2!.id });
+    await expectDomainError(proposeVersion(actor, { versionId: v2!.id }), "VO_WRONG_COMMAND");
     await expectDomainError(
       authoriseInitialVersion(actor, {
         versionId: v2!.id,
@@ -330,7 +334,7 @@ describe("authorised versions are immutable", () => {
         authorisedOn: today,
         authorisationEvidenceId: evidence.id,
       }),
-      "VO_VALUE_CHANGE_REQUIRED",
+      "VO_INVALID_TRANSITION",
     );
   });
 });

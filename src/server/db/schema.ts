@@ -25,6 +25,9 @@ import {
   ASSURANCE_TRIGGERS,
   EVIDENCE_STATUSES,
   INFORMATION_REQUEST_ITEM_STATUSES,
+  LEAKAGE_STATUSES,
+  SCENARIO_KINDS,
+  VALUE_CHANGE_STATUSES,
   INFORMATION_REQUEST_STATUSES,
   KEY_DATE_KINDS,
   PROJECT_STATUSES,
@@ -49,6 +52,9 @@ export const keyDateKind = pgEnum("key_date_kind", KEY_DATE_KINDS);
 export const projectStatus = pgEnum("project_status", PROJECT_STATUSES);
 export const assuranceTrigger = pgEnum("assurance_trigger", ASSURANCE_TRIGGERS);
 export const assuranceReviewStatus = pgEnum("assurance_review_status", ASSURANCE_REVIEW_STATUSES);
+export const leakageStatus = pgEnum("leakage_status", LEAKAGE_STATUSES);
+export const scenarioKind = pgEnum("scenario_kind", SCENARIO_KINDS);
+export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
 export const informationRequestStatus = pgEnum("information_request_status", INFORMATION_REQUEST_STATUSES);
 export const informationRequestItemStatus = pgEnum(
   "information_request_item_status",
@@ -500,6 +506,12 @@ export const assuranceReview = pgTable(
     whatChanged: text(),
     whyItMatters: text(),
     summary: text(),
+    /**
+     * Project-level realised value known but not yet responsibly attributable to
+     * individual drivers. Explicitly labelled; never belongs to any driver.
+     */
+    unattributedRealisedValue: moneyCol(),
+    unattributedRealisedRationale: text(),
     createdBy: uuid()
       .notNull()
       .references(() => appUser.id),
@@ -539,6 +551,10 @@ export const assuranceReview = pgTable(
     check("assurance_review_sequence_positive", sql`${t.sequence} >= 1`),
     check("assurance_review_not_self_previous", sql`${t.previousReviewId} is distinct from ${t.id}`),
     check(
+      "assurance_review_unattributed_rationale",
+      sql`${t.unattributedRealisedValue} is null or ${t.unattributedRealisedRationale} is not null`,
+    ),
+    check(
       "assurance_review_finalised_shape",
       sql`(${t.status} = 'finalised') = (${t.finalisedBy} is not null and ${t.finalisedAt} is not null)`,
     ),
@@ -558,12 +574,18 @@ export const valuePosition = pgTable(
     currentForecast: moneyCol(),
     /** Cumulative realised value to the review date. Null = not yet assessed. */
     realisedValue: moneyCol(),
+    /** Consultant explicitly could not assess the forecast; requires a rationale. */
+    forecastNotAssessed: boolean().notNull().default(false),
     forecastRationale: text(),
     realisedValueRationale: text(),
     createdAt: createdAt(),
   },
   (t) => [
     unique("value_position_driver_uq").on(t.assuranceReviewId, t.valueDriverId),
+    check(
+      "value_position_not_assessed_shape",
+      sql`not ${t.forecastNotAssessed} or (${t.currentForecast} is null and ${t.forecastRationale} is not null)`,
+    ),
     foreignKey({
       name: "value_position_review_fk",
       columns: [t.assuranceReviewId, t.projectId],
@@ -579,6 +601,330 @@ export const valuePosition = pgTable(
       columns: [t.valueDriverId, t.valueCaseId],
       foreignColumns: [valueDriver.id, valueDriver.valueCaseId],
     }),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Management response (Phase 3)
+//
+// Value Leakage is a register item (an identified issue) reassessed per review:
+//   Total VL = Recoverable VL + Unrecoverable VL; Recoverable is derived.
+// Leakage and Value Gap are independent — nothing reconciles one to the other.
+
+export const valueLeakage = pgTable(
+  "value_leakage",
+  {
+    id: id(),
+    projectId: uuid().notNull(),
+    valueCaseId: uuid().notNull(),
+    code: text().notNull(),
+    title: text().notNull(),
+    description: text(),
+    identifiedInReviewId: uuid().notNull(),
+    /** The AVO who owns the response (no separate Risk Owner). */
+    responseOwnerPersonId: uuid(),
+    status: leakageStatus().notNull().default("open"),
+    requiredDecisionDate: date(),
+    consultantAssessment: text(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("value_leakage_code_uq").on(t.projectId, t.code),
+    unique("value_leakage_id_project_uq").on(t.id, t.projectId),
+    unique("value_leakage_id_case_uq").on(t.id, t.valueCaseId),
+    foreignKey({
+      name: "value_leakage_case_fk",
+      columns: [t.valueCaseId, t.projectId],
+      foreignColumns: [valueCase.id, valueCase.projectId],
+    }),
+    foreignKey({
+      name: "value_leakage_review_fk",
+      columns: [t.identifiedInReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "value_leakage_owner_fk",
+      columns: [t.projectId, t.responseOwnerPersonId],
+      foreignColumns: [projectStakeholder.projectId, projectStakeholder.personId],
+    }),
+  ],
+);
+
+export const valueLeakageDriver = pgTable(
+  "value_leakage_driver",
+  {
+    id: id(),
+    valueLeakageId: uuid().notNull(),
+    valueCaseId: uuid().notNull(),
+    valueDriverId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("value_leakage_driver_uq").on(t.valueLeakageId, t.valueDriverId),
+    foreignKey({
+      name: "value_leakage_driver_leakage_fk",
+      columns: [t.valueLeakageId, t.valueCaseId],
+      foreignColumns: [valueLeakage.id, valueLeakage.valueCaseId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "value_leakage_driver_driver_fk",
+      columns: [t.valueDriverId, t.valueCaseId],
+      foreignColumns: [valueDriver.id, valueDriver.valueCaseId],
+    }),
+    foreignKey({
+      name: "value_leakage_driver_project_fk",
+      columns: [t.valueLeakageId, t.projectId],
+      foreignColumns: [valueLeakage.id, valueLeakage.projectId],
+    }),
+  ],
+);
+
+/** A leakage item's size in one review. Editable only while that review is draft. */
+export const leakageAssessment = pgTable(
+  "leakage_assessment",
+  {
+    id: id(),
+    valueLeakageId: uuid().notNull(),
+    assuranceReviewId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    totalAmount: moneyCol().notNull(),
+    unrecoverableAmount: moneyCol().notNull().default("0"),
+    unrecoverableRationale: text(),
+    unrecoverableValidatedBy: uuid().references(() => appUser.id),
+    assessmentNote: text(),
+    assessedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("leakage_assessment_review_uq").on(t.valueLeakageId, t.assuranceReviewId),
+    foreignKey({
+      name: "leakage_assessment_leakage_fk",
+      columns: [t.valueLeakageId, t.projectId],
+      foreignColumns: [valueLeakage.id, valueLeakage.projectId],
+    }),
+    foreignKey({
+      name: "leakage_assessment_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    // Leakage is an exposure: non-negative. Until evidence shows it is lost, it is recoverable.
+    check("leakage_assessment_total_non_negative", sql`${t.totalAmount} >= 0`),
+    check(
+      "leakage_assessment_unrecoverable_range",
+      sql`${t.unrecoverableAmount} >= 0 and ${t.unrecoverableAmount} <= ${t.totalAmount}`,
+    ),
+    check(
+      "leakage_assessment_unrecoverable_validated",
+      sql`${t.unrecoverableAmount} = 0 or (${t.unrecoverableRationale} is not null and ${t.unrecoverableValidatedBy} is not null)`,
+    ),
+  ],
+);
+
+/** An option / alternative trajectory. Totals are consultant-entered, never derived. */
+export const scenario = pgTable(
+  "scenario",
+  {
+    id: id(),
+    assuranceReviewId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    label: text().notNull(),
+    kind: scenarioKind().notNull(),
+    totalValue: moneyCol().notNull(),
+    narrative: text(),
+    sortOrder: integer().notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("scenario_id_review_uq").on(t.id, t.assuranceReviewId),
+    foreignKey({
+      name: "scenario_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    uniqueIndex("scenario_one_current_uq")
+      .on(t.assuranceReviewId)
+      .where(sql`${t.kind} = 'current'`),
+    uniqueIndex("scenario_one_recommended_uq")
+      .on(t.assuranceReviewId)
+      .where(sql`${t.kind} = 'recommended'`),
+  ],
+);
+
+/** Cardaxia's recommendation. Immutable once issued; never rewritten by the decision. */
+export const recommendation = pgTable(
+  "recommendation",
+  {
+    id: id(),
+    assuranceReviewId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    scenarioId: uuid().notNull(),
+    narrative: text().notNull(),
+    issuedBy: uuid().references(() => appUser.id),
+    issuedAt: timestamp({ withTimezone: true }),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("recommendation_review_uq").on(t.assuranceReviewId),
+    foreignKey({
+      name: "recommendation_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "recommendation_scenario_fk",
+      columns: [t.scenarioId, t.assuranceReviewId],
+      foreignColumns: [scenario.id, scenario.assuranceReviewId],
+    }),
+    check("recommendation_issued_shape", sql`(${t.issuedAt} is null) = (${t.issuedBy} is null)`),
+  ],
+);
+
+/** The client / AVO decision. Recorded by a consultant; immutable. */
+export const decision = pgTable(
+  "decision",
+  {
+    id: id(),
+    assuranceReviewId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    selectedScenarioId: uuid().notNull(),
+    decidedByPersonId: uuid().notNull(),
+    decidedOn: date().notNull(),
+    rationale: text(),
+    economicConsequence: text(),
+    supportingEvidenceId: uuid(),
+    recordedBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    recordedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("decision_review_uq").on(t.assuranceReviewId),
+    unique("decision_id_project_uq").on(t.id, t.projectId),
+    foreignKey({
+      name: "decision_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "decision_scenario_fk",
+      columns: [t.selectedScenarioId, t.assuranceReviewId],
+      foreignColumns: [scenario.id, scenario.assuranceReviewId],
+    }),
+    foreignKey({
+      name: "decision_decided_by_fk",
+      columns: [t.projectId, t.decidedByPersonId],
+      foreignColumns: [projectStakeholder.projectId, projectStakeholder.personId],
+    }),
+    foreignKey({
+      name: "decision_evidence_fk",
+      columns: [t.supportingEvidenceId, t.projectId],
+      foreignColumns: [evidence.id, evidence.projectId],
+    }),
+  ],
+);
+
+/**
+ * The only path to Authorised V2+. References the version in force (from) and
+ * the copy-forward draft it proposes (to). V1's initial authorisation is not a
+ * Value Change (PMO decision).
+ */
+export const valueChange = pgTable(
+  "value_change",
+  {
+    id: id(),
+    projectId: uuid().notNull(),
+    valueCaseId: uuid().notNull(),
+    code: text().notNull(),
+    fromVersionId: uuid().notNull(),
+    toVersionId: uuid().notNull(),
+    assuranceReviewId: uuid(),
+    decisionId: uuid(),
+    reason: text(),
+    economicImpactNarrative: text(),
+    /** Stated change to Authorised Value; if set, the proposed version must reconcile to it before authorisation. */
+    statedChangeAmount: moneyCol(),
+    status: valueChangeStatus().notNull().default("draft"),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+    proposedAt: timestamp({ withTimezone: true }),
+    proposedBy: uuid().references(() => appUser.id),
+    authorisedOn: date(),
+    authorisedByPersonId: uuid(),
+    authorisationEvidenceId: uuid(),
+    authorisationNote: text(),
+    authorisationRecordedBy: uuid().references(() => appUser.id),
+    authorisationRecordedAt: timestamp({ withTimezone: true }),
+    closedAt: timestamp({ withTimezone: true }),
+    closedBy: uuid().references(() => appUser.id),
+    closureNote: text(),
+  },
+  (t) => [
+    unique("value_change_code_uq").on(t.valueCaseId, t.code),
+    unique("value_change_to_version_uq").on(t.toVersionId),
+    foreignKey({
+      name: "value_change_case_fk",
+      columns: [t.valueCaseId, t.projectId],
+      foreignColumns: [valueCase.id, valueCase.projectId],
+    }),
+    foreignKey({
+      name: "value_change_from_version_fk",
+      columns: [t.fromVersionId, t.valueCaseId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.valueCaseId, valueCaseVersion.projectId],
+    }),
+    foreignKey({
+      name: "value_change_to_version_fk",
+      columns: [t.toVersionId, t.valueCaseId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.valueCaseId, valueCaseVersion.projectId],
+    }),
+    foreignKey({
+      name: "value_change_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "value_change_decision_fk",
+      columns: [t.decisionId, t.projectId],
+      foreignColumns: [decision.id, decision.projectId],
+    }),
+    foreignKey({
+      name: "value_change_authorised_by_fk",
+      columns: [t.projectId, t.authorisedByPersonId],
+      foreignColumns: [projectStakeholder.projectId, projectStakeholder.personId],
+    }),
+    foreignKey({
+      name: "value_change_authorisation_evidence_fk",
+      columns: [t.authorisationEvidenceId, t.projectId],
+      foreignColumns: [evidence.id, evidence.projectId],
+    }),
+    check("value_change_versions_differ", sql`${t.fromVersionId} <> ${t.toVersionId}`),
+    check("value_change_code_not_blank", sql`length(trim(${t.code})) > 0`),
+    check(
+      "value_change_proposed_shape",
+      sql`${t.status} in ('draft', 'withdrawn') or (${t.proposedAt} is not null and ${t.proposedBy} is not null and ${t.reason} is not null)`,
+    ),
+    check(
+      "value_change_authorised_shape",
+      sql`${t.status} <> 'authorised' or (
+            ${t.authorisedOn} is not null and ${t.authorisedByPersonId} is not null
+        and ${t.authorisationEvidenceId} is not null and ${t.authorisationRecordedBy} is not null
+        and ${t.authorisationRecordedAt} is not null)`,
+    ),
+    check(
+      "value_change_closed_shape",
+      sql`(${t.status} in ('rejected', 'withdrawn')) = (${t.closedAt} is not null and ${t.closedBy} is not null)`,
+    ),
+    uniqueIndex("value_change_one_open_uq")
+      .on(t.valueCaseId)
+      .where(sql`${t.status} in ('draft', 'proposed')`),
   ],
 );
 
