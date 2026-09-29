@@ -19,7 +19,7 @@ MODE=${SMOKE_MODE:-production}
 DB=value_office_${MODE}_smoke
 APP_ROLE=vo_app_smoke
 APP_PASSWORD="smoke-$(openssl rand -hex 12)"
-PORT=${SMOKE_PORT:-3200}
+PORT=${SMOKE_PORT:-$([ "$MODE" = production ] && echo 3200 || echo 3201)}
 S3_PORT=${SMOKE_S3_PORT:-9100}
 CONSULTANT_EMAIL=smoke.consultant@cardaxia.ai
 CONSULTANT_PASSWORD="smoke-$(openssl rand -hex 16)"
@@ -59,7 +59,12 @@ if [ "$MODE" = production ]; then
 else
   STORAGE=(VO_REPORT_STORAGE=database)
 fi
-cleanup() { kill ${S3_PID:-} "${APP_PID:-}" 2>/dev/null || true; }
+# npx does not forward signals to the server it spawned: stop it by its command line.
+cleanup() {
+  kill ${S3_PID:-} "${APP_PID:-}" 2>/dev/null || true
+  pkill -f "next start --port $PORT" 2>/dev/null || true
+  pkill -f "fake-s3.ts $S3_PORT" 2>/dev/null || true
+}
 trap cleanup EXIT
 
 echo "→ next start (NODE_ENV=production, VO_DEPLOYMENT_MODE=$MODE)"
@@ -73,6 +78,8 @@ APP_PID=$!
 for _ in $(seq 1 60); do curl -sf "http://localhost:$PORT/api/health" >/dev/null && break; sleep 1; done
 curl -sf "http://localhost:$PORT/api/health" || { cat production-smoke-server.log; exit 1; }
 echo
+# The server answering must be the one just started, in the tier under test.
+grep -q "configuration ok: deployment=$MODE " production-smoke-server.log || { cat production-smoke-server.log; exit 1; }
 
 echo "→ security headers"
 headers=$(curl -sI "http://localhost:$PORT/sign-in")
