@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { Client } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { register } from "@/instrumentation";
+import { resetEnvCache } from "@/server/env";
 
 import { checkApplicationRole, grantAppRole, withClient } from "@/server/db/role";
 
@@ -75,5 +78,41 @@ describe("least-privilege application role", () => {
     ).toMatch(/must be owner|permission denied/);
     // Without command context every mutation is still rejected.
     expect(await refused("insert into client (name) values ('no context')")).toMatch(/VO_NO_COMMAND_CONTEXT/);
+  });
+});
+
+describe("production tier startup", () => {
+  it("accepts the intended restricted application role", async () => {
+    const url = new URL(ownerUrl);
+    url.username = ROLE;
+    url.password = PASSWORD;
+    const saved = { ...process.env };
+    process.env = {
+      ...saved,
+      NEXT_RUNTIME: "nodejs",
+      NODE_ENV: "production",
+      VO_DEPLOYMENT_MODE: "production",
+      DATABASE_URL: url.toString(),
+      VO_SESSION_SECRET: "s".repeat(40),
+      VO_APP_ORIGIN: "https://value-office.example.com",
+      VO_REPORT_STORAGE: "s3",
+      VO_S3_BUCKET: "b",
+      VO_S3_REGION: "r",
+      VO_S3_ACCESS_KEY_ID: "k",
+      VO_S3_SECRET_ACCESS_KEY: "s",
+      VO_PDF_RUNTIME: "serverless",
+    };
+    delete process.env.VO_DEV_USER_EMAIL;
+    delete process.env.VO_AUTH_MODE;
+    resetEnvCache();
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await expect(register()).resolves.toBeUndefined();
+      expect(log.mock.calls.at(-1)![0]).toMatch(/deployment=production .*db-role=least-privilege/);
+    } finally {
+      log.mockRestore();
+      process.env = saved;
+      resetEnvCache();
+    }
   });
 });

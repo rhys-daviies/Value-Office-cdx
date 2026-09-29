@@ -1,8 +1,95 @@
 # Deployment runbook — Vercel (internal Cardaxia use)
 
-The Value Office is one Next.js app on Vercel, plus a managed PostgreSQL database and a private
-S3-compatible bucket. It is independent of Impaxia: separate repository, project, database and bucket, with no
-runtime dependency. Nothing here provisions paid infrastructure. Every account-level step is marked **[Cardaxia]**.
+The Value Office is one Next.js app on Vercel with a managed PostgreSQL database. It is independent of Impaxia:
+separate repository, project and database, with no runtime dependency. There are two deployment tiers, chosen
+explicitly with `VO_DEPLOYMENT_MODE`:
+
+| Tier                            | `VO_DEPLOYMENT_MODE`    | Use                                                        |
+| ------------------------------- | ----------------------- | ---------------------------------------------------------- |
+| **A. Internal / pilot**         | `internal`              | Demo and internal, **non-sensitive** data. Fastest set-up. |
+| **B. Production / client data** | `production` (or unset) | Required before any sensitive client data is stored.       |
+
+An unset mode is treated as `production`. An unknown value stops the server. Nothing ever silently downgrades to
+`internal`.
+
+**What stays the same in both tiers:**
+
+- sign-in is required everywhere, and the development identity is always refused;
+- sessions are secure (`__Host-` Secure HttpOnly cookie, server-side revocation);
+- audit logging, command enforcement, authorised Value Case and Value Change controls, and issued-report
+  immutability (all enforced by database triggers, which fire for every role);
+- security headers, CSP, `no-store` and a minimal health endpoint.
+
+**What the internal tier relaxes:**
+
+- the app may connect as the provider-managed role (Neon's `neondb_owner`). A table owner _could_ disable
+  triggers; the app never does, but the database no longer prevents it;
+- issued PDFs may be stored in PostgreSQL instead of a private S3 bucket.
+
+The UI shows an "Internal pilot — no sensitive client data" badge in this tier.
+
+---
+
+## A. Internal / pilot — quickest Vercel deployment
+
+1. **Import** the GitHub repository into Vercel (default Next.js settings; Node 24 comes from `package.json`).
+2. **Connect Neon** through the Vercel integration. It sets `DATABASE_URL` (pooled, `neondb_owner`) and
+   `DATABASE_URL_UNPOOLED`.
+3. **Run migrations** once, from a developer machine, with the Neon owner connection. They are re-runnable and
+   apply only what's missing:
+   ```bash
+   MIGRATION_DATABASE_URL='<DATABASE_URL_UNPOOLED from Vercel/Neon>' npm run db:migrate
+   ```
+4. **Set three variables** in Vercel (Settings → Environment Variables → _Production_):
+
+   | Variable             | Value                            |
+   | -------------------- | -------------------------------- |
+   | `VO_DEPLOYMENT_MODE` | `internal`                       |
+   | `VO_SESSION_SECRET`  | output of `openssl rand -hex 32` |
+   | `VO_REPORT_STORAGE`  | `database`                       |
+
+   Derived automatically on Vercel in this tier:
+   - `VO_APP_ORIGIN` = `https://$VERCEL_PROJECT_PRODUCTION_URL`. Set it explicitly if you use a custom domain.
+     Sign-in only works on that origin; preview URLs are refused.
+   - `VO_PDF_RUNTIME` = `serverless` (bundled Chromium).
+
+   Do **not** set `VO_DEV_USER_EMAIL` or `VO_AUTH_MODE=dev`. The server refuses to start with either.
+
+5. **Create consultant accounts.** The password is prompted and hidden:
+   ```bash
+   DATABASE_URL='<DATABASE_URL from Vercel/Neon>' npm run user:create -- --email rhys@cardaxia.ai --name "Rhys Davies"
+   ```
+6. **Deploy** (redeploy after changing environment variables). The function log shows
+   `configuration ok: deployment=internal … db-role=provider-managed`, preceded by the INTERNAL / PILOT warning.
+7. **Smoke test:**
+   ```bash
+   read -rs SMOKE_PASSWORD && export SMOKE_PASSWORD
+   SMOKE_BASE_URL=https://<project>.vercel.app SMOKE_EMAIL=rhys@cardaxia.ai npm run smoke:deploy
+   ```
+   This creates one project, "Deployment smoke <timestamp>".
+
+No PostgreSQL role creation, S3 bucket or IAM set-up is needed. CI exercises exactly this tier on every push
+(`SMOKE_MODE=internal ./scripts/production-smoke.sh`).
+
+**Why not Vercel's local disk for PDFs?** Only `/tmp` is writable, and it is per instance and ephemeral. An issued
+PDF would disappear, or be missing on the next instance, so the internal tier stores PDFs in PostgreSQL instead. That
+store is insert-only, content-addressed, and hash-checked by the database and on every read. It is suitable for pilot
+volumes, since a PDF is typically 50–200 KB.
+
+**Moving from A to B later:**
+
+- set up the production-tier items below (restricted role, S3 bucket, `VO_DEPLOYMENT_MODE=production`);
+- redeploy;
+- PDFs issued in the internal tier stay in `report_document` and remain readable only while
+  `VO_REPORT_STORAGE=database`. Copying them to S3 before switching is a one-off step to plan, if pilot issues must
+  be kept.
+
+---
+
+## B. Production / client data — hardened deployment
+
+Everything below is the Phase 4B posture, and is required before sensitive client data is used. Set
+`VO_DEPLOYMENT_MODE=production` (or leave it unset).
 
 ```
 Browser ──HTTPS──► Vercel (Next.js 16, Node 24 functions)
@@ -11,7 +98,7 @@ Browser ──HTTPS──► Vercel (Next.js 16, Node 24 functions)
                      └─ report issue → serverless Chromium → PDF → private S3 bucket
 ```
 
-## What the runtime needs (verified)
+### What the runtime needs (verified)
 
 | Requirement          | How it is met on Vercel                                                                                                                                                                                                                            |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -26,7 +113,7 @@ Browser ──HTTPS──► Vercel (Next.js 16, Node 24 functions)
 **Plan:** internal commercial use needs a Vercel **Pro** team, which Cardaxia already has for Impaxia. Hobby is
 non-commercial.
 
-## Roles and secrets
+### Roles and secrets
 
 | Item                      | Where it lives                                                                                               |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------ |
@@ -36,7 +123,7 @@ non-commercial.
 | S3 key pair               | Vercel (Production). Scoped to the one bucket and prefix, Put and Get only.                                  |
 | Consultant passwords      | Typed at the `user:create` prompt. Stored only as scrypt hashes.                                             |
 
-Production refuses to start if any of the following is true:
+The production tier refuses to start if any of the following is true:
 
 - `VO_AUTH_MODE=dev`, or `VO_DEV_USER_EMAIL` is set;
 - the session secret is missing or shorter than 32 characters;
@@ -47,7 +134,7 @@ Production refuses to start if any of the following is true:
 
 Errors name the variable, never its value.
 
-## Initial deployment
+### Initial deployment
 
 1. **[Cardaxia] Create the Vercel project** from `rhys-daviies/Value-Office-cdx`, in the Cardaxia team. Use the
    default framework settings: build `npm run build`, install `npm ci`. Restrict preview deployments (see
@@ -64,7 +151,7 @@ Errors name the variable, never its value.
    _Production_):
    `DATABASE_URL` (the `vo_app` user on the pooled host), `VO_SESSION_SECRET`, `VO_APP_ORIGIN`,
    `VO_REPORT_STORAGE=s3`, `VO_S3_BUCKET`, `VO_S3_REGION`, `VO_S3_ACCESS_KEY_ID`, `VO_S3_SECRET_ACCESS_KEY`,
-   `VO_PDF_RUNTIME=serverless`, and optionally `VO_DB_POOL_MAX=5`, `VO_S3_PREFIX`, `VO_S3_ENDPOINT` (R2) and
+   `VO_PDF_RUNTIME=serverless`, `VO_DEPLOYMENT_MODE=production`, and optionally `VO_DB_POOL_MAX=5`, `VO_S3_PREFIX`, `VO_S3_ENDPOINT` (R2) and
    `VO_SESSION_TTL_HOURS`. Do **not** set `VO_DEV_USER_EMAIL`, `VO_AUTH_MODE=dev` or `MIGRATION_DATABASE_URL`.
 5. **[Cardaxia] Create the private bucket** (see _Object storage_) and its access key.
 6. **PDF runtime:** there's nothing to install. `VO_PDF_RUNTIME=serverless` is enough.
@@ -82,7 +169,8 @@ Errors name the variable, never its value.
    account's sessions immediately.
 9. **Deploy** (Vercel → Deploy, or push to `main`).
 10. **Verify health:** `curl https://<origin>/api/health` returns `{"status":"ok","database":"ok"}`. The
-    function log shows `configuration ok: auth=password storage=s3 pdf=serverless db-role=least-privilege`.
+    function log shows
+    `configuration ok: deployment=production auth=password storage=s3 pdf=serverless db-role=least-privilege`.
 11. **Sign in** at `https://<origin>/sign-in`.
 12. **Open or create a project.** Creating one is also the mutation step (13).
 13. **Perform a mutation**, for example add a key date.
@@ -107,7 +195,7 @@ SMOKE_BASE_URL=https://<origin> SMOKE_EMAIL=<account> npm run smoke:deploy
 The smoke test creates one project, named `Deployment smoke <timestamp>` under client "Cardaxia — deployment smoke
 test". It is ordinary audited data.
 
-## Update deployment
+### Update deployment
 
 1. Review the release: CI must be green on the exact commit.
 2. **Migrate first** (step 7 command). Migrations so far are additive, so the running version keeps working on the
@@ -118,7 +206,7 @@ test". It is ordinary audited data.
    migrations are forward-only, so rolling back code over an additive migration is safe. A destructive migration
    would need its own reviewed plan; none exists today. Issued reports and audit rows are never rewritten.
 
-## Object storage
+### Object storage
 
 **Recommended: AWS S3.** Impaxia already uses S3 for private attachments, so Cardaxia's AWS account and practices
 apply. Use a **separate bucket** for the Value Office. Cloudflare R2 (`VO_S3_ENDPOINT`, region `auto`) is an
@@ -147,7 +235,7 @@ Minimal IAM policy for the app's key:
 
 The app never deletes objects, and never generates public or pre-signed URLs.
 
-## Previews
+### Previews
 
 Preview deployments must never receive production secrets or the production database. Either:
 
@@ -157,7 +245,9 @@ Preview deployments must never receive production secrets or the production data
 A preview deployment with no `VO_APP_ORIGIN` fails closed at startup, which is intended. Enable Vercel Deployment
 Protection for previews.
 
-## Backups and recovery (requirements; nothing is configured by this repository)
+## Both tiers
+
+### Backups and recovery (requirements; nothing is configured by this repository)
 
 - **PostgreSQL** holds the whole Value Record, including the audit trail and issued-report snapshots.
   - Enable the provider's managed backups with point-in-time recovery. Retention should be at least 14 days; 30 is
@@ -166,14 +256,15 @@ Protection for previews.
   - Restore procedure: restore to a new database, re-create or re-grant `vo_app`, run `npm run db:check-role`,
     then repoint `DATABASE_URL`.
   - Test a restore before relying on it, then periodically.
-- **Object storage** holds the issued PDFs.
+- **Internal tier:** issued PDFs are in PostgreSQL (`report_document`), so the database backups cover them.
+- **Object storage** holds the issued PDFs in the production tier.
   - S3 is designed for very high durability. Keep the bucket private.
   - Optionally enable versioning or replication.
   - If a PDF is lost, the issue record and its immutable snapshot remain in Postgres and are viewable. The PDF can
     be regenerated from the snapshot, but not byte-identically, so its recorded hash would not match.
 - Neither is claimed as configured until Cardaxia has done so.
 
-## Local development
+### Local development
 
 This repository changes nothing about local development: dev identity (`VO_DEV_USER_EMAIL`), local PDF storage
 and Playwright Chromium, as before. To try password sign-in locally:

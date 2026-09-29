@@ -4,6 +4,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { eq } from "drizzle-orm";
+
+import { COMMANDS } from "@/server/commands/names";
+import { runCommand, type Actor } from "@/server/commands/run";
+import { db, schema } from "@/server/db/client";
 import { env } from "@/server/env";
 
 // Content-addressed, immutable storage for issued report PDFs. Keys are
@@ -15,8 +20,8 @@ import { env } from "@/server/env";
 // through the authenticated PDF route, never a raw storage URL.
 
 export interface DocumentStore {
-  /** Store bytes under key unless an object already exists there. */
-  put(key: string, bytes: Uint8Array): Promise<void>;
+  /** Store bytes under key unless an object already exists there (as `actor`, where the store audits writes). */
+  put(key: string, bytes: Uint8Array, actor?: Actor): Promise<void>;
   /** The bytes under key, or null when absent. */
   get(key: string): Promise<Buffer | null>;
 }
@@ -122,6 +127,33 @@ export function s3Store(config: S3Config): DocumentStore {
   };
 }
 
+/**
+ * PostgreSQL store (internal / pilot tier): durable across serverless instances with no extra
+ * infrastructure. Insert-only via reports.storeDocument; the database re-checks the hash.
+ */
+export function databaseStore(): DocumentStore {
+  return {
+    async put(key, bytes, actor) {
+      const hash = checkKey(key);
+      if (!actor) throw new Error("The database report store records who stored each document");
+      await runCommand(COMMANDS.storeReportDocument, actor, async ({ tx }) => {
+        await tx
+          .insert(schema.reportDocument)
+          .values({ key, sha256: hash, content: Buffer.from(bytes), bytes: bytes.byteLength, createdBy: actor.userId })
+          .onConflictDoNothing({ target: schema.reportDocument.key });
+      });
+    },
+    async get(key) {
+      checkKey(key);
+      const [row] = await db()
+        .select({ content: schema.reportDocument.content })
+        .from(schema.reportDocument)
+        .where(eq(schema.reportDocument.key, key));
+      return row ? Buffer.from(row.content) : null;
+    },
+  };
+}
+
 let configured: DocumentStore | undefined;
 
 /** The store selected by configuration (validated by env(): s3 mode fails closed if incomplete). */
@@ -129,17 +161,19 @@ export function documentStore(): DocumentStore {
   if (configured) return configured;
   const e = env();
   configured =
-    e.VO_REPORT_STORAGE === "s3"
-      ? s3Store({
-          bucket: e.VO_S3_BUCKET!,
-          region: e.VO_S3_REGION!,
-          endpoint: e.VO_S3_ENDPOINT,
-          accessKeyId: e.VO_S3_ACCESS_KEY_ID!,
-          secretAccessKey: e.VO_S3_SECRET_ACCESS_KEY!,
-          forcePathStyle: e.VO_S3_FORCE_PATH_STYLE,
-          prefix: e.VO_S3_PREFIX,
-        })
-      : localStore(e.VO_REPORT_STORAGE_DIR ?? path.join(process.cwd(), "storage", "reports"));
+    e.VO_REPORT_STORAGE === "database"
+      ? databaseStore()
+      : e.VO_REPORT_STORAGE === "s3"
+        ? s3Store({
+            bucket: e.VO_S3_BUCKET!,
+            region: e.VO_S3_REGION!,
+            endpoint: e.VO_S3_ENDPOINT,
+            accessKeyId: e.VO_S3_ACCESS_KEY_ID!,
+            secretAccessKey: e.VO_S3_SECRET_ACCESS_KEY!,
+            forcePathStyle: e.VO_S3_FORCE_PATH_STYLE,
+            prefix: e.VO_S3_PREFIX,
+          })
+        : localStore(e.VO_REPORT_STORAGE_DIR ?? path.join(process.cwd(), "storage", "reports"));
   return configured;
 }
 
@@ -151,10 +185,11 @@ export function resetDocumentStore(): void {
 export async function putDocument(
   bytes: Uint8Array,
   store = documentStore(),
+  actor?: Actor,
 ): Promise<{ key: string; sha256: string; bytes: number }> {
   const hash = sha256(bytes);
   const key = `reports/${hash}.pdf`;
-  await store.put(key, bytes);
+  await store.put(key, bytes, actor);
   return { key, sha256: hash, bytes: bytes.byteLength };
 }
 

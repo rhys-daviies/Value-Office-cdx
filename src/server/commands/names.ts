@@ -59,6 +59,7 @@ export const COMMANDS = {
   rejectValueChange: "valueChange.reject", // trigger-checked
   withdrawValueChange: "valueChange.withdraw", // trigger-checked
   issueReport: "reports.issue", // trigger-checked
+  storeReportDocument: "reports.storeDocument", // trigger-checked
   setPassword: "user.setPassword", // trigger-checked
   disableUser: "user.disable", // trigger-checked
   signIn: "auth.signIn", // trigger-checked

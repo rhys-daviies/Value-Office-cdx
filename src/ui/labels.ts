@@ -106,6 +106,7 @@ export const COMMAND_LABELS: Record<string, string> = {
   "valueChange.reject": "Value Change rejected by the VCO",
   "valueChange.withdraw": "Value Change withdrawn",
   "reports.issue": "Report issued",
+  "reports.storeDocument": "Report PDF stored",
   "user.setPassword": "Consultant password set",
   "user.disable": "Consultant sign-in disabled",
   "auth.signIn": "Signed in",
@@ -138,6 +139,7 @@ export const TABLE_AREAS: Record<string, string> = {
   decision: "Decision",
   value_change: "Value Change",
   report_issue: "Reports",
+  report_document: "Reports",
   app_credential: "Access",
   app_session: "Access",
 };
@@ -168,6 +170,7 @@ export const TABLE_LABELS: Record<string, string> = {
   decision: "Client decision",
   value_change: "Value Change",
   report_issue: "Issued report",
+  report_document: "Stored report PDF",
   app_credential: "Sign-in credential",
   app_session: "Session",
 };

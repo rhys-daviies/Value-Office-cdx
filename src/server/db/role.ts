@@ -24,7 +24,7 @@ export async function grantAppRole(db: ClientBase, role: string): Promise<void> 
       `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${r}`,
       // Append-only / insert-only records.
       `REVOKE INSERT, UPDATE, DELETE ON audit_event FROM ${r}`,
-      `REVOKE UPDATE, DELETE ON report_issue FROM ${r}`,
+      `REVOKE UPDATE, DELETE ON report_issue, report_document FROM ${r}`,
       `REVOKE DELETE ON app_session, app_credential FROM ${r}`,
       `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${r}`,
       `REVOKE ALL ON SEQUENCE audit_event_id_seq FROM ${r}`,

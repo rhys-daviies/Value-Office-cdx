@@ -57,10 +57,16 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run test:e2e
-      - name: Production-like deployment smoke test (least-privilege DB role, password auth, S3 storage)
+      - name: Deployment smoke — production tier (least-privilege DB role, password auth, S3 storage)
         run: ./scripts/production-smoke.sh
         env:
           SMOKE_ADMIN_URL: postgres://vo:vo@localhost:5432/postgres
+          SMOKE_MODE: production
+      - name: Deployment smoke — internal / pilot tier (owner DB role, password auth, database storage)
+        run: ./scripts/production-smoke.sh
+        env:
+          SMOKE_ADMIN_URL: postgres://vo:vo@localhost:5432/postgres
+          SMOKE_MODE: internal
       - uses: actions/upload-artifact@v6
         if: failure()
         with:

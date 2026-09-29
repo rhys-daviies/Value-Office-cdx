@@ -18,6 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const consultant = await currentConsultantOrNull();
   const canSignOut = consultant && env().VO_AUTH_MODE === "password";
+  const internal = env().deployment === "internal";
   return (
     <html lang="en" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-slate-50 text-slate-900">
@@ -27,6 +28,15 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               Cardaxia Value Office
             </Link>
             <div className="flex items-center gap-3 text-xs text-slate-500">
+              {internal && (
+                <span
+                  className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900"
+                  title="Internal pilot environment: demo and non-sensitive data only"
+                  data-testid="deployment-internal"
+                >
+                  Internal pilot — no sensitive client data
+                </span>
+              )}
               <span data-testid="actor">{consultant ? `Consultant: ${consultant.email}` : "Not signed in"}</span>
               {canSignOut && (
                 <form method="post" action="/api/auth/sign-out">

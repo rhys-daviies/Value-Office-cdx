@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import nextConfig from "../../next.config";
 import { NextRequest } from "next/server";
@@ -141,5 +141,101 @@ describe("proxy auth-mode resolution", () => {
     const prod = parseEnv(PROD);
     expect(mayBeAuthenticated(req("vo_session=x"), prod)).toBe(false); // production uses the __Host- cookie
     expect(mayBeAuthenticated(req("__Host-vo_session=x"), prod)).toBe(true);
+  });
+});
+
+describe("deployment tiers (VO_DEPLOYMENT_MODE)", () => {
+  const INTERNAL = {
+    NODE_ENV: "production",
+    VO_DEPLOYMENT_MODE: "internal",
+    DATABASE_URL: PROD.DATABASE_URL,
+    VO_SESSION_SECRET: SECRET,
+    VO_REPORT_STORAGE: "database",
+    // Set by Vercel itself:
+    VERCEL: "1",
+    VERCEL_PROJECT_PRODUCTION_URL: "value-office-cdx.vercel.app",
+  } as const;
+
+  it("internal: minimal Vercel configuration, with origin and serverless PDF derived from the platform", () => {
+    const e = parseEnv(INTERNAL);
+    expect(e).toMatchObject({
+      deployment: "internal",
+      VO_AUTH_MODE: "password",
+      VO_APP_ORIGIN: "https://value-office-cdx.vercel.app",
+      VO_PDF_RUNTIME: "serverless",
+      VO_REPORT_STORAGE: "database",
+    });
+  });
+
+  it("internal never enables the development identity and still requires a session secret", () => {
+    expect(problems({ ...INTERNAL, VO_DEV_USER_EMAIL: "dev@cardaxia.ai" })).toEqual([
+      "VO_DEV_USER_EMAIL must not be set in production (no development identity fallback)",
+    ]);
+    expect(problems({ ...INTERNAL, VO_AUTH_MODE: "dev" })).toContain("VO_AUTH_MODE=dev is not allowed in production");
+    expect(problems({ ...INTERNAL, VO_SESSION_SECRET: undefined })[0]).toMatch(/VO_SESSION_SECRET is required/);
+  });
+
+  it("internal refuses non-durable local storage", () => {
+    expect(problems({ ...INTERNAL, VO_REPORT_STORAGE: "local" })[0]).toMatch(/must be database or s3 in internal mode/);
+  });
+
+  it("production tier (explicit or omitted) keeps every Phase 4B requirement", () => {
+    for (const mode of ["production", undefined]) {
+      const base = { ...INTERNAL, VO_DEPLOYMENT_MODE: mode };
+      const p = problems(base);
+      expect(p).toContain(
+        "VO_REPORT_STORAGE=s3 is required in production (local disk is not durable on serverless hosts)",
+      );
+      expect(p).toContain("VO_REPORT_STORAGE=database is only allowed with VO_DEPLOYMENT_MODE=internal");
+      expect(p).toContain("VO_APP_ORIGIN is required in production"); // not derived outside internal
+      expect(p).toContain("VO_PDF_RUNTIME must be set in production (serverless on Vercel, playwright on a Node host)");
+      expect(parseEnv({ ...PROD, VO_DEPLOYMENT_MODE: mode }).deployment).toBe("production");
+    }
+  });
+
+  it("an unknown deployment mode fails closed", () => {
+    expect(problems({ ...PROD, VO_DEPLOYMENT_MODE: "staging" })[0]).toMatch(/^VO_DEPLOYMENT_MODE:/);
+    expect(problems({ ...INTERNAL, VO_DEPLOYMENT_MODE: "Internal" })[0]).toMatch(/^VO_DEPLOYMENT_MODE:/);
+  });
+
+  it("internal keeps authentication required", () => {
+    const e = parseEnv(INTERNAL);
+    const req = new NextRequest("http://localhost/projects");
+    expect(mayBeAuthenticated(req, e)).toBe(false);
+  });
+});
+
+describe("startup by tier", () => {
+  const saved = { ...process.env };
+  afterEach(() => {
+    process.env = { ...saved };
+    resetEnvCache();
+  });
+  const start = (over: Record<string, string>) => {
+    process.env = { ...saved, ...over, NEXT_RUNTIME: "nodejs", DATABASE_URL: saved.DATABASE_URL };
+    delete process.env.VO_DEV_USER_EMAIL;
+    delete process.env.VO_AUTH_MODE;
+    resetEnvCache();
+    return register();
+  };
+
+  it("internal accepts the provider-managed (owner) role that production rejects", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    await expect(
+      start({
+        NODE_ENV: "production",
+        VO_DEPLOYMENT_MODE: "internal",
+        VO_SESSION_SECRET: SECRET,
+        VO_REPORT_STORAGE: "database",
+        VO_APP_ORIGIN: "https://pilot.example.com",
+        VO_PDF_RUNTIME: "serverless",
+      }),
+    ).resolves.toBeUndefined();
+    expect(warn.mock.calls[0]![0]).toMatch(/INTERNAL \/ PILOT deployment — not for sensitive client data/);
+    expect(log.mock.calls.at(-1)![0]).toMatch(/deployment=internal .*db-role=provider-managed/);
+    await expect(start({ ...PROD, VO_DEPLOYMENT_MODE: "production" })).rejects.toThrow(/Unsafe database role/);
+    warn.mockRestore();
+    log.mockRestore();
   });
 });

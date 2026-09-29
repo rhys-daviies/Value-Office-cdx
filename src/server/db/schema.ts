@@ -5,6 +5,7 @@ import {
   boolean,
   char,
   check,
+  customType,
   date,
   foreignKey,
   index,
@@ -1177,6 +1178,35 @@ export const reportIssue = pgTable(
       t.issueNumber,
     ),
     index("report_issue_project_idx").on(t.projectId, t.issuedAt),
+  ],
+);
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => "bytea" });
+
+/**
+ * Issued report PDFs held in PostgreSQL — the durable store for the INTERNAL / PILOT deployment
+ * tier (VO_REPORT_STORAGE=database). Insert-only and content-addressed like the S3 store; the
+ * production tier uses private S3 instead. Audit rows omit the bytes (drizzle/0012).
+ */
+export const reportDocument = pgTable(
+  "report_document",
+  {
+    id: id(),
+    /** reports/<sha256>.pdf */
+    key: text().notNull(),
+    sha256: char({ length: 64 }).notNull(),
+    content: bytea().notNull(),
+    bytes: integer().notNull(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("report_document_key_uq").on(t.key),
+    check("report_document_key_format", sql`${t.key} = 'reports/' || ${t.sha256} || '.pdf'`),
+    check("report_document_sha256_format", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+    check("report_document_bytes", sql`${t.bytes} > 0 and ${t.bytes} = octet_length(${t.content})`),
   ],
 );
 

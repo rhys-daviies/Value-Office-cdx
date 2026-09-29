@@ -42,7 +42,7 @@ export async function issueReport(actor: Actor, input: { type: ReportType; proje
   ).catch((err) => {
     throw err instanceof PdfUnavailableError ? new DomainError("VO_PDF_UNAVAILABLE", err.message) : err;
   });
-  const document = await putDocument(pdf);
+  const document = await putDocument(pdf, undefined, actor);
 
   return issueReportCommand(actor, {
     ...input,

@@ -29,17 +29,18 @@ All configuration is validated in [src/server/env.ts](src/server/env.ts); see [.
 variable. Production fails closed on unsafe or incomplete security configuration (see
 [docs/deployment.md](docs/deployment.md)).
 
-| Variable                                    | Purpose                                                                                   |
-| ------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                              | Application database (production: the least-privilege `vo_app` role)                      |
-| `MIGRATION_DATABASE_URL`, `VO_APP_DB_ROLE`  | Migrations as the owner role, then re-grant the app role (operator machine only)          |
-| `TEST_DATABASE_URL` / `E2E_DATABASE_URL`    | Test / Playwright databases — **reset every run**; names must end in `_test` / `_e2e`     |
-| `VO_AUTH_MODE`                              | `password` (default; only mode in production) or `dev` (local convenience)                |
-| `VO_DEV_USER_EMAIL` / `_NAME`               | Local development identity (implies `dev` mode outside production; refused in production) |
-| `VO_SESSION_SECRET`, `VO_SESSION_TTL_HOURS` | Session-token HMAC key (≥ 32 chars) and lifetime                                          |
-| `VO_APP_ORIGIN`                             | Public origin (required in production)                                                    |
-| `VO_REPORT_STORAGE` + `VO_S3_*`             | `local` (default) or `s3` (private S3-compatible bucket; required in production)          |
-| `VO_PDF_RUNTIME`                            | `playwright` (local Chromium) or `serverless` (`@sparticuz/chromium`, Vercel)             |
+| Variable                                    | Purpose                                                                                                  |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                              | Application database (production: the least-privilege `vo_app` role)                                     |
+| `MIGRATION_DATABASE_URL`, `VO_APP_DB_ROLE`  | Migrations as the owner role, then re-grant the app role (operator machine only)                         |
+| `TEST_DATABASE_URL` / `E2E_DATABASE_URL`    | Test / Playwright databases — **reset every run**; names must end in `_test` / `_e2e`                    |
+| `VO_AUTH_MODE`                              | `password` (default; only mode in production) or `dev` (local convenience)                               |
+| `VO_DEV_USER_EMAIL` / `_NAME`               | Local development identity (implies `dev` mode outside production; refused in production)                |
+| `VO_SESSION_SECRET`, `VO_SESSION_TTL_HOURS` | Session-token HMAC key (≥ 32 chars) and lifetime                                                         |
+| `VO_APP_ORIGIN`                             | Public origin (required in production)                                                                   |
+| `VO_DEPLOYMENT_MODE`                        | Deployed tier: `internal` (pilot, non-sensitive data) or `production` (default; client data)             |
+| `VO_REPORT_STORAGE` + `VO_S3_*`             | `local` (dev/test), `database` (internal tier) or `s3` (private bucket; required in the production tier) |
+| `VO_PDF_RUNTIME`                            | `playwright` (local Chromium) or `serverless` (`@sparticuz/chromium`, Vercel)                            |
 
 ## Sign-in (Phase 4B)
 
@@ -50,8 +51,9 @@ created by an operator:
 npm run user:create -- --email rhys@cardaxia.ai --name "Rhys Davies"   # password prompted, hidden
 ```
 
-Locally, `VO_DEV_USER_EMAIL` keeps the implicit development identity; production never allows it. Deployment,
-database roles, storage and backups: [docs/deployment.md](docs/deployment.md).
+Locally, `VO_DEV_USER_EMAIL` keeps the implicit development identity; deployed servers never allow it.
+Deployment has two explicit tiers: **internal / pilot** (Vercel + Neon, three variables) and **production /
+client data** (restricted DB role, private S3). See [docs/deployment.md](docs/deployment.md).
 
 ## Consultant workflow (Phase 1)
 

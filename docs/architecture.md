@@ -227,7 +227,11 @@ Migrations run as the owner role. The app connects as a non-owner role granted D
 on `report_issue`, no TRUNCATE, and no CREATE on `public`. Not owning the tables, it cannot alter or disable
 triggers.
 
-In production, startup refuses a superuser, table-owner, schema-CREATE, BYPASSRLS or CREATEROLE connection.
+In the production tier (`VO_DEPLOYMENT_MODE=production` or unset), startup refuses a superuser, table-owner,
+schema-CREATE, BYPASSRLS or CREATEROLE connection. The explicit **internal / pilot** tier (`VO_DEPLOYMENT_MODE=internal`)
+accepts a provider-managed owner role (e.g. Neon), logging a warning. It may store PDFs in PostgreSQL
+(`report_document`: insert-only via `reports.storeDocument`, sha256 re-checked by the database, bytes redacted from
+audit). All triggers, auth and immutability are unchanged; see docs/deployment.md.
 Remaining trust boundary: the app role sets `vo.actor_id`/`vo.command` itself. The database guards protect against
 application bugs and misuse, not against a compromised application server.
 Nothing else depends on how identity is established.
