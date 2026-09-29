@@ -113,6 +113,17 @@ export async function buildInformationRequestReport(
 // ---------------------------------------------------------------------------
 // Re-Qualification
 
+/** The authorised version in force, when it is not `versionId`. */
+async function versionInForceIfNot(projectId: string, versionId: string) {
+  const [inForce] = await db()
+    .select()
+    .from(schema.valueCaseVersion)
+    .where(and(eq(schema.valueCaseVersion.projectId, projectId), eq(schema.valueCaseVersion.status, "authorised")));
+  if (!inForce || inForce.id === versionId) return null;
+  const detail = await getVersionDetail(projectId, inForce.versionNumber);
+  return { versionNumber: inForce.versionNumber, title: inForce.title, total: detail!.summary.financialTotal };
+}
+
 export async function buildRequalificationReport(
   projectId: string,
   versionId: string,
@@ -157,6 +168,7 @@ export async function buildRequalificationReport(
         supersededOn: isoDate(version.supersededAt),
       },
       movement: ws.movement,
+      currentVersion: await versionInForceIfNot(projectId, version.id),
       drivers: detail.drivers.map((d) => {
         const inherited = inheritedById.get(d.valueDriverId);
         return {

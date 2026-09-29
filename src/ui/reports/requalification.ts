@@ -35,6 +35,22 @@ export function renderRequalification(m: RequalificationReport, meta: ReportIssu
 
   return html`
     ${reportHeader(m.header, meta, { asAtLabel: "Authorised on", status })}
+    ${
+      a.status === "superseded"
+        ? html`<div class="callout bad" data-testid="rq-superseded">
+            <span class="stamp">Superseded — not current Authorised Value Case</span>
+            <div>
+              This historical report describes the Re-Qualification that established V${a.versionNumber}.
+              V${a.versionNumber} has been superseded by an approved Value
+              Change${
+                m.currentVersion
+                  ? ` — the Authorised Value Case now in force is V${m.currentVersion.versionNumber} (${m.currentVersion.title}) at ${$.plain(m.currentVersion.total)}`
+                  : ""
+              }.
+            </div>
+          </div>`
+        : null
+    }
 
     <section>
       <h2>1. Executive summary</h2>

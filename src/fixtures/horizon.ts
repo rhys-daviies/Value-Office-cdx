@@ -44,6 +44,9 @@ import { db, schema } from "@/server/db/client";
 
 export const PLACEHOLDER = "[FIXTURE PLACEHOLDER]";
 
+/** Canonical VL-001 narrative: no prototype figures in client-facing text (PMO, Phase 4A). */
+export const HORIZON_VL001_DESCRIPTION = `${PLACEHOLDER} Vendor sequencing issue identified in Assurance Review 1. Amounts have not been reliably established: the earlier prototype figures do not reconcile under the clarified Value Leakage definition (Total = Recoverable + Unrecoverable), so no amount is recorded pending PMO confirmation. Affected drivers and AVO not specified.`;
+
 export const HORIZON = {
   originalBusinessCaseValue: "18000000.00",
   authorisedV1Value: "15500000.00",
@@ -235,7 +238,7 @@ export async function seedHorizon(
     reviewId: draftReview.id,
     code: "VL-001",
     title: "Vendor sequencing",
-    description: `${PLACEHOLDER} Vendor sequencing issue identified in Assurance Review 1. Amounts have not been reliably established: the earlier prototype figures do not reconcile under the clarified Value Leakage definition (Total = Recoverable + Unrecoverable), so no amount is recorded pending PMO confirmation. Affected drivers and AVO not specified.`,
+    description: HORIZON_VL001_DESCRIPTION,
     consultantAssessment: `${PLACEHOLDER} Not assessed under the clarified Value Leakage definition.`,
   });
 

@@ -109,6 +109,11 @@ export type RequalificationReport = {
   };
   /** Authorised − inherited (null when the inherited total is not recorded). */
   movement: string | null;
+  /**
+   * The Authorised Value Case in force when this is not V1 (V1 superseded by a Value Change).
+   * Absent from snapshots issued before Phase 4B.
+   */
+  currentVersion?: { versionNumber: number; title: string; total: string } | null;
   drivers: RequalificationDriver[];
   /** Inherited drivers that are not part of the Re-Qualified Value Case. */
   notCarriedForward: { code: string; name: string; financialValue: string | null }[];
