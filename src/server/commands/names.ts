@@ -58,6 +58,7 @@ export const COMMANDS = {
   authoriseValueChange: "valueChange.authorise", // trigger-checked
   rejectValueChange: "valueChange.reject", // trigger-checked
   withdrawValueChange: "valueChange.withdraw", // trigger-checked
+  issueReport: "reports.issue", // trigger-checked
 } as const;
 
 export type CommandName = (typeof COMMANDS)[keyof typeof COMMANDS];

@@ -32,6 +32,7 @@ import {
   KEY_DATE_KINDS,
   PROJECT_STATUSES,
   QUALIFICATION_STATUSES,
+  REPORT_TYPES,
   VERSION_KINDS,
   VERSION_STATUSES,
 } from "@/domain/statuses";
@@ -55,6 +56,7 @@ export const assuranceReviewStatus = pgEnum("assurance_review_status", ASSURANCE
 export const leakageStatus = pgEnum("leakage_status", LEAKAGE_STATUSES);
 export const scenarioKind = pgEnum("scenario_kind", SCENARIO_KINDS);
 export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
+export const reportType = pgEnum("report_type", REPORT_TYPES);
 export const informationRequestStatus = pgEnum("information_request_status", INFORMATION_REQUEST_STATUSES);
 export const informationRequestItemStatus = pgEnum(
   "information_request_item_status",
@@ -870,6 +872,7 @@ export const valueChange = pgTable(
   (t) => [
     unique("value_change_code_uq").on(t.valueCaseId, t.code),
     unique("value_change_to_version_uq").on(t.toVersionId),
+    unique("value_change_id_project_uq").on(t.id, t.projectId),
     foreignKey({
       name: "value_change_case_fk",
       columns: [t.valueCaseId, t.projectId],
@@ -1045,6 +1048,88 @@ export const informationRequestItem = pgTable(
       columns: [t.fulfilledByEvidenceId, t.projectId],
       foreignColumns: [evidence.id, evidence.projectId],
     }),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Issued client reports (Phase 4A). Insert-only: an issue is an immutable snapshot
+// of the report view model at issue time plus a reference to the generated PDF.
+// A later issue of the same subject is a new row with the next issue number.
+
+export const reportIssue = pgTable(
+  "report_issue",
+  {
+    id: id(),
+    projectId: uuid()
+      .notNull()
+      .references(() => project.id),
+    type: reportType().notNull(),
+    // Exactly one subject, matching the type.
+    informationRequestId: uuid(),
+    valueCaseVersionId: uuid(),
+    assuranceReviewId: uuid(),
+    valueChangeId: uuid(),
+    /** The subject's status when issued (e.g. a Value Change Notice issued as proposed). */
+    subjectStatus: text().notNull(),
+    /** 1, 2, … per subject and type. */
+    issueNumber: integer().notNull(),
+    title: text().notNull(),
+    /** The report view model exactly as rendered. */
+    snapshot: jsonb().notNull(),
+    /** sha256 of the canonical JSON of `snapshot`. */
+    snapshotSha256: char({ length: 64 }).notNull(),
+    rendererVersion: text().notNull(),
+    /** Storage key of the generated PDF (content-addressed). */
+    documentKey: text().notNull(),
+    documentSha256: char({ length: 64 }).notNull(),
+    documentBytes: integer().notNull(),
+    issuedBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** Name as printed on the issued document. */
+    issuedByName: text().notNull(),
+    issuedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({
+      name: "report_issue_information_request_fk",
+      columns: [t.informationRequestId, t.projectId],
+      foreignColumns: [informationRequest.id, informationRequest.projectId],
+    }),
+    foreignKey({
+      name: "report_issue_version_fk",
+      columns: [t.valueCaseVersionId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.projectId],
+    }),
+    foreignKey({
+      name: "report_issue_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "report_issue_value_change_fk",
+      columns: [t.valueChangeId, t.projectId],
+      foreignColumns: [valueChange.id, valueChange.projectId],
+    }),
+    check(
+      "report_issue_subject_shape",
+      sql`(${t.type} = 'information_request') = (${t.informationRequestId} is not null)
+        and (${t.type} = 'requalification') = (${t.valueCaseVersionId} is not null)
+        and (${t.type} = 'assurance') = (${t.assuranceReviewId} is not null)
+        and (${t.type} = 'value_change_notice') = (${t.valueChangeId} is not null)`,
+    ),
+    check("report_issue_number_positive", sql`${t.issueNumber} >= 1`),
+    check(
+      "report_issue_hashes",
+      sql`${t.snapshotSha256} ~ '^[0-9a-f]{64}$' and ${t.documentSha256} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("report_issue_document_bytes", sql`${t.documentBytes} > 0`),
+    uniqueIndex("report_issue_subject_number_uq").on(
+      t.type,
+      sql`coalesce(${t.informationRequestId}, ${t.valueCaseVersionId}, ${t.assuranceReviewId}, ${t.valueChangeId})`,
+      t.issueNumber,
+    ),
+    index("report_issue_project_idx").on(t.projectId, t.issuedAt),
   ],
 );
 

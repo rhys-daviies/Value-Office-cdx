@@ -50,6 +50,20 @@
       "when": 1790650910732,
       "tag": "0006_phase3_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790653117004,
+      "tag": "0007_phase4a_report_issue",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790653117510,
+      "tag": "0008_phase4a_report_integrity",
+      "breakpoints": true
     }
   ]
 }

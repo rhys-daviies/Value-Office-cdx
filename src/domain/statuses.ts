@@ -64,3 +64,9 @@ export type ScenarioKind = (typeof SCENARIO_KINDS)[number];
 /** draft ⇄ proposed → authorised | rejected; draft/proposed → withdrawn. */
 export const VALUE_CHANGE_STATUSES = ["draft", "proposed", "authorised", "rejected", "withdrawn"] as const;
 export type ValueChangeStatus = (typeof VALUE_CHANGE_STATUSES)[number];
+
+// Phase 4A: client outputs.
+
+/** Client-facing report types issued from the Value Record. */
+export const REPORT_TYPES = ["information_request", "requalification", "assurance", "value_change_notice"] as const;
+export type ReportType = (typeof REPORT_TYPES)[number];
