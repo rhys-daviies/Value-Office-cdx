@@ -12,6 +12,9 @@ import { isUuid, requireProject } from "@/ui/require";
 
 export const metadata = { title: "Report preview" };
 
+// Issuing (a server action of this page) renders a PDF with Chromium: allow time for a cold start.
+export const maxDuration = 60;
+
 export default async function ReportPreviewPage({
   params,
 }: PageProps<"/projects/[projectId]/reports/[kind]/[subjectId]">) {

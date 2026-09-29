@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "next dev",
@@ -24,9 +24,17 @@
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
     "db:verify": "drizzle-kit check && drizzle-kit generate && git diff --exit-code -- drizzle && test -z \"$(git status --porcelain -- drizzle)\"",
     "db:seed:compact": "tsx --conditions=react-server scripts/seed-compact.ts",
-    "reports:smoke": "tsx --conditions=react-server scripts/report-smoke.ts"
+    "reports:smoke": "tsx --conditions=react-server scripts/report-smoke.ts",
+    "user:create": "tsx --conditions=react-server scripts/user.ts create",
+    "user:set-password": "tsx --conditions=react-server scripts/user.ts set-password",
+    "user:disable": "tsx --conditions=react-server scripts/user.ts disable",
+    "db:check-role": "tsx scripts/db-check-role.ts",
+    "fixture:horizon:align": "tsx --conditions=react-server scripts/fixture-horizon-align.ts",
+    "smoke:deploy": "playwright test --config playwright.deploy.config.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1142.0",
+    "@sparticuz/chromium": "153.0.0",
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.6",
