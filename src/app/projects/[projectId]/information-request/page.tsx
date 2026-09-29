@@ -12,6 +12,7 @@ import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { PlainBadge, RequestItemBadge } from "@/ui/components/badges";
 import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@/ui/components/fields";
 import { ButtonLink, Empty, Expander, Notice, Section } from "@/ui/components/layout";
+import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate } from "@/ui/format";
 import { IR_ITEM_STATUS_LABELS, IR_STATUS_LABELS } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
@@ -79,8 +80,8 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
       }
       actions={
         <div className="flex flex-wrap gap-2">
-          <ButtonLink variant="secondary" href={`/projects/${projectId}/information-request/${request.id}/print`}>
-            Printable view
+          <ButtonLink variant="secondary" href={reportPreviewHref(projectId, "information_request", request.id)}>
+            Report preview
           </ButtonLink>
           {request.status === "draft" && (
             <ActionForm action={issueInformationRequestAction} confirm="Issue this Information Request to the client?">

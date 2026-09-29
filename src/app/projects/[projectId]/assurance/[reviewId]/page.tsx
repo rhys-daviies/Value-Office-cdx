@@ -26,6 +26,7 @@ import {
   TextField,
 } from "@/ui/components/fields";
 import { Empty, KeyValues, Section, Table, TextLink } from "@/ui/components/layout";
+import { reportPreviewHref } from "@/ui/reports/routes";
 import {
   change,
   Figure,
@@ -66,6 +67,8 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
     <>
       <p className="mb-3 text-sm">
         <TextLink href={`${base}/assurance`}>← Value Assurance</TextLink>
+        {" · "}
+        <TextLink href={reportPreviewHref(projectId, "assurance", review.id)}>Value Assurance Report</TextLink>
       </p>
 
       {/* ---- Review header ---------------------------------------------------------- */}

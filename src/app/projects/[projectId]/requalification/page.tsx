@@ -16,6 +16,7 @@ import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, NonFinancialBadge, PlainBadge, QualificationBadge, VersionBadge } from "@/ui/components/badges";
 import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@/ui/components/fields";
 import { Empty, Missing, Notice, Section, Table, TextLink } from "@/ui/components/layout";
+import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
 import { requireProject } from "@/ui/require";
 import { AddDriverForm, DriverEditor, DriverReadOnly, DriverValue } from "@/ui/value-case/drivers";
@@ -50,6 +51,11 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
   return (
     <>
       <StateBanner status={v1?.status ?? null} versionNumber={v1?.versionNumber ?? 1} />
+      {v1 && (
+        <p className="-mt-2 mb-4 text-sm print:hidden">
+          <TextLink href={reportPreviewHref(projectId, "requalification", v1.id)}>Re-Qualification Report</TextLink>
+        </p>
+      )}
 
       {/* ---- Headline comparison -------------------------------------------------- */}
       <div className="mb-6 grid gap-3 sm:grid-cols-3" data-testid="requal-headline">

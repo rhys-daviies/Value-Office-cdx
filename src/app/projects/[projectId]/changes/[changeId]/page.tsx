@@ -19,6 +19,7 @@ import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { PlainBadge, VersionBadge } from "@/ui/components/badges";
 import { DateField, FormGrid, Hidden, MoneyField, SelectField, TextArea, TextField } from "@/ui/components/fields";
 import { KeyValues, Notice, Section, Table, TextLink } from "@/ui/components/layout";
+import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate, formatDateTime, formatMoneyChange, formatMoneyShort, moneyInputValue } from "@/ui/format";
 import { isUuid, requireProject } from "@/ui/require";
 import { AddDriverForm, DriverEditor } from "@/ui/value-case/drivers";
@@ -61,6 +62,8 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
     <>
       <p className="mb-3 text-sm">
         <TextLink href={`${base}/changes`}>← Value Changes</TextLink>
+        {" · "}
+        <TextLink href={reportPreviewHref(projectId, "value_change_notice", change.id)}>Value Change Notice</TextLink>
       </p>
       <div className="mb-6 rounded-lg border-2 border-slate-300 bg-white px-4 py-3" data-testid="change-state">
         <div className="flex flex-wrap items-center gap-2">

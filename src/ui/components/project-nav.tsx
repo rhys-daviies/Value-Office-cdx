@@ -12,6 +12,7 @@ const TABS = [
   { href: "/requalification", label: "Re-Qualification" },
   { href: "/assurance", label: "Assurance" },
   { href: "/changes", label: "Value Changes" },
+  { href: "/reports", label: "Reports" },
   { href: "/history", label: "History" },
 ];
 
