@@ -45,3 +45,6 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /playwright/.cache/
+
+# issued report PDFs (local artefact store; see docs/architecture.md)
+/storage/

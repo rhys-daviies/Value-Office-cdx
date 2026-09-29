@@ -17,7 +17,7 @@ createdb -p 5433 value_office_test
 npm run db:migrate
 npm run db:seed:horizon           # optional: Project Horizon through Authorised V1
 npm run dev                       # http://localhost:3000
-npx playwright install chromium   # once, for e2e tests
+npx playwright install chromium   # once: report PDFs, tests and e2e
 ```
 
 > **This machine:** Homebrew PostgreSQL 16 runs on port **5433**, because a separate EDB PostgreSQL 18
@@ -25,13 +25,15 @@ npx playwright install chromium   # once, for e2e tests
 
 ## Environment variables
 
-| Variable            | Required | Purpose                                                                                  |
-| ------------------- | -------- | ---------------------------------------------------------------------------------------- |
-| `DATABASE_URL`      | yes      | Application database                                                                     |
-| `TEST_DATABASE_URL` | tests    | Test database. **Reset on every test run**; name must end in `_test`                     |
-| `E2E_DATABASE_URL`  | e2e      | Playwright database. **Created if missing and reset every run**; name must end in `_e2e` |
-| `VO_DEV_USER_EMAIL` | dev      | Development identity (consultant). Ignored — and refused — in production builds          |
-| `VO_DEV_USER_NAME`  | no       | Display name for the dev identity                                                        |
+| Variable                 | Required | Purpose                                                                                  |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------- |
+| `DATABASE_URL`           | yes      | Application database                                                                     |
+| `TEST_DATABASE_URL`      | tests    | Test database. **Reset on every test run**; name must end in `_test`                     |
+| `E2E_DATABASE_URL`       | e2e      | Playwright database. **Created if missing and reset every run**; name must end in `_e2e` |
+| `VO_DEV_USER_EMAIL`      | dev      | Development identity (consultant). Ignored — and refused — in production builds          |
+| `VO_DEV_USER_NAME`       | no       | Display name for the dev identity                                                        |
+| `VO_REPORT_STORAGE_DIR`  | no       | Where issued report PDFs are stored (default `./storage/reports`, git-ignored)           |
+| `VO_CHROMIUM_EXECUTABLE` | no       | Chromium used for PDF generation (default: Playwright's installed Chromium)              |
 
 ## Consultant workflow (Phase 1)
 
@@ -58,6 +60,15 @@ draft V<n+1>, the consultant adjusts the affected drivers until they reconcile t
 records the **VCO's authorisation** with evidence — atomically superseding the old version and authorising the new
 one. Changes live under **Value Changes**.
 
+## Client reports (Phase 4A)
+
+**Reports** lists every report subject and every issued report. Four outputs are generated from the Value Record —
+**Information Request**, **Re-Qualification Report** (V1), **Value Assurance Report** (finalised review) and **Value
+Change Notice** (proposed or authorised change). Open a preview (draft, not issued) → review → confirm → **Issue
+report**: the server snapshots the report model, renders it to PDF with Chromium, stores the PDF and records an
+immutable issue (issuer, time, subject, subject status, snapshot and PDF SHA-256). A later issue is a new record.
+Reports also link from the Information Request, Re-Qualification, review and Value Change pages.
+
 > Next.js allows one `next dev` per checkout: stop your own dev server before `npm run test:e2e`.
 
 ## Database and migrations
@@ -81,6 +92,7 @@ one. Changes live under **Value Changes**.
 | `npm run test:e2e`        | Playwright: smoke, Horizon UI acceptance, consultant golden path (own dev server on :3100 against `E2E_DATABASE_URL`) |
 | `npm run db:migrate`      | Apply migrations to `DATABASE_URL`                                                                                    |
 | `npm run db:seed:horizon` | Seed Project Horizon through the public commands (idempotent)                                                         |
+| `npm run reports:smoke`   | Render Horizon's reports to PDF (read-only PDF generation smoke test)                                                 |
 | `npm run verify`          | typecheck + lint + format + tests + build                                                                             |
 
 CI (`.github/workflows/ci.yml`) runs all of the above against a fresh PostgreSQL 16 service.

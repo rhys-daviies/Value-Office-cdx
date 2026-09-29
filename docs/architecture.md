@@ -19,7 +19,7 @@ src/
     queries/        Read models (totals are derived here, never stored).
     db/             Drizzle schema + client.
   fixtures/         Canonical fixtures (Project Horizon), built through commands.
-drizzle/            Migrations (0000 generated schema, 0001 hand-written integrity/audit).
+drizzle/            Migrations (generated schema + hand-written integrity/audit, see each file header).
 tests/              Vitest against real PostgreSQL.  e2e/  Playwright.
 ```
 
@@ -59,11 +59,11 @@ from Zod issue paths or known constraint names (`src/server/actions/errors.ts`).
 
 ## Value Case versioning
 
-| Version | Kind                      | Lifecycle                                           |
-| ------- | ------------------------- | --------------------------------------------------- |
-| V0      | `inherited_business_case` | `draft → recorded` (locked)                         |
-| V1      | `value_case`              | `draft ⇄ proposed → authorised` (locked)            |
-| V2+     | `value_case`              | via approved Value Change — **not yet implemented** |
+| Version | Kind                      | Lifecycle                                      |
+| ------- | ------------------------- | ---------------------------------------------- |
+| V0      | `inherited_business_case` | `draft → recorded` (locked)                    |
+| V1      | `value_case`              | `draft ⇄ proposed → authorised` (locked)       |
+| V2+     | `value_case`              | via its Value Change (see Management response) |
 
 - `value_driver` = stable identity (code, e.g. `VD-01`, unique per Value Case, immutable).
   `value_driver_version` = that driver's content in one version. New versions copy content forward
@@ -138,6 +138,38 @@ value_change          VC code; from = version in force, to = copy-forward draft;
   total to the stated change, then in one transaction: change → authorised, old version → superseded, new version →
   authorised. Rejected/withdrawn changes and their versions are preserved and immutable. One open change at a time.
 - Old reviews keep the version they measured against; new reviews open against the version in force.
+
+## Client reports (Phase 4A)
+
+```
+Value Record → report read model (src/server/queries/reports.ts) → report model (src/domain/reports.ts)
+             → HTML (src/ui/reports, one renderer) → preview page | issued view | Chromium PDF
+             → report_issue (immutable snapshot + PDF reference)
+```
+
+- **One source of figures.** Report builders project the existing read models (`getRequalificationWorkspace`,
+  `getVersionDetail`, `getAssuranceWorkspace`, `getReviewResponse`, `getValueChangeDetail`,
+  `getInformationRequestWorkspace`); they add no calculations. Renderers only format.
+- **One renderer.** Reports are rendered to strings with an escaping `html` template (`src/ui/reports/html.ts`), not
+  React, because Next.js forbids `react-dom/server` in server code; the same string is embedded in the preview, the
+  issued view and the PDF. Styles are one scoped stylesheet (`.vo-report`).
+- **Client language, visible uncertainty.** Unquantified leakage renders "Not yet quantified" (never $0); incomplete
+  forecasts render "Incomplete" with the blocking drivers; unattributed realised value is shown separately; an
+  unreconciled proposed change is stamped NOT RECONCILED / NOT READY FOR AUTHORISATION. Only an issued recommendation
+  appears. Value Gap and Value Leakage are never combined. "Next actions" lists only recorded follow-ups.
+- **Issuing** (`src/server/reports/issue.ts`): build model → render issued HTML → PDF (Playwright/Chromium, JS
+  disabled, network blocked) → store PDF → command `reports.issue`, which rebuilds the snapshot and refuses a stale
+  one (`VO_REPORT_STALE`). `vo_report_issue_guard` (0008): insert only via `reports.issue` by the acting consultant at
+  `now()`; subject must be issuable (IR issued/closed · V1 authorised/superseded · review finalised · change
+  proposed/authorised) and `subject_status` must match it; `issue_number` is the next for that subject; update, delete
+  and truncate are rejected.
+- **Snapshot hash** = sha256 of canonical JSON (keys sorted) of the stored model — stable across environments.
+  The PDF hash identifies the stored artefact; Chromium PDFs are not byte-identical across environments, so
+  regeneration is not expected to reproduce it.
+- **Storage** (`src/server/reports/storage.ts`): local content-addressed files `reports/<sha256>.pdf` under
+  `VO_REPORT_STORAGE_DIR`, verified against the recorded hash on download. **Production step still required:** an
+  object store (S3/R2) implementing the same put/get by key, and Chromium available on the host. If a PDF is missing
+  in an environment, the issued snapshot remains viewable.
 
 ## Money
 

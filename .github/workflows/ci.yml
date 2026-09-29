@@ -48,9 +48,12 @@ jobs:
         run: npm run db:verify
       - name: Seed Horizon fixture through commands
         run: npm run db:seed:horizon
+      # Chromium is needed by Vitest too: issued reports are rendered to PDF server-side.
+      - run: npx playwright install --with-deps chromium
+      - name: PDF generation smoke test (Horizon reports)
+        run: npm run reports:smoke
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
