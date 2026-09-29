@@ -26,6 +26,8 @@ jobs:
     env:
       DATABASE_URL: postgres://vo:vo@localhost:5432/value_office_ci
       TEST_DATABASE_URL: postgres://vo:vo@localhost:5432/value_office_test
+      # Created, reset, migrated and Horizon-seeded by e2e/global-setup.ts
+      E2E_DATABASE_URL: postgres://vo:vo@localhost:5432/value_office_e2e
       VO_DEV_USER_EMAIL: ci@cardaxia.ai
       VO_DEV_USER_NAME: CI Consultant
     steps:
