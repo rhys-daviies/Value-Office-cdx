@@ -40,6 +40,14 @@ npx playwright install chromium   # once, for e2e tests
 (draft V1 against V0, edit drivers, propose, record VCO authorisation) → **Authorised V1**. **History** shows the audit
 trail per command. `/status` is an operational check.
 
+## Value Assurance (Phase 2)
+
+**Assurance** → open a review (trigger, date, optional triggering evidence) against the Authorised Value Case in force
+→ record what changed and link evidence → enter each driver's Current Forecast and cumulative Realised Value with
+rationale → see movement, Value Gap and totals → finalise (immutable). The next review measures movement against the
+latest finalised review. Mandatory cadence (kick-off, Go-Live, six-monthly, material evidence) is derived and shown,
+never scheduled.
+
 > Next.js allows one `next dev` per checkout: stop your own dev server before `npm run test:e2e`.
 
 ## Database and migrations

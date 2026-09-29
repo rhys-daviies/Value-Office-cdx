@@ -87,6 +87,30 @@ from Zod issue paths or known constraint names (`src/server/actions/errors.ts`).
 - Status summaries are counts only — no scores or readiness measures (that would be methodology).
 - No forecast terminology exists in Phase 1.
 
+## Value Assurance
+
+```
+assurance_review  draft → finalised (immutable)   against_version_id = Authorised version in force at opening
+  └ previous_review_id = latest finalised review (null for the first) — one draft at a time keeps the chain linear
+value_position    one per (review, driver): current_forecast, realised_value (cumulative), rationales
+evidence_link     + assurance_review_id target (review-relevant evidence)
+```
+
+- Reviews never write to Value Case tables; Authorised V1 is untouched by Assurance.
+- `vo_assurance_review_guard`: created as draft by the acting consultant; against an authorised version; previous
+  review must be same project, finalised, the latest finalised, and not later-dated; finalisation only via
+  `assurance.finaliseReview`, only changes status/finaliser, and requires a position for every driver in the
+  version (including non-financial). Finalised reviews cannot be updated or deleted.
+- `vo_value_position_guard`: positions only in draft reviews, only for drivers in the review's version.
+- Evidence linked to, or triggering, a finalised review is frozen (`vo_evidence_is_locked`).
+- Calculations (`src/domain/assurance.ts`), derived never stored:
+  Value Gap = Authorised − Current Forecast; first-review movement = forecast − Authorised; later movement =
+  forecast − previous finalised forecast. Project figures sum financial drivers only, and are reported as
+  incomplete (not partially summed) until every financial driver is assessed. Realised totals show coverage.
+- Cadence (`src/domain/assurance-cadence.ts`) derives kick-off / Go-Live from key dates, six-monthly from the latest
+  finalised review date (basis shown), and flags material-change evidence recorded since the latest finalised
+  position that no finalised review has considered.
+
 ## Money
 
 `numeric(18,2)` in the database, decimal strings at boundaries, `decimal.js` for arithmetic
@@ -112,5 +136,6 @@ When added: `src/ai/` produces suggestions into its own table; consultants accep
 
 ## Deliberately not built yet
 
-Assurance reviews, value positions (forecast/realised), gap, leakage, scenarios, recommendations, decisions, Value Changes (V2+),
-reports/PDF, charts, AI, client portal, production auth, binary document storage.
+Value Leakage (recoverable/unrecoverable), scenarios/alternative trajectories, Cardaxia recommendations, client
+decisions, Value Changes (V2+), reports/PDF, charts, AI, automated scheduling/notifications, client portal,
+production auth, binary document storage.
