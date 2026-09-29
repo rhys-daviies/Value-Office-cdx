@@ -4,8 +4,9 @@ import type { AssuranceTrigger } from "./statuses";
 // and material change to evidence. This derives only what existing data supports.
 // Nothing is scheduled, monitored or notified — consultants open reviews manually.
 //
-// Six-monthly cadence is anchored on the latest finalised review date, and the
-// basis is stated alongside the date so no false precision is implied.
+// Six-monthly cadence is anchored on Go-Live (PMO decision): Go-Live + 6k months.
+// Without a Go-Live date it is not derived unless six-month key dates are recorded.
+// The basis is stated alongside each date so no false precision is implied.
 
 export type RequirementStatus = "due" | "in_progress" | "upcoming" | "satisfied" | "unknown";
 
@@ -91,22 +92,46 @@ export function deriveAssuranceRequirements(input: CadenceInput): AssuranceRequi
     });
   }
 
-  // Six-monthly
+  // Six-monthly, anchored on Go-Live: Go-Live + 6, +12, +18 … months. Each
+  // occurrence is computed from the anchor (never chained), so month-end clamping
+  // cannot drift, and a review done early or late does not move later dates.
+  // Finalised six-month reviews satisfy occurrences in order.
   {
-    const latest = finalised.reduce<(typeof finalised)[number] | null>(
-      (best, r) => (best === null || r.sequence > best.sequence ? r : best),
-      null,
-    );
-    const date = latest ? addMonths(latest.reviewDate, 6) : null;
-    out.push({
-      trigger: "six_month",
-      label: "Six-month review",
-      status: draft?.trigger === "six_month" ? "in_progress" : latest === null ? "unknown" : dated(date),
-      date,
-      basis: latest
-        ? `Six months after the latest finalised review (#${latest.sequence}, ${latest.reviewDate})`
-        : "Derived once a first review is finalised",
-    });
+    const goLive = keyDate("go_live");
+    const done = finalised.filter((r) => r.trigger === "six_month").length;
+    const inProgress = draft?.trigger === "six_month";
+    const explicit = input.keyDates
+      .filter((k) => k.kind === "six_month_review")
+      .map((k) => k.date)
+      .sort();
+    if (goLive) {
+      const occurrence = done + 1;
+      const date = addMonths(goLive, 6 * occurrence);
+      out.push({
+        trigger: "six_month",
+        label: "Six-month review",
+        status: inProgress ? "in_progress" : dated(date),
+        date,
+        basis: `Go-Live (${goLive}) + ${6 * occurrence} months; ${done} six-month review${done === 1 ? "" : "s"} finalised`,
+      });
+    } else if (explicit.length > 0) {
+      const date = explicit[done] ?? null;
+      out.push({
+        trigger: "six_month",
+        label: "Six-month review",
+        status: inProgress ? "in_progress" : date === null ? "satisfied" : dated(date),
+        date,
+        basis: "Recorded six-month review key date (no Go-Live date recorded)",
+      });
+    } else {
+      out.push({
+        trigger: "six_month",
+        label: "Six-month review",
+        status: inProgress ? "in_progress" : "unknown",
+        date: null,
+        basis: "Record the Go-Live date in Setup to derive the six-monthly cadence",
+      });
+    }
   }
 
   // Material evidence change

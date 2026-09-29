@@ -37,6 +37,7 @@ const values = (rows: readonly PositionRow[]): PositionValues[] =>
     valueDriverId: p.valueDriverId,
     currentForecast: p.currentForecast,
     realisedValue: p.realisedValue,
+    forecastNotAssessed: p.forecastNotAssessed,
   }));
 
 async function listReviews(projectId: string): Promise<ReviewRow[]> {
@@ -81,6 +82,7 @@ export async function getAssuranceReviewList(projectId: string): Promise<ReviewL
       bases.get(review.againstVersionId)!,
       values(await positionsOf(review.id)),
       await priorFor(review, reviews),
+      { unattributedRealised: review.unattributedRealisedValue },
     );
     out.push({ review, againstVersionNumber: (await versionLabel(review.againstVersionId)).versionNumber, totals });
   }
@@ -112,7 +114,9 @@ export async function getAssuranceWorkspace(projectId: string, reviewId: string)
 
   const prior = await priorFor(review, all);
   const positions = await positionsOf(review.id);
-  const { rows, totals } = computeValuePosition(await driverBasis(review.againstVersionId), values(positions), prior);
+  const { rows, totals } = computeValuePosition(await driverBasis(review.againstVersionId), values(positions), prior, {
+    unattributedRealised: review.unattributedRealisedValue,
+  });
   const byDriver = new Map(positions.map((p) => [p.valueDriverId, p]));
   const previous = prior.kind === "review" ? all.find((r) => r.id === prior.reviewId)! : null;
   const previousPositions = previous

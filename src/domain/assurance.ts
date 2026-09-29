@@ -13,6 +13,8 @@ import type { EvidenceStatus, QualificationStatus } from "./statuses";
 // otherwise it is null ("incomplete") rather than a misleading partial sum.
 // Realised Value is the exception: it is cumulative-to-date and may legitimately
 // be assessed for only some drivers, so its sum is reported with a coverage count.
+// Project Realised Value = attributed per-driver realised + review-level
+// unattributed realised (an explicitly labelled aggregate never assigned to a driver).
 
 export type DriverBasis = {
   valueDriverId: string;
@@ -28,6 +30,8 @@ export type PositionValues = {
   valueDriverId: string;
   currentForecast: string | null;
   realisedValue: string | null;
+  /** Explicit "Not Assessed" (with rationale) rather than a blank forecast. */
+  forecastNotAssessed?: boolean;
 };
 
 /** What movement is measured against. */
@@ -37,6 +41,7 @@ export type PriorPosition =
 export type DriverPositionRow = DriverBasis & {
   financial: boolean;
   hasPosition: boolean;
+  forecastNotAssessed: boolean;
   /** Authorised Value (first review) or the previous review's forecast (later reviews). */
   previousForecast: string | null;
   currentForecast: string | null;
@@ -52,9 +57,16 @@ export type PositionTotals = {
   forecastAssessed: number;
   forecastTotal: string | null;
   realisedAssessed: number;
+  /** Sum of per-driver realised values (null when none is assessed). */
+  realisedAttributedTotal: string | null;
+  /** Review-level realised value not attributed to any driver (null when none). */
+  unattributedRealised: string | null;
+  /** Attributed + unattributed (null when neither exists). */
   realisedTotal: string | null;
   valueGap: string | null;
   movement: string | null;
+  /** Financial drivers that prevent a complete project forecast (blank or Not Assessed). */
+  forecastBlockers: { code: string; name: string; notAssessed: boolean }[];
 };
 
 const diff = (a: string, b: string) => toDbMoney(money(a).minus(money(b)));
@@ -63,6 +75,7 @@ export function computeValuePosition(
   drivers: readonly DriverBasis[],
   positions: readonly PositionValues[],
   prior: PriorPosition,
+  opts: { unattributedRealised?: string | null } = {},
 ): { rows: DriverPositionRow[]; totals: PositionTotals } {
   const rows = drivers.map((d): DriverPositionRow => {
     const p = positions.find((x) => x.valueDriverId === d.valueDriverId);
@@ -76,6 +89,7 @@ export function computeValuePosition(
       ...d,
       financial,
       hasPosition: Boolean(p),
+      forecastNotAssessed: p?.forecastNotAssessed ?? false,
       previousForecast,
       currentForecast,
       realisedValue: p?.realisedValue ?? null,
@@ -94,6 +108,10 @@ export function computeValuePosition(
   const forecastTotal = allDefined((r) => r.currentForecast);
   const authorisedTotal = toDbMoney(sumMoney(financialRows.map((r) => r.authorisedValue!)));
   const realised = financialRows.flatMap((r) => (r.realisedValue === null ? [] : [r.realisedValue]));
+  const attributed = realised.length > 0 ? toDbMoney(sumMoney(realised)) : null;
+  const unattributed = opts.unattributedRealised ?? null;
+  const realisedTotal =
+    attributed === null && unattributed === null ? null : toDbMoney(sumMoney([attributed ?? "0", unattributed ?? "0"]));
 
   return {
     rows,
@@ -104,9 +122,14 @@ export function computeValuePosition(
       forecastAssessed: financialRows.filter((r) => r.currentForecast !== null).length,
       forecastTotal,
       realisedAssessed: realised.length,
-      realisedTotal: realised.length > 0 ? toDbMoney(sumMoney(realised)) : null,
+      realisedAttributedTotal: attributed,
+      unattributedRealised: unattributed,
+      realisedTotal,
       valueGap: forecastTotal === null ? null : diff(authorisedTotal, forecastTotal),
       movement: allDefined((r) => r.movement),
+      forecastBlockers: financialRows
+        .filter((r) => r.currentForecast === null)
+        .map((r) => ({ code: r.code, name: r.name, notAssessed: r.forecastNotAssessed })),
     },
   };
 }

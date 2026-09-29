@@ -54,15 +54,45 @@ describe("deriveAssuranceRequirements", () => {
     });
   });
 
-  it("six-monthly is anchored on the latest finalised review and states its basis", () => {
-    expect(find(base, "six_month")?.status).toBe("unknown");
-    const r = find({ ...base, reviews: [review({ reviewDate: "2026-03-10" })] }, "six_month");
-    expect(r).toMatchObject({ status: "due", date: "2026-09-10" });
-    expect(r?.basis).toMatch(/Six months after the latest finalised review \(#1, 2026-03-10\)/);
-    expect(find({ ...base, reviews: [review({})] }, "six_month")).toMatchObject({
-      status: "upcoming",
-      date: "2027-03-15",
-    });
+  it("six-monthly is anchored on Go-Live: +6, then +12 months", () => {
+    const withGoLive = { ...base, keyDates: [{ kind: "go_live", date: "2026-03-10" }] };
+    expect(find(withGoLive, "six_month")).toMatchObject({ status: "due", date: "2026-09-10" });
+    expect(find(withGoLive, "six_month")?.basis).toMatch(/Go-Live \(2026-03-10\) \+ 6 months/);
+    const oneDone = { ...withGoLive, reviews: [review({ trigger: "six_month", reviewDate: "2026-09-10" })] };
+    expect(find(oneDone, "six_month")).toMatchObject({ status: "upcoming", date: "2027-03-10" });
+  });
+
+  it("handles month ends from the anchor without drifting", () => {
+    const keyDates = [{ kind: "go_live", date: "2026-08-31" }];
+    expect(find({ ...base, today: "2026-01-01", keyDates }, "six_month")?.date).toBe("2027-02-28");
+    const one = review({ trigger: "six_month", reviewDate: "2027-02-28" });
+    // +12 from the anchor is 31 Aug — not 28 Aug, which chaining from 28 Feb would give.
+    expect(find({ ...base, today: "2026-01-01", keyDates, reviews: [one] }, "six_month")?.date).toBe("2027-08-31");
+  });
+
+  it("a late or early review does not move the next scheduled occurrence", () => {
+    const keyDates = [{ kind: "go_live", date: "2026-01-31" }];
+    const late = review({ trigger: "six_month", reviewDate: "2026-09-15" }); // due 2026-07-31
+    expect(find({ ...base, keyDates, reviews: [late] }, "six_month")?.date).toBe("2027-01-31");
+    const early = review({ trigger: "six_month", reviewDate: "2026-06-01" });
+    expect(find({ ...base, keyDates, reviews: [early] }, "six_month")?.date).toBe("2027-01-31");
+    // Ad-hoc reviews are separate and do not satisfy the six-monthly cadence.
+    const adHoc = review({ trigger: "ad_hoc", reviewDate: "2026-07-31" });
+    expect(find({ ...base, keyDates, reviews: [adHoc] }, "six_month")?.date).toBe("2026-07-31");
+  });
+
+  it("does not invent a six-monthly date without Go-Live, unless six-month key dates are recorded", () => {
+    expect(find(base, "six_month")).toMatchObject({ status: "unknown", date: null });
+    const explicit = {
+      ...base,
+      keyDates: [
+        { kind: "six_month_review", date: "2026-09-30" },
+        { kind: "six_month_review", date: "2027-03-31" },
+      ],
+    };
+    expect(find(explicit, "six_month")).toMatchObject({ status: "due", date: "2026-09-30" });
+    const oneDone = { ...explicit, reviews: [review({ trigger: "six_month" })] };
+    expect(find(oneDone, "six_month")).toMatchObject({ status: "upcoming", date: "2027-03-31" });
   });
 
   it("flags material-change evidence recorded since the latest finalised position and not yet reviewed", () => {

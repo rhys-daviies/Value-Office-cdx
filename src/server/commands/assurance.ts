@@ -128,6 +128,8 @@ export const updateReview = defineCommand(
     whatChanged: clearableText,
     whyItMatters: clearableText,
     summary: clearableText,
+    unattributedRealisedValue: clearableMoney,
+    unattributedRealisedRationale: clearableText,
   }),
   async ({ tx }, { reviewId, ...fields }) => {
     const review = await getReview(tx, reviewId);
@@ -145,6 +147,8 @@ const positionInput = z.object({
   valueDriverId: uuid,
   currentForecast: clearableMoney,
   realisedValue: clearableMoney,
+  /** Explicit "Not Assessed": clears the forecast and requires a rationale. */
+  forecastNotAssessed: z.boolean().optional(),
   forecastRationale: clearableText,
   realisedValueRationale: clearableText,
 });
@@ -165,6 +169,12 @@ export const upsertValuePositions = defineCommand(
     }
     const rows = [];
     for (const { valueDriverId, ...values } of input.positions) {
+      if (values.forecastNotAssessed && values.currentForecast) {
+        throw new DomainError("VO_INVALID_INPUT", "A driver cannot have both a Current Forecast and Not Assessed", {
+          issues: [{ path: `forecast__${valueDriverId}`, message: "Clear the forecast or untick Not Assessed" }],
+        });
+      }
+      if (values.forecastNotAssessed) values.currentForecast = null;
       const changes = Object.fromEntries(Object.entries(values).filter(([, v]) => v !== undefined));
       const [row] = await tx
         .insert(schema.valuePosition)
