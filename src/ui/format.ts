@@ -34,6 +34,22 @@ export function formatMoney(value: string | null | undefined, currency: string):
   return `${d.isNegative() ? "-" : ""}${currencySymbol(currency)}${groupThousands(int!)}.${frac}`;
 }
 
+/** Report table amount: $4,800,000 (cents only when present: $1,250.50). */
+export function formatMoneyPlain(value: string | null | undefined, currency: string): string {
+  if (value === null || value === undefined) return "—";
+  const d = new Decimal(value);
+  const [int, frac] = d.abs().toFixed(2).split(".");
+  const cents = frac === "00" ? "" : `.${frac}`;
+  return `${d.isNegative() ? "-" : ""}${currencySymbol(currency)}${groupThousands(int!)}${cents}`;
+}
+
+/** Signed report table amount: +$200,000 / -$600,000. */
+export function formatMoneyPlainChange(value: string | null | undefined, currency: string): string {
+  if (value === null || value === undefined) return "—";
+  const d = new Decimal(value);
+  return `${d.isPositive() && !d.isZero() ? "+" : ""}${formatMoneyPlain(value, currency)}`;
+}
+
 /** Headline amount in millions: $15.5m, -$0.4m. Falls back to thousands below $100k. */
 export function formatMoneyShort(value: string | null | undefined, currency: string): string {
   if (value === null || value === undefined) return "—";

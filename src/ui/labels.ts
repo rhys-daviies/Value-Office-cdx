@@ -105,6 +105,7 @@ export const COMMAND_LABELS: Record<string, string> = {
   "valueChange.authorise": "Value Change authorised by the VCO",
   "valueChange.reject": "Value Change rejected by the VCO",
   "valueChange.withdraw": "Value Change withdrawn",
+  "reports.issue": "Report issued",
 };
 
 export const TABLE_AREAS: Record<string, string> = {
@@ -132,6 +133,7 @@ export const TABLE_AREAS: Record<string, string> = {
   recommendation: "Recommendation",
   decision: "Decision",
   value_change: "Value Change",
+  report_issue: "Reports",
 };
 
 export const TABLE_LABELS: Record<string, string> = {
@@ -159,6 +161,7 @@ export const TABLE_LABELS: Record<string, string> = {
   recommendation: "Recommendation",
   decision: "Client decision",
   value_change: "Value Change",
+  report_issue: "Issued report",
 };
 export const SCENARIO_KIND_LABELS = {
   current: "Current trajectory",

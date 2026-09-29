@@ -23,13 +23,15 @@
     "db:seed:horizon": "tsx --conditions=react-server scripts/seed-horizon.ts",
     "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test && npm run build",
     "db:verify": "drizzle-kit check && drizzle-kit generate && git diff --exit-code -- drizzle && test -z \"$(git status --porcelain -- drizzle)\"",
-    "db:seed:compact": "tsx --conditions=react-server scripts/seed-compact.ts"
+    "db:seed:compact": "tsx --conditions=react-server scripts/seed-compact.ts",
+    "reports:smoke": "tsx --conditions=react-server scripts/report-smoke.ts"
   },
   "dependencies": {
     "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.45.3",
     "next": "16.3.6",
     "pg": "^8.23.0",
+    "playwright-core": "^1.63.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
