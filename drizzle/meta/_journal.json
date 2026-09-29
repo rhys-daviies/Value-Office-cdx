@@ -64,6 +64,20 @@
       "when": 1790653117510,
       "tag": "0008_phase4a_report_integrity",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790667413482,
+      "tag": "0009_phase4b_auth",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790667413974,
+      "tag": "0010_phase4b_auth_integrity",
+      "breakpoints": true
     }
   ]
 }

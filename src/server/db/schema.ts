@@ -82,6 +82,53 @@ export const appUser = pgTable(
   (t) => [uniqueIndex("app_user_email_lower_uq").on(sql`lower(${t.email})`)],
 );
 
+// Sign-in (Phase 4B). Secrets are never audited in clear: the audit trigger on these
+// tables redacts password_hash and token_hash (drizzle/0010).
+
+/** A consultant's password credential. One per user; disabled users cannot sign in. */
+export const appCredential = pgTable(
+  "app_credential",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    /** scrypt$N$r$p$salt$hash (base64url). Never plaintext. */
+    passwordHash: text().notNull(),
+    passwordSetAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    disabledAt: timestamp({ withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("app_credential_user_uq").on(t.userId),
+    check(
+      "app_credential_hash_format",
+      sql`${t.passwordHash} ~ '^scrypt[$][0-9]+[$][0-9]+[$][0-9]+[$][A-Za-z0-9_-]+[$][A-Za-z0-9_-]+$'`,
+    ),
+  ],
+);
+
+/** A signed-in session. The cookie carries a random token; only its keyed hash is stored. */
+export const appSession = pgTable(
+  "app_session",
+  {
+    id: id(),
+    userId: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    tokenHash: char({ length: 64 }).notNull(),
+    createdAt: createdAt(),
+    expiresAt: timestamp({ withTimezone: true }).notNull(),
+    revokedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    unique("app_session_token_uq").on(t.tokenHash),
+    index("app_session_user_idx").on(t.userId),
+    check("app_session_token_format", sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+    check("app_session_expiry_after_creation", sql`${t.expiresAt} > ${t.createdAt}`),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Client / project
 
