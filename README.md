@@ -25,15 +25,33 @@ npx playwright install chromium   # once: report PDFs, tests and e2e
 
 ## Environment variables
 
-| Variable                 | Required | Purpose                                                                                  |
-| ------------------------ | -------- | ---------------------------------------------------------------------------------------- |
-| `DATABASE_URL`           | yes      | Application database                                                                     |
-| `TEST_DATABASE_URL`      | tests    | Test database. **Reset on every test run**; name must end in `_test`                     |
-| `E2E_DATABASE_URL`       | e2e      | Playwright database. **Created if missing and reset every run**; name must end in `_e2e` |
-| `VO_DEV_USER_EMAIL`      | dev      | Development identity (consultant). Ignored — and refused — in production builds          |
-| `VO_DEV_USER_NAME`       | no       | Display name for the dev identity                                                        |
-| `VO_REPORT_STORAGE_DIR`  | no       | Where issued report PDFs are stored (default `./storage/reports`, git-ignored)           |
-| `VO_CHROMIUM_EXECUTABLE` | no       | Chromium used for PDF generation (default: Playwright's installed Chromium)              |
+All configuration is validated in [src/server/env.ts](src/server/env.ts); see [.env.example](.env.example) for every
+variable. Production fails closed on unsafe or incomplete security configuration (see
+[docs/deployment.md](docs/deployment.md)).
+
+| Variable                                    | Purpose                                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                              | Application database (production: the least-privilege `vo_app` role)                      |
+| `MIGRATION_DATABASE_URL`, `VO_APP_DB_ROLE`  | Migrations as the owner role, then re-grant the app role (operator machine only)          |
+| `TEST_DATABASE_URL` / `E2E_DATABASE_URL`    | Test / Playwright databases — **reset every run**; names must end in `_test` / `_e2e`     |
+| `VO_AUTH_MODE`                              | `password` (default; only mode in production) or `dev` (local convenience)                |
+| `VO_DEV_USER_EMAIL` / `_NAME`               | Local development identity (implies `dev` mode outside production; refused in production) |
+| `VO_SESSION_SECRET`, `VO_SESSION_TTL_HOURS` | Session-token HMAC key (≥ 32 chars) and lifetime                                          |
+| `VO_APP_ORIGIN`                             | Public origin (required in production)                                                    |
+| `VO_REPORT_STORAGE` + `VO_S3_*`             | `local` (default) or `s3` (private S3-compatible bucket; required in production)          |
+| `VO_PDF_RUNTIME`                            | `playwright` (local Chromium) or `serverless` (`@sparticuz/chromium`, Vercel)             |
+
+## Sign-in (Phase 4B)
+
+Consultants sign in with email + password at `/sign-in` (no public sign-up, no client accounts). Accounts are
+created by an operator:
+
+```bash
+npm run user:create -- --email rhys@cardaxia.ai --name "Rhys Davies"   # password prompted, hidden
+```
+
+Locally, `VO_DEV_USER_EMAIL` keeps the implicit development identity; production never allows it. Deployment,
+database roles, storage and backups: [docs/deployment.md](docs/deployment.md).
 
 ## Consultant workflow (Phase 1)
 
@@ -81,18 +99,23 @@ Reports also link from the Information Request, Re-Qualification, review and Val
 
 ## Scripts
 
-| Script                    | What it does                                                                                                          |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev`             | Dev server                                                                                                            |
-| `npm run build` / `start` | Production build / serve                                                                                              |
-| `npm run typecheck`       | Route typegen + `tsc --noEmit`                                                                                        |
-| `npm run lint`            | ESLint, including architecture-boundary rules                                                                         |
-| `npm run format[:check]`  | Prettier                                                                                                              |
-| `npm test`                | Vitest: domain + database invariant tests against `TEST_DATABASE_URL`                                                 |
-| `npm run test:e2e`        | Playwright: smoke, Horizon UI acceptance, consultant golden path (own dev server on :3100 against `E2E_DATABASE_URL`) |
-| `npm run db:migrate`      | Apply migrations to `DATABASE_URL`                                                                                    |
-| `npm run db:seed:horizon` | Seed Project Horizon through the public commands (idempotent)                                                         |
-| `npm run reports:smoke`   | Render Horizon's reports to PDF (read-only PDF generation smoke test)                                                 |
-| `npm run verify`          | typecheck + lint + format + tests + build                                                                             |
+| Script                                                       | What it does                                                                                                          |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                                                | Dev server                                                                                                            |
+| `npm run build` / `start`                                    | Production build / serve                                                                                              |
+| `npm run typecheck`                                          | Route typegen + `tsc --noEmit`                                                                                        |
+| `npm run lint`                                               | ESLint, including architecture-boundary rules                                                                         |
+| `npm run format[:check]`                                     | Prettier                                                                                                              |
+| `npm test`                                                   | Vitest: domain + database invariant tests against `TEST_DATABASE_URL`                                                 |
+| `npm run test:e2e`                                           | Playwright: smoke, Horizon UI acceptance, consultant golden path (own dev server on :3100 against `E2E_DATABASE_URL`) |
+| `npm run db:migrate`                                         | Apply migrations to `DATABASE_URL`                                                                                    |
+| `npm run db:seed:horizon`                                    | Seed Project Horizon through the public commands (idempotent)                                                         |
+| `npm run reports:smoke`                                      | Render Horizon's reports to PDF (read-only PDF generation smoke test)                                                 |
+| `npm run user:create` / `user:set-password` / `user:disable` | Operator account management (password prompted or `--password-stdin`)                                                 |
+| `npm run db:check-role`                                      | Verify `DATABASE_URL` is a least-privilege application role                                                           |
+| `npm run smoke:deploy`                                       | Deployment smoke test against `SMOKE_BASE_URL` (see docs/deployment.md)                                               |
+| `scripts/production-smoke.sh`                                | CI: production-like server (app role, password auth, fake S3) + deployment smoke                                      |
+| `npm run fixture:horizon:align -- --confirm`                 | Dev only: align an older Horizon fixture's VL-001 narrative with the canonical seed                                   |
+| `npm run verify`                                             | typecheck + lint + format + tests + build                                                                             |
 
 CI (`.github/workflows/ci.yml`) runs all of the above against a fresh PostgreSQL 16 service.

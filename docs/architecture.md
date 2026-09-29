@@ -166,20 +166,70 @@ Value Record → report read model (src/server/queries/reports.ts) → report mo
 - **Snapshot hash** = sha256 of canonical JSON (keys sorted) of the stored model — stable across environments.
   The PDF hash identifies the stored artefact; Chromium PDFs are not byte-identical across environments, so
   regeneration is not expected to reproduce it.
-- **Storage** (`src/server/reports/storage.ts`): local content-addressed files `reports/<sha256>.pdf` under
-  `VO_REPORT_STORAGE_DIR`, verified against the recorded hash on download. **Production step still required:** an
-  object store (S3/R2) implementing the same put/get by key, and Chromium available on the host. If a PDF is missing
-  in an environment, the issued snapshot remains viewable.
+- **Storage** (`src/server/reports/storage.ts`): `DocumentStore` put/get by content-addressed key
+  `reports/<sha256>.pdf`.
+  - Adapters: `local` (`VO_REPORT_STORAGE_DIR`; development/test) and `s3` (any private S3-compatible bucket;
+    required in production).
+  - S3 writes use `If-None-Match: *`, so objects are never overwritten, and no ACL (objects stay private).
+  - Every read is verified against the issue's recorded hash. PDFs are reachable only through the authenticated
+    route.
+  - If a PDF is missing, the issued snapshot remains viewable.
+- **PDF runtime** (`VO_PDF_RUNTIME`): `playwright` (installed Chromium) or `serverless` (`@sparticuz/chromium`,
+  Linux x64, same Chromium major as `playwright-core`; traced only into the report issue route).
+- **Superseded V1:** a Re-Qualification Report previewed or issued after V1 was superseded carries a
+  "Superseded — not current Authorised Value Case" stamp naming the version in force. Earlier issues are never
+  rewritten.
 
 ## Money
 
 `numeric(18,2)` in the database, decimal strings at boundaries, `decimal.js` for arithmetic
 (`src/domain/money.ts`). JavaScript numbers are never used for money.
 
-## Authentication
+## Authentication and web security (Phase 4B)
 
-Development only: the actor is `VO_DEV_USER_EMAIL`, auto-provisioned as an `app_user`. Production builds refuse
-to resolve an actor until a real identity provider (Auth.js + Entra/Google) replaces `getCurrentActor()`.
+- **Seam:** `getCurrentActor()` (`src/server/auth/actor.ts`) is the only place identity is established; SSO can
+  replace password sessions there later. `app_user` remains the consultant identity.
+- **Password mode** (default; the only mode in production): `app_credential` holds an scrypt hash
+  (N=2¹⁵, r=8, p=1, per-user salt, parameters in the hash; constant-time verify; a dummy hash equalises timing
+  for unknown accounts). Sign-in (`POST /api/auth/sign-in`, same-origin only) opens an `app_session`: the cookie
+  carries 32 random bytes, and the database stores `HMAC-SHA256(VO_SESSION_SECRET, token)`. The cookie is
+  `__Host-vo_session` in production: HttpOnly, Secure, SameSite=Lax, Path=/, expiring with the session
+  (`VO_SESSION_TTL_HOURS`, default 12). Sign-out revokes the session server-side. Disabling an account revokes all
+  its sessions. Credentials and sessions change only via `user.setPassword` / `user.disable` / `auth.signIn` /
+  `auth.signOut` (trigger-checked, never deleted). Their audit rows redact `password_hash` and `token_hash`.
+- **Dev mode:** `VO_DEV_USER_EMAIL`, implicit, for local development only. Refused by production configuration
+  validation and again at resolution time.
+- **Enforcement in depth:**
+  1. `src/proxy.ts` redirects pages without a session cookie to `/sign-in`, and answers 401 to other requests.
+     This is an optimistic check.
+  2. Every page calls `requireConsultant()` (directly or via `requireProject`), every server action runs
+     `perform()` → `getCurrentActor()`, and the PDF route checks the session. Each of these verifies against the
+     database.
+  3. `tests/auth/boundaries.test.ts` fails if any page, route or action skips this.
+- **CSRF:** server actions carry Next.js's Origin/Host check. The auth routes require a matching `Origin`. Cookies
+  are SameSite=Lax. Redirect targets are same-site paths only.
+- **Headers:** a per-request nonce CSP (`script-src 'self' 'nonce-…' 'strict-dynamic'`, `frame-ancestors 'none'`,
+  `object-src 'none'`, `form-action 'self'`). `style-src` allows inline styles for the report renderer. Also
+  X-Frame-Options DENY, nosniff, Referrer-Policy same-origin, COOP, Permissions-Policy, noindex, HSTS (production)
+  and `Cache-Control: private, no-store` (dynamic pages, PDFs, health).
+- **Sensitive output:**
+  - `/api/health` returns only `{status, database}`;
+  - `/status` is for signed-in consultants only;
+  - configuration errors name variables, never values;
+  - storage errors omit credentials;
+  - production error pages show Next's digest only.
+
+## Production database role
+
+Migrations run as the owner role. The app connects as a non-owner role granted DML only
+(`src/server/db/role.ts`; re-granted after every migration when `VO_APP_DB_ROLE` is set). The audit functions are
+`SECURITY DEFINER`, so the app role has no direct write access to `audit_event`. It also has no UPDATE or DELETE
+on `report_issue`, no TRUNCATE, and no CREATE on `public`. Not owning the tables, it cannot alter or disable
+triggers.
+
+In production, startup refuses a superuser, table-owner, schema-CREATE, BYPASSRLS or CREATEROLE connection.
+Remaining trust boundary: the app role sets `vo.actor_id`/`vo.command` itself. The database guards protect against
+application bugs and misuse, not against a compromised application server.
 Nothing else depends on how identity is established.
 
 ## Documents
