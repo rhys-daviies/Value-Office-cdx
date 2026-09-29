@@ -46,7 +46,17 @@ trail per command. `/status` is an operational check.
 → record what changed and link evidence → enter each driver's Current Forecast and cumulative Realised Value with
 rationale → see movement, Value Gap and totals → finalise (immutable). The next review measures movement against the
 latest finalised review. Mandatory cadence (kick-off, Go-Live, six-monthly, material evidence) is derived and shown,
-never scheduled.
+never scheduled (six-monthly is anchored on Go-Live).
+
+## Management response and Value Change (Phase 3)
+
+In a review: identify **Value Leakage** (Total = Recoverable + Unrecoverable; recoverable until evidence shows loss) →
+enter **options / alternative trajectories** (consultant-entered totals) → draft and **issue Cardaxia's
+recommendation** (then options freeze) → record the **client / AVO decision** (client-elected difference is
+derived) → if the Authorised Value Case must change, prepare a **Value Change**: it copies the version in force into a
+draft V<n+1>, the consultant adjusts the affected drivers until they reconcile to the stated change, proposes it, and
+records the **VCO's authorisation** with evidence — atomically superseding the old version and authorising the new
+one. Changes live under **Value Changes**.
 
 > Next.js allows one `next dev` per checkout: stop your own dev server before `npm run test:e2e`.
 

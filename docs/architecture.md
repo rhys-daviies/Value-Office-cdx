@@ -107,9 +107,37 @@ evidence_link     + assurance_review_id target (review-relevant evidence)
   Value Gap = Authorised − Current Forecast; first-review movement = forecast − Authorised; later movement =
   forecast − previous finalised forecast. Project figures sum financial drivers only, and are reported as
   incomplete (not partially summed) until every financial driver is assessed. Realised totals show coverage.
-- Cadence (`src/domain/assurance-cadence.ts`) derives kick-off / Go-Live from key dates, six-monthly from the latest
-  finalised review date (basis shown), and flags material-change evidence recorded since the latest finalised
-  position that no finalised review has considered.
+- **Unattributed realised value** (`assurance_review.unattributed_realised_value` + required rationale): realised value
+  known at project level but not attributable to drivers. Project Realised = attributed per-driver + unattributed.
+  It never belongs to any driver.
+- **Finalisation coverage:** every financial driver needs a Current Forecast or an explicit, reasoned
+  `forecast_not_assessed`; any Not Assessed makes the project forecast and Value Gap Incomplete.
+- Cadence (`src/domain/assurance-cadence.ts`) derives kick-off / Go-Live from key dates; **six-monthly is anchored on
+  Go-Live** (Go-Live + 6k months, computed from the anchor; finalised six-month reviews satisfy occurrences in order,
+  so early/late reviews never shift the schedule); without Go-Live only recorded six-month key dates count. Material-
+  change evidence recorded since the latest finalised position and not yet reviewed is flagged.
+
+## Management response (Phase 3)
+
+```
+value_leakage         register item: code, issue, AVO response owner, status, identified_in_review
+  ├ value_leakage_driver   affected drivers (same Value Case)
+  └ leakage_assessment     per review: total ≥ 0, 0 ≤ unrecoverable ≤ total; recoverable derived
+scenario              per review: label, kind (current|recommended|alternative|no_action), consultant-entered total
+recommendation        1 per review → the recommended scenario; immutable once issued (options freeze with it)
+decision              1 per review → selected scenario, decision maker, date, evidence; immutable; needs an issued recommendation
+value_change          VC code; from = version in force, to = copy-forward draft; stated change; review/decision origin
+```
+
+- Leakage and Value Gap are independent; nothing reconciles one to the other. Unrecoverable > 0 requires a rationale
+  and is validated by the acting consultant (trigger-checked). Assessments lock with their review.
+- Client-elected difference = selected − recommended (derived); the recommendation is never rewritten.
+- **Value Change → V2+** (`vo_value_change_guard`, extended `vo_value_case_version_guard`): versions after the first
+  authorised one are created, proposed, returned, authorised, rejected and withdrawn only in lock-step with their
+  Value Change. Authorisation (VCO only, evidence, not future-dated) must reconcile the proposed drivers' financial
+  total to the stated change, then in one transaction: change → authorised, old version → superseded, new version →
+  authorised. Rejected/withdrawn changes and their versions are preserved and immutable. One open change at a time.
+- Old reviews keep the version they measured against; new reviews open against the version in force.
 
 ## Money
 
