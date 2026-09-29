@@ -15,6 +15,13 @@
       "when": 1790642866840,
       "tag": "0001_integrity_and_audit",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790646494300,
+      "tag": "0002_fix_evidence_lock_parameter",
+      "breakpoints": true
     }
   ]
 }
