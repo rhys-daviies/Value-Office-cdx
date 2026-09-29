@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vo
+          POSTGRES_PASSWORD: vo
+          POSTGRES_DB: value_office_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vo" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://vo:vo@localhost:5432/value_office_ci
+      TEST_DATABASE_URL: postgres://vo:vo@localhost:5432/value_office_test
+      VO_DEV_USER_EMAIL: ci@cardaxia.ai
+      VO_DEV_USER_NAME: CI Consultant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Create test database
+        run: PGPASSWORD=vo psql -h localhost -U vo -d value_office_ci -c "create database value_office_test"
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run format:check
+      - name: Migrations apply to a fresh database
+        run: npm run db:migrate
+      - name: No schema drift between schema.ts and migrations
+        run: npm run db:verify
+      - name: Seed Horizon fixture through commands
+        run: npm run db:seed:horizon
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
