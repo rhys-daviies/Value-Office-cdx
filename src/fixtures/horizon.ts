@@ -228,14 +228,14 @@ export async function seedHorizon(
     unattributedRealisedRationale: `${PLACEHOLDER} $2.8m realised is known only at project level; no reliable per-driver attribution is available.`,
   });
 
-  // Value Leakage: vendor sequencing. The prototype figures do not reconcile under
-  // Total = Recoverable + Unrecoverable, so no assessment amounts are recorded (PMO decision).
-  const p = HORIZON.response.prototypeLeakage;
+  // Value Leakage: vendor sequencing. The prototype figures (HORIZON.response.prototypeLeakage)
+  // do not reconcile under Total = Recoverable + Unrecoverable, so no assessment amounts are
+  // recorded (PMO decision) and the figures are kept out of client-facing text.
   await createLeakage(actor, {
     reviewId: draftReview.id,
     code: "VL-001",
     title: "Vendor sequencing",
-    description: `${PLACEHOLDER} Old-prototype figures: exposure $${p.exposure}, "leakage to date" $${p.leakageToDate}, "still recoverable" $${p.stillRecoverable}. These do not reconcile under Total VL = Recoverable + Unrecoverable (0.25 + 0.30 ≠ 0.70), so no assessment is recorded pending PMO confirmation. Affected drivers and AVO not specified.`,
+    description: `${PLACEHOLDER} Vendor sequencing issue identified in Assurance Review 1. Amounts have not been reliably established: the earlier prototype figures do not reconcile under the clarified Value Leakage definition (Total = Recoverable + Unrecoverable), so no amount is recorded pending PMO confirmation. Affected drivers and AVO not specified.`,
     consultantAssessment: `${PLACEHOLDER} Not assessed under the clarified Value Leakage definition.`,
   });
 

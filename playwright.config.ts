@@ -28,6 +28,7 @@ export default defineConfig({
       DATABASE_URL: e2eDatabaseUrl(),
       VO_DEV_USER_EMAIL: "e2e.consultant@cardaxia.ai",
       VO_DEV_USER_NAME: "E2E Consultant",
+      VO_REPORT_STORAGE_DIR: "test-results/e2e-report-storage",
     },
   },
 });

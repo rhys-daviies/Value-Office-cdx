@@ -20,7 +20,11 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     globalSetup: ["tests/support/global-setup.ts"],
-    env: { DATABASE_URL: testDatabaseUrl, NODE_ENV: "test" },
+    env: {
+      DATABASE_URL: testDatabaseUrl,
+      NODE_ENV: "test",
+      VO_REPORT_STORAGE_DIR: path.resolve(import.meta.dirname, "test-results/report-storage"),
+    },
     testTimeout: 20_000,
     hookTimeout: 60_000,
   },
