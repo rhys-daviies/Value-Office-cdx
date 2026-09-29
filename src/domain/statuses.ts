@@ -31,3 +31,12 @@ export const PROJECT_STATUSES = ["active", "archived"] as const;
 export const INFORMATION_REQUEST_STATUSES = ["draft", "issued", "closed"] as const;
 
 export const INFORMATION_REQUEST_ITEM_STATUSES = ["open", "partially_received", "received", "not_available"] as const;
+
+// Value Assurance (PMO-approved, Phase 2).
+
+export const ASSURANCE_TRIGGERS = ["kickoff", "go_live", "six_month", "material_evidence_change", "ad_hoc"] as const;
+export type AssuranceTrigger = (typeof ASSURANCE_TRIGGERS)[number];
+
+/** draft – editable · finalised – immutable; corrections require a new review. */
+export const ASSURANCE_REVIEW_STATUSES = ["draft", "finalised"] as const;
+export type AssuranceReviewStatus = (typeof ASSURANCE_REVIEW_STATUSES)[number];

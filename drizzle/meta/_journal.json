@@ -22,6 +22,20 @@
       "when": 1790646494300,
       "tag": "0002_fix_evidence_lock_parameter",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790648757270,
+      "tag": "0003_assurance_schema",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790648801455,
+      "tag": "0004_assurance_integrity",
+      "breakpoints": true
     }
   ]
 }

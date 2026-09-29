@@ -21,6 +21,8 @@ import {
 } from "drizzle-orm/pg-core";
 
 import {
+  ASSURANCE_REVIEW_STATUSES,
+  ASSURANCE_TRIGGERS,
   EVIDENCE_STATUSES,
   INFORMATION_REQUEST_ITEM_STATUSES,
   INFORMATION_REQUEST_STATUSES,
@@ -45,6 +47,8 @@ export const versionKind = pgEnum("version_kind", VERSION_KINDS);
 export const versionStatus = pgEnum("version_status", VERSION_STATUSES);
 export const keyDateKind = pgEnum("key_date_kind", KEY_DATE_KINDS);
 export const projectStatus = pgEnum("project_status", PROJECT_STATUSES);
+export const assuranceTrigger = pgEnum("assurance_trigger", ASSURANCE_TRIGGERS);
+export const assuranceReviewStatus = pgEnum("assurance_review_status", ASSURANCE_REVIEW_STATUSES);
 export const informationRequestStatus = pgEnum("information_request_status", INFORMATION_REQUEST_STATUSES);
 export const informationRequestItemStatus = pgEnum(
   "information_request_item_status",
@@ -471,9 +475,116 @@ export const assumption = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Value Assurance
+//
+// A review is a dated Value Position taken against the Authorised Value Case
+// version in force when it was opened. Forecasts and realised values live here,
+// never in the Value Case version. Gap and movement are derived, not stored.
+
+export const assuranceReview = pgTable(
+  "assurance_review",
+  {
+    id: id(),
+    projectId: uuid().notNull(),
+    valueCaseId: uuid().notNull(),
+    sequence: integer().notNull(),
+    trigger: assuranceTrigger().notNull(),
+    triggerEvidenceId: uuid(),
+    /** The exact Authorised Value Case version this position is measured against. */
+    againstVersionId: uuid().notNull(),
+    /** The latest finalised review when this one was opened; null for the first review. */
+    previousReviewId: uuid(),
+    reviewDate: date().notNull(),
+    status: assuranceReviewStatus().notNull().default("draft"),
+    whatChanged: text(),
+    whyItMatters: text(),
+    summary: text(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+    finalisedBy: uuid().references(() => appUser.id),
+    finalisedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    unique("assurance_review_sequence_uq").on(t.projectId, t.sequence),
+    unique("assurance_review_id_project_uq").on(t.id, t.projectId),
+    unique("assurance_review_id_case_uq").on(t.id, t.valueCaseId),
+    foreignKey({
+      name: "assurance_review_case_fk",
+      columns: [t.valueCaseId, t.projectId],
+      foreignColumns: [valueCase.id, valueCase.projectId],
+    }),
+    foreignKey({
+      name: "assurance_review_version_fk",
+      columns: [t.againstVersionId, t.valueCaseId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.valueCaseId, valueCaseVersion.projectId],
+    }),
+    foreignKey({
+      name: "assurance_review_previous_fk",
+      columns: [t.previousReviewId, t.projectId],
+      foreignColumns: [t.id, t.projectId],
+    }),
+    foreignKey({
+      name: "assurance_review_trigger_evidence_fk",
+      columns: [t.triggerEvidenceId, t.projectId],
+      foreignColumns: [evidence.id, evidence.projectId],
+    }),
+    // One draft at a time keeps the chain of positions linear (each review's
+    // previous position is unambiguous).
+    uniqueIndex("assurance_review_one_draft_uq")
+      .on(t.projectId)
+      .where(sql`${t.status} = 'draft'`),
+    check("assurance_review_sequence_positive", sql`${t.sequence} >= 1`),
+    check("assurance_review_not_self_previous", sql`${t.previousReviewId} is distinct from ${t.id}`),
+    check(
+      "assurance_review_finalised_shape",
+      sql`(${t.status} = 'finalised') = (${t.finalisedBy} is not null and ${t.finalisedAt} is not null)`,
+    ),
+  ],
+);
+
+/** One row per Value Driver per review. Financial values are on the project's Value Basis. */
+export const valuePosition = pgTable(
+  "value_position",
+  {
+    id: id(),
+    assuranceReviewId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    valueCaseId: uuid().notNull(),
+    valueDriverId: uuid().notNull(),
+    /** Consultant's current expected financial outcome. May be negative; null = not assessed / non-financial. */
+    currentForecast: moneyCol(),
+    /** Cumulative realised value to the review date. Null = not yet assessed. */
+    realisedValue: moneyCol(),
+    forecastRationale: text(),
+    realisedValueRationale: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("value_position_driver_uq").on(t.assuranceReviewId, t.valueDriverId),
+    foreignKey({
+      name: "value_position_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "value_position_review_case_fk",
+      columns: [t.assuranceReviewId, t.valueCaseId],
+      foreignColumns: [assuranceReview.id, assuranceReview.valueCaseId],
+    }),
+    foreignKey({
+      name: "value_position_driver_fk",
+      columns: [t.valueDriverId, t.valueCaseId],
+      foreignColumns: [valueDriver.id, valueDriver.valueCaseId],
+    }),
+  ],
+);
+
 /**
- * Links evidence to exactly one target. Phase 1 targets: driver version or assumption.
- * Later phases add further nullable target columns (e.g. assurance review) and extend the check.
+ * Links evidence to exactly one target: a driver version, an assumption, or an
+ * Assurance Review (evidence relevant to that review's value position).
  */
 export const evidenceLink = pgTable(
   "evidence_link",
@@ -483,6 +594,7 @@ export const evidenceLink = pgTable(
     projectId: uuid().notNull(),
     valueDriverVersionId: uuid(),
     assumptionId: uuid(),
+    assuranceReviewId: uuid(),
     relevanceNote: text(),
     createdAt: createdAt(),
   },
@@ -502,13 +614,24 @@ export const evidenceLink = pgTable(
       columns: [t.assumptionId, t.projectId],
       foreignColumns: [assumption.id, assumption.projectId],
     }).onDelete("cascade"),
-    check("evidence_link_exactly_one_target", sql`num_nonnulls(${t.valueDriverVersionId}, ${t.assumptionId}) = 1`),
+    foreignKey({
+      name: "evidence_link_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }).onDelete("cascade"),
+    check(
+      "evidence_link_exactly_one_target",
+      sql`num_nonnulls(${t.valueDriverVersionId}, ${t.assumptionId}, ${t.assuranceReviewId}) = 1`,
+    ),
     uniqueIndex("evidence_link_driver_version_uq")
       .on(t.evidenceId, t.valueDriverVersionId)
       .where(sql`${t.valueDriverVersionId} is not null`),
     uniqueIndex("evidence_link_assumption_uq")
       .on(t.evidenceId, t.assumptionId)
       .where(sql`${t.assumptionId} is not null`),
+    uniqueIndex("evidence_link_review_uq")
+      .on(t.evidenceId, t.assuranceReviewId)
+      .where(sql`${t.assuranceReviewId} is not null`),
   ],
 );
 
