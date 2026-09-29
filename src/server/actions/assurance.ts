@@ -12,7 +12,7 @@ import {
   upsertValuePositions,
 } from "@/server/commands/assurance";
 
-import { clear, moneyField, opt, required } from "./form";
+import { bool, clear, moneyField, opt, required } from "./form";
 import { perform } from "./perform";
 import type { ActionState } from "./state";
 
@@ -49,6 +49,10 @@ export async function updateReviewAction(_prev: ActionState, fd: FormData): Prom
       whatChanged: clear(fd, "whatChanged"),
       whyItMatters: clear(fd, "whyItMatters"),
       summary: clear(fd, "summary"),
+      unattributedRealisedValue: fd.has("unattributedRealisedValue")
+        ? moneyField(fd, "unattributedRealisedValue", "update")
+        : undefined,
+      unattributedRealisedRationale: clear(fd, "unattributedRealisedRationale"),
     });
     return "Review saved";
   });
@@ -65,6 +69,7 @@ export async function saveValuePositionsAction(_prev: ActionState, fd: FormData)
       reviewId: required(fd, "reviewId"),
       positions: driverIds.map((id) => ({
         valueDriverId: id,
+        forecastNotAssessed: fd.has(`forecast__${id}`) ? bool(fd, `notAssessed__${id}`) : undefined,
         currentForecast: moneyField(fd, `forecast__${id}`, "update"),
         realisedValue: moneyField(fd, `realised__${id}`, "update"),
         forecastRationale: clear(fd, `forecastRationale__${id}`),

@@ -222,8 +222,8 @@ export type ComparisonRow = {
 export async function getRequalificationWorkspace(projectId: string) {
   const versions = await listVersions(projectId);
   const inheritedVersion = versions.find((v) => v.kind === "inherited_business_case") ?? null;
-  // Phase 1 has at most one Value Case version (V1): the latest is the one being re-qualified.
-  const requalifiedVersion = versions.filter((v) => v.kind === "value_case").at(-1) ?? null;
+  // Re-Qualification is always V1; later versions come from Value Changes.
+  const requalifiedVersion = versions.find((v) => v.kind === "value_case" && v.versionNumber === 1) ?? null;
 
   const inheritedDrivers = inheritedVersion ? await loadVersionDrivers(inheritedVersion.id) : [];
   const requalifiedDrivers = requalifiedVersion ? await loadVersionDrivers(requalifiedVersion.id) : [];

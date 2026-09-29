@@ -31,7 +31,11 @@ export async function listProjects() {
   return projects.map(({ project, clientName }) => ({
     ...project,
     clientName,
-    latestVersion: versions.filter((v) => v.projectId === project.id).at(-1) ?? null,
+    // The version in force if there is one (a later proposed V2 does not replace it), else the latest.
+    latestVersion:
+      versions.find((v) => v.projectId === project.id && v.status === "authorised") ??
+      versions.filter((v) => v.projectId === project.id).at(-1) ??
+      null,
     kickoffDate: dates.find((d) => d.projectId === project.id && d.kind === "kickoff")?.date ?? null,
     goLiveDate: dates.find((d) => d.projectId === project.id && d.kind === "go_live")?.date ?? null,
   }));
@@ -104,7 +108,8 @@ export async function getProjectOverview(projectId: string) {
 
   const timeline = await getValueCaseTimeline(projectId);
   const inherited = timeline.find((t) => t.version.kind === "inherited_business_case") ?? null;
-  const requalified = timeline.filter((t) => t.version.kind === "value_case").at(-1) ?? null;
+  // The Re-Qualified Value Case is V1; later versions are Value Changes (shown in Assurance / Changes).
+  const requalified = timeline.find((t) => t.version.kind === "value_case" && t.version.versionNumber === 1) ?? null;
 
   return {
     header,

@@ -14,6 +14,8 @@ export function versionTone(kind: VersionKind, status: VersionStatus): string {
     authorised: "bg-emerald-50 text-emerald-800 ring-emerald-300",
     superseded: "bg-slate-50 text-slate-500 ring-slate-200",
     recorded: "bg-slate-100 text-slate-700 ring-slate-300",
+    rejected: "bg-red-50 text-red-700 ring-red-200",
+    withdrawn: "bg-slate-50 text-slate-500 ring-slate-200",
   }[status];
 }
 
@@ -26,6 +28,8 @@ export function versionBorder(kind: VersionKind, status: VersionStatus): string 
     authorised: "border-emerald-400",
     superseded: "border-slate-200",
     recorded: "border-slate-300",
+    rejected: "border-red-200",
+    withdrawn: "border-slate-200",
   }[status];
 }
 
@@ -49,6 +53,8 @@ export function VersionBadge({
           authorised: `V${versionNumber} · Authorised`,
           superseded: `V${versionNumber} · Superseded`,
           recorded: `V${versionNumber}`,
+          rejected: `V${versionNumber} · Rejected`,
+          withdrawn: `V${versionNumber} · Withdrawn`,
         }[status];
   return (
     <span className={`${base} ${versionTone(kind, status)}`} data-testid="version-badge">

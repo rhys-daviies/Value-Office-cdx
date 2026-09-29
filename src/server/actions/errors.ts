@@ -49,6 +49,31 @@ const CONSTRAINTS: Record<string, Explanation> = {
     message: "Trigger evidence must belong to this project.",
   },
   evidence_link_review_uq: { field: "evidenceId", message: "That evidence is already linked to this review." },
+  value_leakage_code_uq: { field: "code", message: "A leakage item with this code already exists in this project." },
+  value_leakage_owner_fk: {
+    field: "responseOwnerPersonId",
+    message: "The response owner must be a stakeholder on this project.",
+  },
+  value_leakage_driver_driver_fk: { field: "driverIds", message: "Affected drivers must belong to this Value Case." },
+  leakage_assessment_unrecoverable_range: {
+    field: "unrecoverableAmount",
+    message: "Unrecoverable must be between zero and the total leakage.",
+  },
+  leakage_assessment_total_non_negative: { field: "totalAmount", message: "Total leakage cannot be negative." },
+  scenario_one_current_uq: { field: "kind", message: "This review already has a Current trajectory scenario." },
+  scenario_one_recommended_uq: { field: "kind", message: "This review already has a Recommended scenario." },
+  decision_review_uq: { message: "A client decision has already been recorded for this review." },
+  decision_decided_by_fk: {
+    field: "decidedByPersonId",
+    message: "The decision maker must be a stakeholder on this project.",
+  },
+  value_change_code_uq: { field: "code", message: "A Value Change with this code already exists." },
+  value_change_one_open_uq: { message: "Another Value Change is still open — authorise, reject or withdraw it first." },
+  value_change_proposed_shape: { field: "reason", message: "Record the reason for the change before proposing it." },
+  value_change_authorised_shape: {
+    field: "authorisationEvidenceId",
+    message: "Authorisation needs the VCO, a date and supporting evidence.",
+  },
   value_case_version_authorised_shape: {
     field: "authorisationEvidenceId",
     message: "Authorisation needs the VCO, a date and supporting evidence.",

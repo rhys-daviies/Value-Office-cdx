@@ -42,6 +42,11 @@ export function recordName(change: AuditRow): string {
       return `Review #${r.sequence}`;
     case "value_position":
       return "Value Position";
+    case "value_leakage":
+    case "value_change":
+      return `${r.code} ${r.title ?? ""}`.trim();
+    case "scenario":
+      return String(r.label ?? "");
     default:
       return String(r.name ?? r.title ?? r.code ?? "");
   }

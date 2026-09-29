@@ -1,5 +1,6 @@
 import { getNextAssuranceRequirement, getValuePositionSummary } from "@/server/queries/assurance";
 import { getProjectOverview } from "@/server/queries/projects";
+import { getResponseSummary } from "@/server/queries/response";
 import {
   change,
   Figure,
@@ -26,10 +27,11 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STA
 export default async function ProjectOverviewPage({ params }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
   await requireProject(projectId);
-  const [o, position, cadence] = await Promise.all([
+  const [o, position, cadence, response] = await Promise.all([
     getProjectOverview(projectId).then((x) => x!),
     getValuePositionSummary(projectId),
     getNextAssuranceRequirement(projectId),
+    getResponseSummary(projectId),
   ]);
   const { project, clientName, valueBasisLocked } = o.header;
   const base = `/projects/${projectId}`;
@@ -89,7 +91,68 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
               testId="overview-gap"
             />
           </div>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3" data-testid="overview-leakage">
+            <Figure
+              label={`Open Value Leakage (${response.openLeakageCount})`}
+              value={
+                response.leakage.total === null
+                  ? response.openLeakageCount
+                    ? NOT_ASSESSED
+                    : "None"
+                  : formatMoneyShort(response.leakage.total, currency)
+              }
+              note={
+                response.openLeakageCount
+                  ? `${response.leakage.assessedCount} of ${response.openLeakageCount} assessed in a finalised review`
+                  : "Independent of Value Gap"
+              }
+              testId="overview-leakage-total"
+            />
+            <Figure
+              label="Recoverable VL"
+              value={
+                response.leakage.recoverable === null ? "—" : formatMoneyShort(response.leakage.recoverable, currency)
+              }
+              testId="overview-leakage-recoverable"
+            />
+            <Figure
+              label="Unrecoverable VL"
+              value={
+                response.leakage.unrecoverable === null
+                  ? "—"
+                  : formatMoneyShort(response.leakage.unrecoverable, currency)
+              }
+              testId="overview-leakage-unrecoverable"
+            />
+          </div>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <p data-testid="overview-authorised-version">
+              <span className="text-slate-500">Authorised Value Case in force: </span>
+              <TextLink href={`${base}/value-case/v/${position.authorised.versionNumber}`}>
+                V{position.authorised.versionNumber}
+              </TextLink>
+              {response.openChange && (
+                <>
+                  {" "}
+                  · open change{" "}
+                  <TextLink href={`${base}/changes/${response.openChange.id}`}>
+                    {response.openChange.code} ({response.openChange.status})
+                  </TextLink>
+                </>
+              )}
+            </p>
+            <p data-testid="overview-recommendation">
+              <span className="text-slate-500">Latest Cardaxia recommendation: </span>
+              {response.recommendation
+                ? `${response.recommendation.scenario.label} ${formatMoneyShort(response.recommendation.scenario.totalValue, currency)} (Review #${response.recommendation.review.sequence})`
+                : "None issued"}
+            </p>
+            <p data-testid="overview-decision">
+              <span className="text-slate-500">Latest client decision: </span>
+              {response.decision
+                ? `${response.decision.scenario.label} ${formatMoneyShort(response.decision.scenario.totalValue, currency)}${response.decision.difference ? ` (${change(response.decision.difference, currency)} vs recommendation)` : ""}`
+                : "None recorded"}
+            </p>
             <p>
               <span className="text-slate-500">Last Assurance Review: </span>
               {position.reviews.length === 0 ? (

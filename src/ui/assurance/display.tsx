@@ -34,10 +34,10 @@ export function forecastHeadline(t: PositionTotals, currency: string): { value: 
 
 export function realisedHeadline(t: PositionTotals, currency: string): { value: string; note: string } {
   if (t.realisedTotal === null) return { value: NOT_ASSESSED, note: coverage(0, t.financialDriverCount) };
-  return {
-    value: formatMoneyShort(t.realisedTotal, currency),
-    note: coverage(t.realisedAssessed, t.financialDriverCount),
-  };
+  const parts = [`${coverage(t.realisedAssessed, t.financialDriverCount)}`];
+  if (t.unattributedRealised !== null)
+    parts.push(`incl. ${formatMoneyShort(t.unattributedRealised, currency)} unattributed`);
+  return { value: formatMoneyShort(t.realisedTotal, currency), note: parts.join(" · ") };
 }
 
 export function RequirementBadge({ status }: { status: RequirementStatus }) {

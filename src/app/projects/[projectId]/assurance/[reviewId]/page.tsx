@@ -9,9 +9,22 @@ import {
   updateReviewAction,
 } from "@/server/actions/assurance";
 import { getAssuranceWorkspace, listReviewEvidenceOptions, type AssuranceWorkspace } from "@/server/queries/assurance";
+import { listDriverOptions } from "@/server/queries/information-request";
+import { listStakeholders } from "@/server/queries/mobilise";
+import { getReviewResponse } from "@/server/queries/response";
+import { ReviewResponse } from "@/ui/assurance/response";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, NonFinancialBadge, PlainBadge, QualificationBadge } from "@/ui/components/badges";
-import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@/ui/components/fields";
+import {
+  Checkbox,
+  DateField,
+  FormGrid,
+  Hidden,
+  MoneyField,
+  SelectField,
+  TextArea,
+  TextField,
+} from "@/ui/components/fields";
 import { Empty, KeyValues, Section, Table, TextLink } from "@/ui/components/layout";
 import {
   change,
@@ -44,7 +57,10 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
     : `Authorised Value V${ws.againstVersion.versionNumber} — first review`;
   const forecast = forecastHeadline(totals, currency);
   const realised = realisedHeadline(totals, currency);
-  const financialWithoutForecast = totals.financialDriverCount - totals.forecastAssessed;
+  const blankForecasts = totals.forecastBlockers.filter((b) => !b.notAssessed);
+  const notAssessed = totals.forecastBlockers.filter((b) => b.notAssessed);
+  const response = await getReviewResponse(projectId, review.id);
+  const [stakeholders, driverOptions] = await Promise.all([listStakeholders(projectId), listDriverOptions(projectId)]);
 
   return (
     <>
@@ -229,7 +245,7 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             testId="review-forecast"
             emphasis
           />
-          <Figure label="Realised Value" value={realised.value} note={realised.note} testId="review-realised" />
+          <Figure label="Realised Value (total)" value={realised.value} note={realised.note} testId="review-realised" />
           <Figure label="Value Gap" value={headline(totals.valueGap, currency, "Incomplete")} testId="review-gap" />
           <Figure
             label="Movement"
@@ -242,7 +258,88 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             testId="review-movement"
           />
         </div>
+        {totals.forecastBlockers.length > 0 && (
+          <div
+            className="mt-3 rounded border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900"
+            data-testid="forecast-blockers"
+          >
+            Project Current Forecast and Value Gap are incomplete because of:{" "}
+            {totals.forecastBlockers
+              .map((b) => `${b.code} ${b.name} (${b.notAssessed ? "Not Assessed" : "blank"})`)
+              .join(", ")}
+          </div>
+        )}
+
+        <div className="mt-4 grid gap-3 text-sm sm:grid-cols-3" data-testid="realised-breakdown">
+          <div className="rounded border border-slate-200 p-3">
+            <p className="text-xs text-slate-500">Attributed Realised Value</p>
+            <p className="text-lg font-semibold" data-testid="realised-attributed">
+              {totals.realisedAttributedTotal === null
+                ? "None attributed"
+                : formatMoneyShort(totals.realisedAttributedTotal, currency)}
+            </p>
+            <p className="text-xs text-slate-500">
+              Sum of per-driver realised values ({totals.realisedAssessed} of {totals.financialDriverCount} drivers)
+            </p>
+          </div>
+          <div className="rounded border border-violet-200 bg-violet-50 p-3">
+            <p className="text-xs text-violet-800">Unattributed Realised Value</p>
+            <p className="text-lg font-semibold text-violet-900" data-testid="realised-unattributed">
+              {totals.unattributedRealised === null ? "None" : formatMoneyShort(totals.unattributedRealised, currency)}
+            </p>
+            <p className="text-xs text-violet-800">Known at project level; not yet attributed to any Value Driver</p>
+            {review.unattributedRealisedRationale && !draft && (
+              <p className="mt-1 text-xs text-violet-900" data-testid="unattributed-rationale">
+                {review.unattributedRealisedRationale}
+              </p>
+            )}
+          </div>
+          <div className="rounded border border-slate-300 p-3">
+            <p className="text-xs text-slate-500">Total Realised Value</p>
+            <p className="text-lg font-semibold" data-testid="realised-total">
+              {realised.value}
+            </p>
+            <p className="text-xs text-slate-500">Attributed + unattributed</p>
+          </div>
+        </div>
+        {draft && (
+          <div className="mt-3">
+            <ActionForm action={updateReviewAction} testId="unattributed-form">
+              <Hidden name="projectId" value={projectId} />
+              <Hidden name="reviewId" value={review.id} />
+              <FormGrid>
+                <MoneyField
+                  name="unattributedRealisedValue"
+                  label="Unattributed realised value"
+                  currency={currency}
+                  defaultValue={moneyInputValue(review.unattributedRealisedValue)}
+                  hint="Only for realised value known at project level that cannot yet be responsibly attributed to drivers. Leave blank if none."
+                />
+                <TextArea
+                  name="unattributedRealisedRationale"
+                  label="Why it remains unattributed"
+                  rows={2}
+                  defaultValue={review.unattributedRealisedRationale}
+                />
+              </FormGrid>
+              <div className="mt-2">
+                <SubmitButton variant="secondary">Save unattributed realised value</SubmitButton>
+              </div>
+            </ActionForm>
+          </div>
+        )}
       </Section>
+
+      <ReviewResponse
+        projectId={projectId}
+        currency={currency}
+        review={review}
+        response={response}
+        stakeholders={stakeholders.map((p) => ({ value: p.personId, label: p.name }))}
+        drivers={driverOptions}
+        evidence={evidenceOptions.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }))}
+        currentForecastTotal={totals.forecastTotal}
+      />
 
       <Section title="Why it matters" description="The economic significance of this position.">
         {draft ? (
@@ -278,11 +375,17 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
                 ? "✓ Every Value Driver has a Value Position"
                 : `✗ ${ws.missingPositions} Value Driver(s) have no saved position — required`}
             </li>
-            <li className={financialWithoutForecast === 0 ? "text-emerald-800" : "text-amber-800"}>
-              {financialWithoutForecast === 0
-                ? "✓ Every financial driver has a Current Forecast"
-                : `⚠ ${financialWithoutForecast} financial driver(s) have no Current Forecast — totals will show as incomplete`}
+            <li className={blankForecasts.length === 0 ? "text-emerald-800" : "text-red-700"}>
+              {blankForecasts.length === 0
+                ? "✓ Every financial driver has a Current Forecast or an explicit Not Assessed"
+                : `✗ ${blankForecasts.map((b) => b.code).join(", ")}: no Current Forecast — enter one or mark Not Assessed with a rationale (required)`}
             </li>
+            {notAssessed.length > 0 && (
+              <li className="text-amber-800">
+                ⚠ Not Assessed: {notAssessed.map((b) => b.code).join(", ")} — project forecast and Value Gap will show
+                as Incomplete
+              </li>
+            )}
             <li className={review.whatChanged ? "text-emerald-800" : "text-amber-800"}>
               {review.whatChanged ? "✓ What changed recorded" : "⚠ What changed not recorded"}
             </li>
@@ -301,8 +404,14 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             <Hidden name="projectId" value={projectId} />
             <Hidden name="reviewId" value={review.id} />
             <SubmitButton
-              disabled={ws.missingPositions > 0}
-              title={ws.missingPositions > 0 ? "Save a position for every driver first" : undefined}
+              disabled={ws.missingPositions > 0 || blankForecasts.length > 0}
+              title={
+                ws.missingPositions > 0
+                  ? "Save a position for every driver first"
+                  : blankForecasts.length > 0
+                    ? "Every financial driver needs a forecast or an explicit Not Assessed"
+                    : undefined
+              }
             >
               Finalise review
             </SubmitButton>
@@ -353,7 +462,9 @@ function PositionTable({ ws, currency }: { ws: AssuranceWorkspace; currency: str
                 </td>
                 <td className="text-right font-semibold whitespace-nowrap" data-testid="position-forecast">
                   {r.currentForecast === null ? (
-                    <span className="font-normal text-amber-700">Not assessed</span>
+                    <span className="font-normal text-amber-700">
+                      {r.forecastNotAssessed ? "Not Assessed (explicit)" : "Blank"}
+                    </span>
                   ) : (
                     money(r.currentForecast)
                   )}
@@ -449,6 +560,14 @@ function PositionEditor({ ws, projectId, currency }: { ws: AssuranceWorkspace; p
                     rows={1}
                     defaultValue={r.realisedValueRationale}
                   />
+                  <div className="sm:col-span-4">
+                    <Checkbox
+                      name={`notAssessed__${r.valueDriverId}`}
+                      label="Not assessed — no forecast possible yet"
+                      defaultChecked={r.forecastNotAssessed}
+                      hint="Use when a forecast genuinely cannot be assessed yet — leave the forecast blank and give the reason in Forecast rationale. The project forecast will show as Incomplete."
+                    />
+                  </div>
                 </FormGrid>
               ) : (
                 <FormGrid>

@@ -20,6 +20,8 @@ export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
   proposed: "Proposed",
   authorised: "Authorised",
   superseded: "Superseded",
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
 };
 
 export const IR_ITEM_STATUS_LABELS = {
@@ -87,6 +89,22 @@ export const COMMAND_LABELS: Record<string, string> = {
   "assurance.linkEvidence": "Evidence linked to review",
   "assurance.unlinkEvidence": "Evidence unlinked from review",
   "assurance.finaliseReview": "Assurance Review finalised",
+  "leakage.create": "Value Leakage identified",
+  "leakage.update": "Value Leakage updated",
+  "leakage.setDrivers": "Leakage affected drivers updated",
+  "leakage.assess": "Value Leakage assessed",
+  "options.upsertScenario": "Scenario saved",
+  "options.removeScenario": "Scenario removed",
+  "options.saveRecommendation": "Recommendation drafted",
+  "options.issueRecommendation": "Cardaxia recommendation issued",
+  "options.recordDecision": "Client decision recorded",
+  "valueChange.create": "Value Change opened",
+  "valueChange.update": "Value Change updated",
+  "valueChange.propose": "Value Change proposed to the VCO",
+  "valueChange.return": "Value Change returned for revision",
+  "valueChange.authorise": "Value Change authorised by the VCO",
+  "valueChange.reject": "Value Change rejected by the VCO",
+  "valueChange.withdraw": "Value Change withdrawn",
 };
 
 export const TABLE_AREAS: Record<string, string> = {
@@ -107,6 +125,13 @@ export const TABLE_AREAS: Record<string, string> = {
   assumption: "Value Case",
   assurance_review: "Value Assurance",
   value_position: "Value Assurance",
+  value_leakage: "Value Leakage",
+  value_leakage_driver: "Value Leakage",
+  leakage_assessment: "Value Leakage",
+  scenario: "Options",
+  recommendation: "Recommendation",
+  decision: "Decision",
+  value_change: "Value Change",
 };
 
 export const TABLE_LABELS: Record<string, string> = {
@@ -127,4 +152,17 @@ export const TABLE_LABELS: Record<string, string> = {
   assumption: "Assumption",
   assurance_review: "Assurance Review",
   value_position: "Value Position",
+  value_leakage: "Value Leakage item",
+  value_leakage_driver: "Leakage affected driver",
+  leakage_assessment: "Leakage assessment",
+  scenario: "Scenario",
+  recommendation: "Recommendation",
+  decision: "Client decision",
+  value_change: "Value Change",
 };
+export const SCENARIO_KIND_LABELS = {
+  current: "Current trajectory",
+  recommended: "Recommended",
+  alternative: "Alternative",
+  no_action: "No action",
+} as const;
