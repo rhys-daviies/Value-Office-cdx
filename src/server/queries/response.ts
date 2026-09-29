@@ -256,7 +256,11 @@ export async function getValueChangeDetail(projectId: string, changeId: string) 
     : [];
   const [review] = row.assuranceReviewId
     ? await db()
-        .select({ id: schema.assuranceReview.id, sequence: schema.assuranceReview.sequence })
+        .select({
+          id: schema.assuranceReview.id,
+          sequence: schema.assuranceReview.sequence,
+          reviewDate: schema.assuranceReview.reviewDate,
+        })
         .from(schema.assuranceReview)
         .where(eq(schema.assuranceReview.id, row.assuranceReviewId))
     : [];

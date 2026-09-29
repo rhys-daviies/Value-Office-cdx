@@ -56,7 +56,11 @@ async function priorFor(review: ReviewRow, all: readonly ReviewRow[]): Promise<P
 
 async function versionLabel(versionId: string) {
   const [v] = await db()
-    .select({ versionNumber: schema.valueCaseVersion.versionNumber, status: schema.valueCaseVersion.status })
+    .select({
+      versionNumber: schema.valueCaseVersion.versionNumber,
+      status: schema.valueCaseVersion.status,
+      title: schema.valueCaseVersion.title,
+    })
     .from(schema.valueCaseVersion)
     .where(eq(schema.valueCaseVersion.id, versionId));
   return v!;

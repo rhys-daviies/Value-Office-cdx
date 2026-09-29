@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { sumMoney, type Money } from "@/domain/money";
-import { summariseDrivers, type DriverSummary } from "@/domain/value-case";
+import { moneyChange, summariseDrivers, type DriverSummary } from "@/domain/value-case";
 import { db, schema } from "@/server/db/client";
 
 /** Totals are always derived from driver versions, never stored. */
@@ -241,13 +241,19 @@ export async function getRequalificationWorkspace(projectId: string) {
     inheritedVersion?.statedTotalValue ??
     (inheritedSummary.financialCount > 0 ? inheritedSummary.financialTotal : null);
 
+  const requalifiedSummary = summariseDrivers(requalifiedDrivers);
   return {
     inheritedVersion,
     inheritedDrivers,
     inheritedTotal,
     requalifiedVersion,
     requalifiedDrivers,
-    requalifiedSummary: summariseDrivers(requalifiedDrivers),
+    requalifiedSummary,
+    /** Re-Qualified total − inherited total (null until both exist). */
+    movement:
+      requalifiedVersion && requalifiedSummary.driverCount > 0
+        ? moneyChange(inheritedTotal, requalifiedSummary.financialTotal)
+        : null,
     comparison,
     nextDriverCode: nextCode(
       [...inheritedDrivers, ...requalifiedDrivers].map((d) => d.code),
