@@ -48,3 +48,7 @@ next-env.d.ts
 
 # issued report PDFs (local artefact store; see docs/architecture.md)
 /storage/
+
+# Playwright sign-in state (test-only e2e session)
+/e2e/.auth/
+production-smoke-server.log

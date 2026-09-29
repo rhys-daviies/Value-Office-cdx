@@ -22,5 +22,5 @@ test("home lands on the project list", async ({ page }) => {
 test("health endpoint reports ok", async ({ request }) => {
   const res = await request.get("/api/health");
   expect(res.status()).toBe(200);
-  expect(await res.json()).toMatchObject({ status: "ok", migrationsApplied: migrationCount });
+  expect(await res.json()).toEqual({ status: "ok", database: "ok" });
 });

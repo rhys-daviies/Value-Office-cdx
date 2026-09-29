@@ -110,7 +110,7 @@ test("issue the Horizon Value Assurance Report: confirmation, immutable issue re
   expect(body.subarray(0, 5).toString("latin1")).toBe("%PDF-");
 
   await page.getByRole("link", { name: "← Reports" }).click();
-  const issued = page.getByTestId("issued-report");
+  const issued = page.getByTestId("issued-report").filter({ hasText: "Value Assurance Report" });
   await expect(issued).toHaveCount(1);
   await expect(issued).toContainText("Value Assurance Report");
   await expect(issued).toContainText("Issue 1");

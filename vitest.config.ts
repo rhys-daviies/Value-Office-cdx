@@ -23,6 +23,8 @@ export default defineConfig({
     env: {
       DATABASE_URL: testDatabaseUrl,
       NODE_ENV: "test",
+      // Test-only secret (never used outside the test suite).
+      VO_SESSION_SECRET: "test-only-session-secret-0123456789abcdef",
       VO_REPORT_STORAGE_DIR: path.resolve(import.meta.dirname, "test-results/report-storage"),
     },
     testTimeout: 20_000,

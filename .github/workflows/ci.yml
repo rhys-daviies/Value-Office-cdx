@@ -11,8 +11,8 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:16
@@ -31,8 +31,8 @@ jobs:
       VO_DEV_USER_EMAIL: ci@cardaxia.ai
       VO_DEV_USER_NAME: CI Consultant
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -50,14 +50,22 @@ jobs:
         run: npm run db:seed:horizon
       # Chromium is needed by Vitest too: issued reports are rendered to PDF server-side.
       - run: npx playwright install --with-deps chromium
-      - name: PDF generation smoke test (Horizon reports)
+      - name: PDF generation smoke test (Horizon reports, Playwright Chromium)
         run: npm run reports:smoke
+      - name: PDF generation smoke test (serverless Chromium, as on Vercel)
+        run: VO_PDF_RUNTIME=serverless npm run reports:smoke
       - run: npm test
       - run: npm run build
       - run: npm run test:e2e
-      - uses: actions/upload-artifact@v4
+      - name: Production-like deployment smoke test (least-privilege DB role, password auth, S3 storage)
+        run: ./scripts/production-smoke.sh
+        env:
+          SMOKE_ADMIN_URL: postgres://vo:vo@localhost:5432/postgres
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: playwright-report
-          path: playwright-report/
+          path: |
+            playwright-report/
+            production-smoke-server.log
           retention-days: 7
