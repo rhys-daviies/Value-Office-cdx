@@ -52,7 +52,7 @@ test("Project Horizon: $18.0m inherited, $15.5m authorised, six drivers", async 
   await expect(page.getByRole("button", { name: /Propose V1|Save driver|Add driver/ })).toHaveCount(0);
 });
 
-test("Project Horizon Assurance: $15.5m authorised, $14.7m forecast, $0.8m gap; $2.8m realised kept as labelled aggregate", async ({
+test("Project Horizon Assurance: $15.5m authorised, $14.7m forecast, $0.8m gap; $2.8m realised unattributed", async ({
   page,
 }) => {
   await page.goto("/projects");
@@ -60,13 +60,13 @@ test("Project Horizon Assurance: $15.5m authorised, $14.7m forecast, $0.8m gap; 
   await expect(page.getByTestId("overview-authorised-value")).toHaveText("$15.5m");
   await expect(page.getByTestId("overview-forecast")).toHaveText("$14.7m");
   await expect(page.getByTestId("overview-gap")).toHaveText("$0.8m");
-  await expect(page.getByTestId("overview-realised")).toHaveText("Not yet assessed");
+  await expect(page.getByTestId("overview-realised")).toHaveText("$2.8m");
 
   await page.getByRole("navigation", { name: "Project" }).getByRole("link", { name: "Assurance", exact: true }).click();
   await expect(page.getByTestId("assurance-authorised")).toHaveText("$15.5m");
   await expect(page.getByTestId("assurance-forecast")).toHaveText("$14.7m");
   await expect(page.getByTestId("assurance-gap")).toHaveText("$0.8m");
-  await expect(page.getByTestId("assurance-realised")).toHaveText("Not yet assessed");
+  await expect(page.getByTestId("assurance-realised")).toHaveText("$2.8m");
 
   await page.getByTestId("review-row").getByRole("link", { name: "#1" }).click();
   const expected = [
@@ -85,7 +85,46 @@ test("Project Horizon Assurance: $15.5m authorised, $14.7m forecast, $0.8m gap; 
     await expect(rows.nth(i).getByTestId("position-forecast")).toHaveText(forecast!);
     await expect(rows.nth(i).getByTestId("position-realised")).toHaveText("Not assessed");
   }
-  await expect(page.getByTestId("review-summary-text")).toContainText(
-    "[FIXTURE PLACEHOLDER] Realised Value of $2.8m is known only as a project-level aggregate",
-  );
+  // $2.8m is unattributed: no driver carries any of it.
+  await expect(page.getByTestId("realised-attributed")).toHaveText("None attributed");
+  await expect(page.getByTestId("realised-unattributed")).toHaveText("$2.8m");
+  await expect(page.getByTestId("realised-total")).toHaveText("$2.8m");
+  await expect(page.getByTestId("unattributed-rationale")).toContainText("[FIXTURE PLACEHOLDER]");
+});
+
+test("Project Horizon Phase 3: options, recommendation vs decision, unassessed leakage, VC-002 proposed", async ({
+  page,
+}) => {
+  await page.goto("/projects");
+  await page.getByRole("link", { name: "Project Horizon" }).click();
+  await expect(page.getByTestId("overview-recommendation")).toContainText("$15.3m");
+  await expect(page.getByTestId("overview-decision")).toContainText("$14.9m");
+  await expect(page.getByTestId("overview-decision")).toContainText("-$0.4m vs recommendation");
+  await expect(page.getByTestId("overview-leakage-total")).toHaveText("Not yet assessed");
+  await expect(page.getByTestId("overview-authorised-version")).toContainText("V1");
+  await expect(page.getByTestId("overview-authorised-version")).toContainText("VC-002 (proposed)");
+
+  await page.getByRole("navigation", { name: "Project" }).getByRole("link", { name: "Assurance", exact: true }).click();
+  await page.getByTestId("review-row").getByRole("link", { name: "#1" }).click();
+  await expect(page.getByTestId("scenario-total")).toHaveText(["$14.7m", "$15.3m", "$14.9m"]);
+  await expect(page.getByTestId("recommendation")).toContainText("$15.3m");
+  await expect(page.getByTestId("decision-recommended")).toHaveText("$15.3m");
+  await expect(page.getByTestId("decision-selected")).toHaveText("$14.9m");
+  await expect(page.getByTestId("decision-difference")).toHaveText("-$0.4m");
+  const vl = page.getByTestId("leakage-VL-001");
+  await expect(vl.getByTestId("leakage-amounts")).toHaveText("Not assessed in this review");
+  await vl.locator("summary").click();
+  await expect(vl.getByTestId("leakage-description")).toContainText("do not reconcile");
+
+  await page
+    .getByRole("navigation", { name: "Project" })
+    .getByRole("link", { name: "Value Changes", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/changes$/);
+  await page.getByTestId("change-row").getByRole("link", { name: "VC-002" }).click();
+  await expect(page.getByTestId("change-from-total")).toHaveText("$15.5m");
+  await expect(page.getByTestId("change-stated")).toHaveText("-$0.6m");
+  await expect(page.getByTestId("change-projected")).toHaveText("$14.9m");
+  await expect(page.getByText("Not reconciled")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Record authorisation/ })).toBeDisabled();
 });
