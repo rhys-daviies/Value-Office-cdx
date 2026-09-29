@@ -1,3 +1,6 @@
+import { eq } from "drizzle-orm";
+
+import { createReview, finaliseReview, updateReview, upsertValuePositions } from "@/server/commands/assurance";
 import { createClient, createProject, setProjectValueBasis } from "@/server/commands/project";
 import { recordEvidence } from "@/server/commands/evidence";
 import type { Actor } from "@/server/commands/run";
@@ -10,11 +13,20 @@ import {
   proposeVersion,
   recordInheritedBusinessCase,
 } from "@/server/commands/value-case";
+import { db, schema } from "@/server/db/client";
 
-// Project Horizon — canonical acceptance fixture, Phase 1 scope (through Authorised V1).
+// Project Horizon — canonical acceptance fixture (through Authorised V1 and the
+// first Value Assurance position).
 //
 // KNOWN FACTS (PMO-supplied): Original Business Case $18.0m; Authorised V1 $15.5m;
-// the six drivers below with value, metric, baseline and target.
+// the six drivers below with value, metric, baseline and target; a current
+// forecast per driver totalling $14.7m (Value Gap $0.8m); realised value $2.8m
+// known ONLY as a project-level aggregate.
+//
+// Realised Value is recorded per Value Driver (PMO decision). Horizon's per-driver
+// realised figures are not known, so every driver's realised value is left null
+// ("not yet assessed") and the $2.8m aggregate is carried as a labelled
+// placeholder in the review narrative. It is never split across drivers.
 //
 // Everything else is a clearly labelled placeholder, not a fact. In particular:
 // currency (the brief uses "$" without specifying which), Value Basis, client
@@ -83,10 +95,27 @@ export const HORIZON = {
       targetValue: "22",
     },
   ],
+  assurance: {
+    currentForecastTotal: "14700000.00",
+    valueGap: "800000.00",
+    /** Project-level aggregate only — no per-driver allocation is known. */
+    realisedAggregate: "2800000.00",
+    forecasts: [
+      { code: "VD-01", currentForecast: "4400000.00" },
+      { code: "VD-02", currentForecast: "3200000.00" },
+      { code: "VD-03", currentForecast: "2200000.00" },
+      { code: "VD-04", currentForecast: "2000000.00" },
+      { code: "VD-05", currentForecast: "2500000.00" },
+      { code: "VD-06", currentForecast: "400000.00" },
+    ],
+  },
 } as const;
 
 /** Builds Horizon through the public commands (no raw inserts, no special-casing). */
-export async function seedHorizon(actor: Actor, opts: { projectCode?: string; authorisedOn?: string } = {}) {
+export async function seedHorizon(
+  actor: Actor,
+  opts: { projectCode?: string; authorisedOn?: string; reviewDate?: string } = {},
+) {
   const today = new Date().toISOString().slice(0, 10);
 
   const client = await createClient(actor, { name: `${PLACEHOLDER} Horizon client` });
@@ -154,5 +183,38 @@ export async function seedHorizon(actor: Actor, opts: { projectCode?: string; au
     authorisationNote: `${PLACEHOLDER} Authorisation details not yet specified.`,
   });
 
-  return { project, vco, v0, v1: authorised };
+  // First Value Assurance position. Trigger and date are not known facts.
+  const draftReview = await createReview(actor, {
+    projectId: project.id,
+    trigger: "ad_hoc", // PLACEHOLDER: the triggering event of Horizon's review is not specified
+    reviewDate: opts.reviewDate ?? today, // PLACEHOLDER date
+    whatChanged: `${PLACEHOLDER} What changed since Authorised V1 is not yet specified.`,
+  });
+  const driverIds = await driverIdsByCode(project.id);
+  await upsertValuePositions(actor, {
+    reviewId: draftReview.id,
+    positions: HORIZON.assurance.forecasts.map((f) => ({
+      valueDriverId: driverIds.get(f.code)!,
+      currentForecast: f.currentForecast,
+      realisedValue: null, // not known per driver — never invented
+      forecastRationale: `${PLACEHOLDER} Forecast rationale not yet specified.`,
+      realisedValueRationale: `${PLACEHOLDER} Per-driver realised value not specified; see review summary.`,
+    })),
+  });
+  await updateReview(actor, {
+    reviewId: draftReview.id,
+    whyItMatters: `${PLACEHOLDER} Economic significance not yet specified.`,
+    summary: `${PLACEHOLDER} Realised Value of $2.8m is known only as a project-level aggregate. Per-driver realised values are not specified, so none are recorded (all drivers: not yet assessed). The aggregate is not split across drivers pending methodology detail.`,
+  });
+  const review = await finaliseReview(actor, { reviewId: draftReview.id });
+
+  return { project, vco, v0, v1: authorised, review };
+}
+
+async function driverIdsByCode(projectId: string): Promise<Map<string, string>> {
+  const rows = await db()
+    .select({ id: schema.valueDriver.id, code: schema.valueDriver.code })
+    .from(schema.valueDriver)
+    .where(eq(schema.valueDriver.projectId, projectId));
+  return new Map(rows.map((r) => [r.code, r.id]));
 }

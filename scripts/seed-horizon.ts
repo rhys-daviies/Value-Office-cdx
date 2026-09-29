@@ -18,9 +18,11 @@ try {
     console.log("Project Horizon already seeded; nothing to do.");
   } else {
     const actor = await ensureUser(email, process.env.VO_DEV_USER_NAME ?? email);
-    const { v1 } = await seedHorizon(actor);
+    const { v1, review } = await seedHorizon(actor);
     const { total } = await getVersionTotal(v1.id);
-    console.log(`Seeded Project Horizon: V${v1.versionNumber} ${v1.status}, total ${toMillions(total)}m`);
+    console.log(
+      `Seeded Project Horizon: V${v1.versionNumber} ${v1.status}, total ${toMillions(total)}m; Assurance Review #${review.sequence} ${review.status}`,
+    );
   }
 } finally {
   await closeDb();

@@ -36,6 +36,12 @@ export const COMMANDS = {
   proposeVersion: "valueCase.proposeVersion", // trigger-checked
   returnVersionToDraft: "valueCase.returnVersionToDraft", // trigger-checked
   authoriseInitialVersion: "valueCase.authoriseInitialVersion", // trigger-checked
+  createAssuranceReview: "assurance.createReview",
+  updateAssuranceReview: "assurance.updateReview",
+  upsertValuePositions: "assurance.upsertValuePositions",
+  linkAssuranceEvidence: "assurance.linkEvidence",
+  unlinkAssuranceEvidence: "assurance.unlinkEvidence",
+  finaliseAssuranceReview: "assurance.finaliseReview", // trigger-checked
 } as const;
 
 export type CommandName = (typeof COMMANDS)[keyof typeof COMMANDS];
