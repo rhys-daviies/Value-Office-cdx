@@ -61,9 +61,12 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                   <td className="whitespace-nowrap">{formatDate(e.evidence.evidenceDate)}</td>
                   <td className="max-w-[12rem] truncate">{e.documentTitle ?? "—"}</td>
                   <td className="text-xs">
-                    {e.links.length === 0 && e.authorises.length === 0 && (
+                    {e.links.length === 0 && e.authorises.length === 0 && e.reviewLinks.length === 0 && (
                       <span className="text-slate-400">Not linked</span>
                     )}
+                    {e.reviewLinks.map((l) => (
+                      <div key={l.linkId}>Assurance Review #{l.sequence}</div>
+                    ))}
                     {e.links.map((l) => (
                       <div key={l.linkId}>
                         V{l.versionNumber} {l.driverCode}

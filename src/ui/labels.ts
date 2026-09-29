@@ -38,6 +38,14 @@ export const KEY_DATE_LABELS = {
   other: "Other",
 } as const;
 
+export const TRIGGER_LABELS = {
+  kickoff: "Kick-off",
+  go_live: "Go-Live",
+  six_month: "Six-month",
+  material_evidence_change: "Material evidence change",
+  ad_hoc: "Ad hoc",
+} as const;
+
 export const COMMAND_LABELS: Record<string, string> = {
   "user.ensure": "Consultant account created",
   "client.create": "Client created",
@@ -73,6 +81,12 @@ export const COMMAND_LABELS: Record<string, string> = {
   "valueCase.proposeVersion": "Value Case proposed for authorisation",
   "valueCase.returnVersionToDraft": "Proposed Value Case returned to draft",
   "valueCase.authoriseInitialVersion": "VCO authorisation recorded",
+  "assurance.createReview": "Assurance Review opened",
+  "assurance.updateReview": "Assurance Review updated",
+  "assurance.upsertValuePositions": "Value Positions saved",
+  "assurance.linkEvidence": "Evidence linked to review",
+  "assurance.unlinkEvidence": "Evidence unlinked from review",
+  "assurance.finaliseReview": "Assurance Review finalised",
 };
 
 export const TABLE_AREAS: Record<string, string> = {
@@ -91,6 +105,8 @@ export const TABLE_AREAS: Record<string, string> = {
   value_driver: "Value Case",
   value_driver_version: "Value Case",
   assumption: "Value Case",
+  assurance_review: "Value Assurance",
+  value_position: "Value Assurance",
 };
 
 export const TABLE_LABELS: Record<string, string> = {
@@ -109,4 +125,6 @@ export const TABLE_LABELS: Record<string, string> = {
   value_driver: "Value Driver identity",
   value_driver_version: "Value Driver",
   assumption: "Assumption",
+  assurance_review: "Assurance Review",
+  value_position: "Value Position",
 };

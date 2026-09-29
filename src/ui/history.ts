@@ -38,6 +38,10 @@ export function recordName(change: AuditRow): string {
       return `${r.label} ${r.date}`;
     case "evidence_link":
       return "evidence link";
+    case "assurance_review":
+      return `Review #${r.sequence}`;
+    case "value_position":
+      return "Value Position";
     default:
       return String(r.name ?? r.title ?? r.code ?? "");
   }

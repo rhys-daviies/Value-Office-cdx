@@ -42,7 +42,7 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
         <h2 className="text-lg font-semibold">
           <span className="font-mono">{e.code}</span> · {e.title}
         </h2>
-        {entry.locked && <LockedBadge label="Locked — relied on by a locked version" />}
+        {entry.locked && <LockedBadge label="Locked — relied on by a locked version or finalised review" />}
         {e.isMaterialChange && <PlainBadge tone="red">Material change</PlainBadge>}
       </div>
 
@@ -76,10 +76,18 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
         </Section>
 
         <Section title="Supports" description="Value Drivers and assumptions that rely on this evidence.">
-          {entry.links.length === 0 && entry.authorises.length === 0 ? (
+          {entry.links.length === 0 && entry.authorises.length === 0 && entry.reviewLinks.length === 0 ? (
             <Empty>Not linked to anything yet.</Empty>
           ) : (
             <ul className="space-y-2 text-sm">
+              {entry.reviewLinks.map((l) => (
+                <li key={l.linkId}>
+                  <TextLink href={`/projects/${projectId}/assurance/${l.reviewId}`}>
+                    Assurance Review #{l.sequence}
+                  </TextLink>{" "}
+                  <span className="text-xs text-slate-500">({l.status})</span>
+                </li>
+              ))}
               {entry.authorises.map((v) => (
                 <li key={`auth-${v}`}>
                   <PlainBadge tone="emerald">Authorisation evidence for V{v}</PlainBadge>
@@ -135,8 +143,8 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
       <Section title="Edit evidence">
         {entry.locked ? (
           <Notice tone="locked" title="Frozen">
-            This evidence is relied on by a proposed, recorded or authorised version. Record new evidence that
-            supersedes it rather than editing it.
+            This evidence is relied on by a proposed, recorded or authorised version, or by a finalised Assurance
+            Review. Record new evidence that supersedes it rather than editing it.
           </Notice>
         ) : (
           <ActionForm action={updateEvidenceAction}>

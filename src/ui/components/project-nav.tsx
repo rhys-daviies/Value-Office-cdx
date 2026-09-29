@@ -10,6 +10,7 @@ const TABS = [
   { href: "/evidence", label: "Evidence" },
   { href: "/value-case", label: "Value Case" },
   { href: "/requalification", label: "Re-Qualification" },
+  { href: "/assurance", label: "Assurance" },
   { href: "/history", label: "History" },
 ];
 

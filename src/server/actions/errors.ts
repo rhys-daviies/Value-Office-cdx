@@ -42,6 +42,13 @@ const CONSTRAINTS: Record<string, Explanation> = {
     field: "authorisationEvidenceId",
     message: "Authorisation evidence must belong to this project.",
   },
+  assurance_review_one_draft_uq: { message: "A draft Assurance Review is already open — finalise it first." },
+  assurance_review_sequence_uq: { message: "Another review was opened at the same time. Please retry." },
+  assurance_review_trigger_evidence_fk: {
+    field: "triggerEvidenceId",
+    message: "Trigger evidence must belong to this project.",
+  },
+  evidence_link_review_uq: { field: "evidenceId", message: "That evidence is already linked to this review." },
   value_case_version_authorised_shape: {
     field: "authorisationEvidenceId",
     message: "Authorisation needs the VCO, a date and supporting evidence.",

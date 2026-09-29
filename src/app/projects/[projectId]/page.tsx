@@ -1,4 +1,14 @@
+import { getNextAssuranceRequirement, getValuePositionSummary } from "@/server/queries/assurance";
 import { getProjectOverview } from "@/server/queries/projects";
+import {
+  change,
+  Figure,
+  forecastHeadline,
+  headline,
+  NOT_ASSESSED,
+  realisedHeadline,
+  RequirementBadge,
+} from "@/ui/assurance/display";
 import {
   EvidenceBadge,
   NonFinancialBadge,
@@ -16,7 +26,11 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STA
 export default async function ProjectOverviewPage({ params }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
   await requireProject(projectId);
-  const o = (await getProjectOverview(projectId))!;
+  const [o, position, cadence] = await Promise.all([
+    getProjectOverview(projectId).then((x) => x!),
+    getValuePositionSummary(projectId),
+    getNextAssuranceRequirement(projectId),
+  ]);
   const { project, clientName, valueBasisLocked } = o.header;
   const base = `/projects/${projectId}`;
   const currency = project.currency;
@@ -31,8 +45,74 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
       )}
       {o.requalified?.version.status === "authorised" && (
         <Notice tone="success" title={`Authorised Value Case V${o.requalified.version.versionNumber} is in force`}>
-          Authorised on {formatDate(o.requalified.version.authorisedOn)}. Value Assurance is a later phase.
+          Authorised on {formatDate(o.requalified.version.authorisedOn)}. Forecasts and realised values are recorded in{" "}
+          <TextLink href={`${base}/assurance`}>Value Assurance</TextLink> reviews and never alter it.
         </Notice>
+      )}
+
+      {position.authorised && (
+        <Section
+          title="Value Assurance"
+          actions={<TextLink href={`${base}/assurance`}>Open Assurance</TextLink>}
+          description={
+            position.latest
+              ? `Latest finalised position: Review #${position.latest.review.sequence}, ${formatDate(position.latest.review.reviewDate)}`
+              : "No finalised Assurance Review yet."
+          }
+        >
+          <div className="grid gap-3 sm:grid-cols-4" data-testid="overview-assurance">
+            <Figure
+              label={`Authorised Value (V${position.authorised.versionNumber})`}
+              value={formatMoneyShort(position.authorisedTotal, currency)}
+              testId="overview-authorised-value"
+            />
+            <Figure
+              label="Current Forecast"
+              value={position.latest ? forecastHeadline(position.latest.totals, currency).value : NOT_ASSESSED}
+              testId="overview-forecast"
+              emphasis
+            />
+            <Figure
+              label="Realised Value"
+              value={position.latest ? realisedHeadline(position.latest.totals, currency).value : NOT_ASSESSED}
+              note={position.latest ? realisedHeadline(position.latest.totals, currency).note : undefined}
+              testId="overview-realised"
+            />
+            <Figure
+              label="Value Gap"
+              value={position.latest ? headline(position.latest.totals.valueGap, currency, "Incomplete") : NOT_ASSESSED}
+              note={
+                position.latest
+                  ? `Movement ${change(position.latest.totals.movement, currency, "incomplete")}`
+                  : undefined
+              }
+              testId="overview-gap"
+            />
+          </div>
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <p>
+              <span className="text-slate-500">Last Assurance Review: </span>
+              {position.reviews.length === 0 ? (
+                "None"
+              ) : (
+                <TextLink href={`${base}/assurance/${position.reviews.at(-1)!.review.id}`}>
+                  #{position.reviews.at(-1)!.review.sequence} ({position.reviews.at(-1)!.review.status})
+                </TextLink>
+              )}
+            </p>
+            <p data-testid="overview-next-requirement">
+              <span className="text-slate-500">Next Assurance Requirement: </span>
+              {cadence.next ? (
+                <>
+                  {cadence.next.label} <RequirementBadge status={cadence.next.status} />
+                  {cadence.next.date && ` ${formatDate(cadence.next.date)}`}
+                </>
+              ) : (
+                "None derivable"
+              )}
+            </p>
+          </div>
+        </Section>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">

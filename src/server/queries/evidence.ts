@@ -69,8 +69,19 @@ export async function getEvidenceRegister(projectId: string) {
     .where(eq(schema.evidence.projectId, projectId))
     .orderBy(asc(schema.evidence.code));
 
-  const [links, locked, authorisations, documents, stakeholders] = await Promise.all([
+  const [links, reviewLinks, locked, authorisations, documents, stakeholders] = await Promise.all([
     listLinks(projectId),
+    db()
+      .select({
+        linkId: schema.evidenceLink.id,
+        evidenceId: schema.evidenceLink.evidenceId,
+        reviewId: schema.assuranceReview.id,
+        sequence: schema.assuranceReview.sequence,
+        status: schema.assuranceReview.status,
+      })
+      .from(schema.evidenceLink)
+      .innerJoin(schema.assuranceReview, eq(schema.assuranceReview.id, schema.evidenceLink.assuranceReviewId))
+      .where(eq(schema.evidenceLink.projectId, projectId)),
     lockedEvidenceIds(projectId),
     db()
       .select({
@@ -92,6 +103,7 @@ export async function getEvidenceRegister(projectId: string) {
     ...r,
     supersededBy: rows.filter((o) => o.evidence.supersedesEvidenceId === r.evidence.id).map((o) => o.evidence.code),
     links: links.filter((l) => l.evidenceId === r.evidence.id),
+    reviewLinks: reviewLinks.filter((l) => l.evidenceId === r.evidence.id),
     authorises: authorisations.filter((a) => a.evidenceId === r.evidence.id).map((a) => a.versionNumber),
     locked: locked.has(r.evidence.id),
   }));
