@@ -12,7 +12,8 @@ import { updateDriverVersion } from "@/server/commands/value-case";
 import { authoriseValueChange, createValueChange, proposeValueChange } from "@/server/commands/value-change";
 import { db, schema } from "@/server/db/client";
 import { buildRequalificationReport, getReportIssue } from "@/server/queries/reports";
-import { issueMetaOf, issueReport } from "@/server/reports/issue";
+import { issueReport } from "@/server/reports/issue";
+import { issueMetaOf } from "@/server/reports/issue-meta";
 import { renderReportArticle } from "@/ui/reports/render";
 
 import { newActor, uid } from "../support/fixtures";

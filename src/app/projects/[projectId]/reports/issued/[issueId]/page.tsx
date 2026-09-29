@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import type { ReportModel } from "@/domain/reports";
 import { getReportIssue } from "@/server/queries/reports";
-import { issueMetaOf } from "@/server/reports/issue";
+import { issueMetaOf } from "@/server/reports/issue-meta";
 import { ButtonLink, KeyValues, Notice, TextLink } from "@/ui/components/layout";
 import { formatDateTime } from "@/ui/format";
 import { renderReportArticle } from "@/ui/reports/render";

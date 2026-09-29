@@ -49,6 +49,19 @@ describe("authentication boundaries", () => {
     expect(readFileSync(path.join(root, "server/actions/perform.ts"), "utf8")).toContain("await getCurrentActor()");
   });
 
+  it("the PDF runtime is loaded only when a PDF is generated (DEFECT-001)", () => {
+    // A static import made every page importing the issue action load playwright-core, so a
+    // packaging gap broke report previews, not just issuing.
+    for (const file of walk(root).filter((f) => /\.(ts|tsx)$/.test(f))) {
+      const source = readFileSync(file, "utf8");
+      expect(source, rel(file)).not.toMatch(/^import (?!type )[^;]*from "playwright-core"/m);
+      expect(source, rel(file)).not.toMatch(/^import (?!type )[^;]*from "@sparticuz\/chromium"/m);
+    }
+    expect(
+      readFileSync(path.join(root, "app/projects/[projectId]/reports/issued/[issueId]/page.tsx"), "utf8"),
+    ).not.toContain('@/server/reports/issue"');
+  });
+
   it("no module exposes server secrets to the client bundle", () => {
     for (const file of walk(root).filter((f) => /\.(ts|tsx)$/.test(f))) {
       const source = readFileSync(file, "utf8");

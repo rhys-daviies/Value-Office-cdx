@@ -56,6 +56,8 @@ jobs:
         run: VO_PDF_RUNTIME=serverless npm run reports:smoke
       - run: npm test
       - run: npm run build
+      - name: Vercel function bundle carries the PDF runtime (traced files only; renders a PDF with serverless Chromium)
+        run: npm run verify:bundle -- --launch
       - run: npm run test:e2e
       - name: Deployment smoke — production tier (least-privilege DB role, password auth, S3 storage)
         run: ./scripts/production-smoke.sh

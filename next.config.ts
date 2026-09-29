@@ -25,7 +25,17 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   // Loaded from node_modules at runtime rather than bundled (native binary / large SDK).
   serverExternalPackages: ["@sparticuz/chromium", "@aws-sdk/client-s3"],
-  outputFileTracingIncludes: { [REPORT_ISSUE_ROUTE]: ["./node_modules/@sparticuz/chromium/bin/**"] },
+  // Files these packages load by computed path, which static tracing cannot see (DEFECT-001:
+  // playwright-core requires path.join(packageRoot, "browsers.json") when it loads).
+  // Checked against the built trace by scripts/verify-function-bundle.mjs.
+  outputFileTracingIncludes: {
+    [REPORT_ISSUE_ROUTE]: [
+      "./node_modules/@sparticuz/chromium/bin/**",
+      "./node_modules/playwright-core/browsers.json",
+      "./node_modules/playwright-core/package.json",
+      "./node_modules/playwright-core/lib/**",
+    ],
+  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

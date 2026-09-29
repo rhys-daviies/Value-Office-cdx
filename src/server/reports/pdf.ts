@@ -1,6 +1,6 @@
 import "server-only";
 
-import { chromium, type LaunchOptions } from "playwright-core";
+import type { LaunchOptions } from "playwright-core";
 
 import { env } from "@/server/env";
 
@@ -27,6 +27,8 @@ async function launchOptions(): Promise<LaunchOptions> {
 export async function htmlToPdf(documentHtml: string, footerLabel: string): Promise<Buffer> {
   let browser;
   try {
+    // Loaded on first use, so pages that merely import the issue action never load the PDF runtime.
+    const { chromium } = await import("playwright-core");
     browser = await chromium.launch(await launchOptions());
   } catch (err) {
     throw new PdfUnavailableError(

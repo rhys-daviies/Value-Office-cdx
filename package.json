@@ -30,6 +30,7 @@
     "user:disable": "tsx --conditions=react-server scripts/user.ts disable",
     "db:check-role": "tsx scripts/db-check-role.ts",
     "fixture:horizon:align": "tsx --conditions=react-server scripts/fixture-horizon-align.ts",
+    "verify:bundle": "node scripts/verify-function-bundle.mjs",
     "smoke:deploy": "playwright test --config playwright.deploy.config.ts"
   },
   "dependencies": {
