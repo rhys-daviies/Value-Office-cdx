@@ -6,17 +6,24 @@ import { closeDb, db, schema } from "@/server/db/client";
 
 import { loadLocalEnv } from "./load-env";
 
-// Seeds the synthetic "Assurance Compact" project (Authorised V1, no reviews). Idempotent by code.
+// Seeds the synthetic "Assurance Compact" and "Response Compact" projects (Authorised V1, no reviews). Idempotent by code.
 loadLocalEnv();
 
 const email = process.env.VO_DEV_USER_EMAIL ?? "consultant@cardaxia.ai";
 try {
-  const [existing] = await db().select().from(schema.project).where(eq(schema.project.code, "COMPACT"));
-  if (existing) {
-    console.log("Assurance Compact already seeded; nothing to do.");
-  } else {
-    await seedCompactAuthorised(await ensureUser(email, process.env.VO_DEV_USER_NAME ?? email));
-    console.log("Seeded Assurance Compact: Authorised V1, no Assurance Reviews");
+  const actor = await ensureUser(email, process.env.VO_DEV_USER_NAME ?? email);
+  // Two identical synthetic engagements so Phase 2 and Phase 3 journeys stay independent.
+  for (const [code, name] of [
+    ["COMPACT", "Assurance Compact"],
+    ["RESPONSE", "Response Compact"],
+  ] as const) {
+    const [existing] = await db().select().from(schema.project).where(eq(schema.project.code, code));
+    if (existing) {
+      console.log(`${name} already seeded; nothing to do.`);
+    } else {
+      await seedCompactAuthorised(actor, { code, name });
+      console.log(`Seeded ${name}: Authorised V1, no Assurance Reviews`);
+    }
   }
 } finally {
   await closeDb();

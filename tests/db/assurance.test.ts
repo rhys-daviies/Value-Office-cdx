@@ -477,7 +477,7 @@ describe("finalisation", () => {
 });
 
 describe("Project Horizon Assurance acceptance", () => {
-  it("shows $15.5m authorised, $14.7m forecast, $0.8m gap, and invents no per-driver realised values", async () => {
+  it("shows $15.5m authorised, $14.7m forecast, $0.8m gap; $2.8m realised is unattributed, never per driver", async () => {
     const actor = await newActor();
     const { project, review } = await seedHorizon(actor, { projectCode: `HORIZON-${uid()}` });
     const summary = await getValuePositionSummary(project.id);
@@ -488,7 +488,9 @@ describe("Project Horizon Assurance acceptance", () => {
       forecastTotal: HORIZON.assurance.currentForecastTotal,
       valueGap: HORIZON.assurance.valueGap,
       movement: "-800000.00",
-      realisedTotal: null,
+      realisedAttributedTotal: null,
+      unattributedRealised: HORIZON.assurance.realisedAggregate,
+      realisedTotal: "2800000.00",
       realisedAssessed: 0,
     });
 
@@ -503,8 +505,7 @@ describe("Project Horizon Assurance acceptance", () => {
     expect(ws!.rows.map((r) => [r.code, r.authorisedValue, r.currentForecast])).toEqual(
       HORIZON.drivers.map((d, i) => [d.code, d.financialValue, HORIZON.assurance.forecasts[i]!.currentForecast]),
     );
-    expect(review.summary).toMatch(
-      /\[FIXTURE PLACEHOLDER\] Realised Value of \$2\.8m is known only as a project-level aggregate/,
-    );
+    expect(review.unattributedRealisedValue).toBe("2800000.00");
+    expect(review.unattributedRealisedRationale).toMatch(/\[FIXTURE PLACEHOLDER\]/);
   });
 });

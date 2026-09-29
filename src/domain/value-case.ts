@@ -60,13 +60,21 @@ export function versionAuthority(kind: VersionKind, status: VersionStatus, versi
   }
   switch (status) {
     case "draft":
-      return "Draft Re-Qualified Value Case";
+      return versionNumber === 1
+        ? "Draft Re-Qualified Value Case"
+        : `Draft Value Case V${versionNumber} (Value Change)`;
     case "proposed":
-      return "Proposed Value Case — awaiting VCO authorisation";
+      return versionNumber === 1
+        ? "Proposed Value Case — awaiting VCO authorisation"
+        : `Proposed Value Case V${versionNumber} — Value Change awaiting VCO authorisation`;
     case "authorised":
       return `Authorised Value Case V${versionNumber}`;
     case "superseded":
       return `Superseded Value Case V${versionNumber}`;
+    case "rejected":
+      return `Proposed V${versionNumber} — Value Change rejected by the VCO`;
+    case "withdrawn":
+      return `Proposed V${versionNumber} — Value Change withdrawn`;
     case "recorded":
       return "Recorded";
   }

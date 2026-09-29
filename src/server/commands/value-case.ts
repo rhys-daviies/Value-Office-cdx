@@ -162,7 +162,8 @@ export const createDraftVersion = defineCommand(
   },
 );
 
-async function copyVersionContents(tx: Tx, fromVersionId: string, toVersionId: string) {
+/** Copy-forward: driver versions, assumptions and evidence links into a new draft. */
+export async function copyVersionContents(tx: Tx, fromVersionId: string, toVersionId: string) {
   const drivers = await tx
     .select()
     .from(schema.valueDriverVersion)

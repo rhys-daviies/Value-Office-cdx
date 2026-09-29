@@ -20,6 +20,8 @@ describe("read models over Horizon", () => {
     expect(timeline.map((t) => [t.version.versionNumber, t.version.status, t.headlineTotal])).toEqual([
       [0, "recorded", "18000000.00"],
       [1, "authorised", "15500000.00"],
+      // VC-002 proposed only: V2 is an unadjusted copy of V1 (per-driver allocation unknown).
+      [2, "proposed", "15500000.00"],
     ]);
 
     const ws = await getRequalificationWorkspace(project.id);
