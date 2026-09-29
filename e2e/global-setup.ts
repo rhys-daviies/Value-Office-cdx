@@ -8,7 +8,7 @@ import { e2eDatabaseUrl } from "./env";
 
 /**
  * Fresh database for every e2e run: create if missing, reset, migrate, then
- * seed Project Horizon through the public commands (the seed script).
+ * seed Project Horizon and the synthetic Assurance Compact project through the public commands.
  * Refuses any database whose name does not end in `_e2e`.
  */
 export default async function globalSetup() {
@@ -36,8 +36,7 @@ export default async function globalSetup() {
   }
   await runMigrations(url);
 
-  execFileSync("npm", ["run", "-s", "db:seed:horizon"], {
-    env: { ...process.env, DATABASE_URL: url },
-    stdio: "inherit",
-  });
+  for (const seed of ["db:seed:horizon", "db:seed:compact"]) {
+    execFileSync("npm", ["run", "-s", seed], { env: { ...process.env, DATABASE_URL: url }, stdio: "inherit" });
+  }
 }
