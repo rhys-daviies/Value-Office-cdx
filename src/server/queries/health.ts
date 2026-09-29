@@ -2,18 +2,17 @@ import { sql } from "drizzle-orm";
 
 import { db } from "@/server/db/client";
 
-export type DbHealth =
-  { ok: true; database: string; serverVersion: string; migrationsApplied: number } | { ok: false; error: string };
+export type DbHealth = { ok: true; migrationsApplied: number } | { ok: false };
 
+/** Database reachability and applied-migration count. Failure detail is logged, never returned. */
 export async function getDbHealth(): Promise<DbHealth> {
   try {
-    const result = await db().execute<{ database: string; version: string; migrations: number }>(sql`
-      select current_database() as database,
-             current_setting('server_version') as version,
-             (select count(*)::int from drizzle.__drizzle_migrations) as migrations`);
-    const row = result.rows[0]!;
-    return { ok: true, database: row.database, serverVersion: row.version, migrationsApplied: row.migrations };
+    const result = await db().execute<{ migrations: number }>(
+      sql`select (select count(*)::int from drizzle.__drizzle_migrations) as migrations`,
+    );
+    return { ok: true, migrationsApplied: result.rows[0]!.migrations };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    console.error("[health] database check failed:", err instanceof Error ? err.name : "unknown error");
+    return { ok: false };
   }
 }

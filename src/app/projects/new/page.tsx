@@ -1,3 +1,4 @@
+import { requireConsultant } from "@/server/auth/actor";
 import { createProjectAction } from "@/server/actions/projects";
 import { listClients } from "@/server/queries/projects";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
@@ -7,6 +8,7 @@ import { PageHeader, Section, TextLink } from "@/ui/components/layout";
 export const metadata = { title: "Create project" };
 
 export default async function NewProjectPage() {
+  await requireConsultant();
   const clients = await listClients();
   return (
     <div className="max-w-3xl">

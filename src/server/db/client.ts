@@ -15,7 +15,7 @@ const globalForDb = globalThis as unknown as { voPool?: Pool; voDb?: Db };
 
 export function db(): Db {
   if (!globalForDb.voDb) {
-    globalForDb.voPool = new Pool({ connectionString: env().DATABASE_URL, max: 10 });
+    globalForDb.voPool = new Pool({ connectionString: env().DATABASE_URL, max: env().VO_DB_POOL_MAX });
     globalForDb.voDb = drizzle(globalForDb.voPool, { schema, casing: "snake_case" });
   }
   return globalForDb.voDb;

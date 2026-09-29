@@ -1,9 +1,13 @@
+import { currentConsultantOrNull } from "@/server/auth/actor";
 import { getReportIssue } from "@/server/queries/reports";
 import { getDocument } from "@/server/reports/storage";
 import { isUuid } from "@/ui/require";
 
 /** Streams an issued report's stored PDF, verified against the hash recorded at issue. */
 export async function GET(_req: Request, ctx: RouteContext<"/projects/[projectId]/reports/issued/[issueId]/pdf">) {
+  if (!(await currentConsultantOrNull())) {
+    return new Response("Authentication required", { status: 401, headers: { "cache-control": "no-store" } });
+  }
   const { projectId, issueId } = await ctx.params;
   if (!isUuid(projectId) || !isUuid(issueId)) return new Response("Not found", { status: 404 });
   const issue = await getReportIssue(projectId, issueId);

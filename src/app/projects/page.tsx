@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { requireConsultant } from "@/server/auth/actor";
 import { listProjects } from "@/server/queries/projects";
 import { VersionBadge } from "@/ui/components/badges";
 import { ButtonLink, Empty, Missing, PageHeader, Table } from "@/ui/components/layout";
@@ -8,6 +9,7 @@ import { formatDate } from "@/ui/format";
 export const metadata = { title: "Projects" };
 
 export default async function ProjectsPage() {
+  await requireConsultant();
   const projects = await listProjects();
   return (
     <>
