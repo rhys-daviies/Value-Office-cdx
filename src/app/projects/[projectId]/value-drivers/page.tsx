@@ -8,7 +8,7 @@ import { nextCode } from "@/server/queries/value-case";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, QualificationBadge } from "@/ui/components/badges";
 import { DateField, FormGrid, Hidden, MoneyField, SelectField, TextArea, TextField } from "@/ui/components/fields";
-import { Empty, Expander, Notice, Section, Table } from "@/ui/components/layout";
+import { Empty, Expander, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { AuthorisedValue, CurrentForecast, LivingStatusBadge, WorkingEstimate } from "@/ui/drivers/display";
 import { formatMoneyShort } from "@/ui/format";
 import { EVIDENCE_STATUS_LABELS, QUALIFICATION_LABELS } from "@/ui/labels";
@@ -40,6 +40,12 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
               Authorised Value Case in force: V{register.inForce.versionNumber},{" "}
               <strong data-testid="authorised-total">{formatMoneyShort(register.authorisedTotal, currency)}</strong>{" "}
               authorised. Working estimates below are not included.
+              <span className="mt-1 block text-xs text-slate-500" data-testid="driver-counts">
+                {register.entries.filter((e) => e.presentation === "in_value_case").length} in Value Case ·{" "}
+                {register.entries.filter((e) => e.presentation === "emerging").length} emerging ·{" "}
+                {register.entries.filter((e) => e.presentation === "outside_current").length} outside current Value
+                Case. Governed history is in <TextLink href={`/projects/${projectId}/value-case`}>Value Case</TextLink>.
+              </span>
             </>
           ) : (
             "No Authorised Value Case yet."
@@ -89,7 +95,7 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
                   </td>
                   <td>{e.avoName ?? <span className="text-amber-700">Not assigned</span>}</td>
                   <td>
-                    <WorkingEstimate value={e.working?.workingEstimate} currency={currency} />
+                    <WorkingEstimate value={e.working?.workingEstimate} currency={currency} noRecord={!e.record} />
                   </td>
                   <td>
                     <AuthorisedValue entry={e} currency={currency} />

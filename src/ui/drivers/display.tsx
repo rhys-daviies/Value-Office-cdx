@@ -8,19 +8,48 @@ import { formatMoneyShort } from "../format";
 
 export const WORKING_DRIVER_LABEL = "Working Value Driver — changes here do not alter an authorised Value Case.";
 
-export function LivingStatusBadge({ entry }: { entry: Pick<DriverEntry, "status" | "authorised" | "formerlyIn"> }) {
-  if (entry.status === "in_value_case") {
-    return <PlainBadge tone="emerald">In Value Case V{entry.authorised!.versionNumber}</PlainBadge>;
-  }
+export function LivingStatusBadge({
+  entry,
+}: {
+  entry: Pick<DriverEntry, "presentation" | "authorised" | "formerlyIn" | "pendingChange">;
+}) {
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <PlainBadge tone="violet">Emerging</PlainBadge>
-      {entry.formerlyIn !== null && <span className="text-xs text-slate-500">(was in V{entry.formerlyIn})</span>}
+    <span className="inline-flex flex-wrap items-center gap-1" data-testid="driver-status">
+      {entry.presentation === "in_value_case" ? (
+        <PlainBadge tone="emerald">In Value Case V{entry.authorised!.versionNumber}</PlainBadge>
+      ) : entry.presentation === "outside_current" ? (
+        <PlainBadge tone="slate">
+          Outside Current Value Case{entry.formerlyIn !== null ? ` (last in V${entry.formerlyIn})` : ""}
+        </PlainBadge>
+      ) : (
+        <PlainBadge tone="violet">Emerging</PlainBadge>
+      )}
+      {entry.pendingChange && (
+        <span className="text-xs text-sky-800" data-testid="driver-pending-change">
+          In {entry.pendingChange.status === "draft" ? "draft" : "proposed"} {entry.pendingChange.code}
+        </span>
+      )}
     </span>
   );
 }
 
-export function WorkingEstimate({ value, currency }: { value: string | null | undefined; currency: string }) {
+export function WorkingEstimate({
+  value,
+  currency,
+  noRecord,
+}: {
+  value: string | null | undefined;
+  currency: string;
+  /** No living record yet: the governed figure must not be echoed as a working one. */
+  noRecord?: boolean;
+}) {
+  if (noRecord) {
+    return (
+      <span className="text-xs text-slate-500" data-testid="working-estimate">
+        No working view yet
+      </span>
+    );
+  }
   if (value == null) {
     return (
       <span className="text-amber-700 italic" data-testid="working-estimate">

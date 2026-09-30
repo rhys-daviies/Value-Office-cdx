@@ -239,6 +239,52 @@ matter is open, and the link is immutable. Information Request reports are uncha
   living record, position, working evidence, matter, request item or formal matter snapshot.
   `vo_value_driver_identity_guard` refuses any other deletion.
 
+## Operating experience (Phase 4D.4)
+
+**Navigation** (`src/ui/navigation.ts`):
+
+- **Primary:** Overview · Assurance · Value Drivers · Evidence (daily work), then Value Case · Value Changes ·
+  Reports (governed value).
+- **Secondary ("More"):** Setup · Information Requests · Re-Qualification · History. These are still one click away.
+
+Every route is unchanged.
+
+**Read models** (`src/server/queries/workspace.ts`) keep working and governed data apart:
+
+- `getContinuousAssuranceWorkspace`: open matters, with evidence and request counts and derived attention. It gives
+  a **working** Value Leakage total of quantified open matters only, and counts unquantified matters separately
+  (never as zero).
+- `getOverviewValueOfficeState`: the governed position next to that working picture.
+- `getGovernedCommitment`: the authorised version in force and its drivers.
+
+Working totals are never added to or netted against the Value Gap, and never shown as formal Value Leakage.
+
+**Needs attention** (`src/domain/attention.ts`) is derived at read time from existing matter fields. It covers:
+
+- escalated;
+- awaiting evidence;
+- no Risk / Leakage Owner;
+- not yet quantified;
+- decision date passed or approaching;
+- monitoring period ended or ending.
+
+"Approaching" means within 14 days, using UTC calendar dates. Nothing is stored, scheduled, assigned or scored.
+
+**Visual language:**
+
+- **Working:** violet, dashed, labelled with `WorkingTag` (e.g. "Working · not formally reviewed").
+- **Governed:** solid, with a lock, labelled with `GovernedTag` (e.g. "Authorised V2").
+
+Labels always accompany colour.
+
+**Driver display status** is still derived:
+
+- **In Value Case:** in the authorised version in force.
+- **Outside Current Value Case:** in an earlier authorised version, but not the one in force.
+- **Emerging:** never authorised.
+
+A driver in a draft or proposed Value Change is noted for information only.
+
 ## Client reports (Phase 4A)
 
 ```

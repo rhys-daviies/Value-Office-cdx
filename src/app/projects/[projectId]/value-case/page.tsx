@@ -3,12 +3,20 @@ import Link from "next/link";
 import { moneyChange, versionAuthority } from "@/domain/value-case";
 import { createInheritedBusinessCaseAction } from "@/server/actions/value-case";
 import { getValueCaseTimeline, type TimelineEntry } from "@/server/queries/value-case";
+import { getGovernedCommitment } from "@/server/queries/workspace";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { Fragment } from "react";
 
-import { NonFinancialBadge, VersionBadge, versionBorder } from "@/ui/components/badges";
+import {
+  EvidenceBadge,
+  GovernedTag,
+  NonFinancialBadge,
+  QualificationBadge,
+  VersionBadge,
+  versionBorder,
+} from "@/ui/components/badges";
 import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields";
-import { ButtonLink, Notice, Section } from "@/ui/components/layout";
+import { ButtonLink, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
 import { requireProject } from "@/ui/require";
 
@@ -17,7 +25,7 @@ export const metadata = { title: "Value Case" };
 export default async function ValueCasePage({ params }: PageProps<"/projects/[projectId]/value-case">) {
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
-  const timeline = await getValueCaseTimeline(projectId);
+  const [timeline, commitment] = await Promise.all([getValueCaseTimeline(projectId), getGovernedCommitment(projectId)]);
   const inherited = timeline.find((t) => t.version.kind === "inherited_business_case");
   const valueCases = timeline.filter((t) => t.version.kind === "value_case");
   const base = `/projects/${projectId}`;
@@ -25,9 +33,92 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        What the client originally claimed, what Cardaxia has re-qualified, and whether management has authorised it.
+        What management has formally committed to. The Authorised Value Case changes only through an authorised Value
+        Change; Cardaxia&apos;s current working view of each driver is in{" "}
+        <TextLink href={`${base}/value-drivers`}>Value Drivers</TextLink>.
       </p>
 
+      {commitment && (
+        <section
+          aria-labelledby="commitment-heading"
+          className="mb-8 rounded-lg border-2 border-emerald-600 bg-white p-4 shadow-sm"
+          data-testid="current-commitment"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 id="commitment-heading" className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+                Current Authorised Value Case
+                <GovernedTag>Authorised V{commitment.version.versionNumber}</GovernedTag>
+              </h2>
+              <p className="mt-1 text-sm text-slate-600" data-testid="commitment-authorisation">
+                {commitment.version.title} · authorised {formatDate(commitment.version.authorisedOn)}
+                {commitment.authorisedByName && ` by ${commitment.authorisedByName} (VCO)`}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-3xl font-semibold text-slate-900" data-testid="commitment-total">
+                {formatMoneyShort(commitment.authorisedTotal, project.currency)}
+              </p>
+              <p className="text-xs text-slate-500">
+                {commitment.latestReview && commitment.forecastTotal !== null
+                  ? `Latest formal forecast ${formatMoneyShort(commitment.forecastTotal, project.currency)} (Review #${commitment.latestReview.sequence}, ${formatDate(commitment.latestReview.date)})`
+                  : "No finalised review measured against this version yet"}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Table>
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th className="text-right">Authorised Value</th>
+                  <th className="text-right">Latest formal forecast</th>
+                  <th>Qualification / evidence</th>
+                  <th>AVO (as authorised)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commitment.drivers.map(({ driver: d, forecast }) => (
+                  <tr key={d.driverVersionId} data-testid={`commitment-driver-${d.code}`}>
+                    <td>
+                      <span className="font-mono text-slate-500">{d.code}</span> {d.name}
+                    </td>
+                    <td className="text-right font-semibold">
+                      {d.financialValue === null ? (
+                        <NonFinancialBadge />
+                      ) : (
+                        formatMoneyShort(d.financialValue, project.currency)
+                      )}
+                    </td>
+                    <td className="text-right">
+                      {!forecast
+                        ? "—"
+                        : forecast.notAssessed
+                          ? "Not assessed"
+                          : forecast.value === null
+                            ? "—"
+                            : formatMoneyShort(forecast.value, project.currency)}
+                    </td>
+                    <td className="space-x-1">
+                      <QualificationBadge status={d.qualificationStatus} />
+                      <EvidenceBadge status={d.evidenceStatus} />
+                    </td>
+                    <td>{d.avoName ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-3 text-sm">
+            <ButtonLink variant="secondary" href={`${base}/value-case/v/${commitment.version.versionNumber}`}>
+              View authorised version detail
+            </ButtonLink>
+            <TextLink href={`${base}/changes`}>Value Changes</TextLink>
+          </div>
+        </section>
+      )}
+
+      <h2 className="mb-2 text-base font-semibold text-slate-900">Version history</h2>
       <ol className="max-w-3xl space-y-2" data-testid="value-case-timeline">
         {inherited ? (
           <TimelineCard entry={inherited} currency={project.currency} href={`${base}/value-case/v/0`} />
@@ -95,8 +186,9 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
       {valueCases.some((v) => v.version.status === "authorised") && (
         <div className="mt-6 max-w-3xl">
           <Notice tone="info">
-            Later changes to an Authorised Value Case will require an approved Value Change authorised by the VCO (a
-            later phase). The authorised version above remains historically preserved.
+            Changes to the Authorised Value Case are made only through a{" "}
+            <TextLink href={`${base}/changes`}>Value Change</TextLink> authorised by the VCO. Earlier versions remain
+            historically preserved.
           </Notice>
         </div>
       )}

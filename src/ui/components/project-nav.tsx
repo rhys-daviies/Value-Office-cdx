@@ -3,43 +3,53 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const TABS = [
-  { href: "", label: "Overview" },
-  { href: "/setup", label: "Setup" },
-  { href: "/information-request", label: "Information Request" },
-  { href: "/evidence", label: "Evidence" },
-  { href: "/value-case", label: "Value Case" },
-  { href: "/requalification", label: "Re-Qualification" },
-  { href: "/value-drivers", label: "Value Drivers" },
-  { href: "/assurance", label: "Assurance" },
-  { href: "/changes", label: "Value Changes" },
-  { href: "/reports", label: "Reports" },
-  { href: "/history", label: "History" },
-];
+import { PRIMARY, SECONDARY, type Tab } from "../navigation";
 
 export function ProjectNav({ projectId }: { projectId: string }) {
   const pathname = usePathname();
   const root = `/projects/${projectId}`;
+  const isActive = (t: Tab) => (t.href === "" ? pathname === root : pathname.startsWith(root + t.href));
   return (
-    <nav className="-mb-px flex gap-1 overflow-x-auto print:hidden" aria-label="Project">
-      {TABS.map((t) => {
-        const href = root + t.href;
-        const active = t.href === "" ? pathname === root : pathname.startsWith(href);
-        return (
-          <Link
-            key={t.label}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={`border-b-2 px-3 py-2 text-sm whitespace-nowrap ${
-              active
-                ? "border-slate-900 font-semibold text-slate-900"
-                : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"
-            }`}
-          >
-            {t.label}
-          </Link>
-        );
-      })}
+    <nav className="-mb-px flex flex-wrap items-end justify-between gap-x-4 print:hidden" aria-label="Project">
+      <ul className="flex flex-wrap gap-1">
+        {PRIMARY.map((t) => (
+          <li key={t.label}>
+            <Link
+              href={root + t.href}
+              aria-current={isActive(t) ? "page" : undefined}
+              className={`block border-b-2 px-3 py-2 text-sm whitespace-nowrap ${
+                isActive(t)
+                  ? "border-slate-900 font-semibold text-slate-900"
+                  : "border-transparent text-slate-700 hover:border-slate-300 hover:text-slate-900"
+              }`}
+            >
+              {t.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className="flex items-end gap-1" data-testid="nav-secondary">
+        <span id="project-nav-more" className="pb-2 text-[11px] font-semibold tracking-wide text-slate-400 uppercase">
+          More
+        </span>
+        <ul className="flex gap-0.5" aria-labelledby="project-nav-more">
+          {SECONDARY.map((t) => (
+            <li key={t.label}>
+              <Link
+                href={root + t.href}
+                aria-current={isActive(t) ? "page" : undefined}
+                className={`block border-b-2 px-2 py-2 text-xs whitespace-nowrap ${
+                  isActive(t)
+                    ? "border-slate-700 font-semibold text-slate-900"
+                    : "border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-800"
+                }`}
+              >
+                {t.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
     </nav>
   );
 }

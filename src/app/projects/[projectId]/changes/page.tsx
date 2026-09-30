@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { listValueChanges } from "@/server/queries/response";
 import { PlainBadge } from "@/ui/components/badges";
-import { Empty, Section, Table, TextLink } from "@/ui/components/layout";
+import { Empty, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
 import { requireProject } from "@/ui/require";
 
@@ -14,14 +14,29 @@ export default async function ChangesPage({ params }: PageProps<"/projects/[proj
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
   const changes = await listValueChanges(projectId);
+  const pending = changes.filter((c) => c.change.status === "draft" || c.change.status === "proposed");
   const base = `/projects/${projectId}`;
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        The only way the Authorised Value Case changes after V1. A Value Change is prepared from a client decision,
-        proposed to the Value Case Owner, and — if authorised — supersedes the version in force. Earlier versions and
-        the reviews measured against them are preserved.
+        What changes to the authorised commitment are being considered or have been approved. A Value Change is the only
+        way the Authorised Value Case changes after V1: it is prepared from a client decision, proposed to the Value
+        Case Owner, and — if authorised — supersedes the version in force. Earlier versions and the reviews measured
+        against them are preserved.
       </p>
+      {pending.length > 0 && (
+        <Notice tone="warning" title="Pending changes to the authorised commitment">
+          {pending.map((c, i) => (
+            <span key={c.change.id}>
+              {i > 0 && " · "}
+              <TextLink href={`${base}/changes/${c.change.id}`}>{c.change.code}</TextLink> is {c.change.status} (V
+              {c.fromNumber} → V{c.toNumber}
+              {c.addedDrivers.length > 0 && `, adds ${c.addedDrivers.map((d) => d.code).join(", ")}`})
+            </span>
+          ))}
+          . The Authorised Value Case in force is unchanged until the VCO authorises.
+        </Notice>
+      )}
       <Section title={`Value Changes (${changes.length})`}>
         {changes.length === 0 ? (
           <Empty>
@@ -37,6 +52,7 @@ export default async function ChangesPage({ params }: PageProps<"/projects/[proj
                 <th className="text-right">Stated change</th>
                 <th className="text-right">Driver-level change</th>
                 <th className="text-right">Proposed version total</th>
+                <th>Drivers added</th>
                 <th>Status</th>
                 <th>Authorised</th>
               </tr>
@@ -59,6 +75,15 @@ export default async function ChangesPage({ params }: PageProps<"/projects/[proj
                   </td>
                   <td className="text-right">{formatMoneyChange(c.actualChange, project.currency)}</td>
                   <td className="text-right">{formatMoneyShort(c.toTotal, project.currency)}</td>
+                  <td className="text-xs" data-testid="change-added-drivers">
+                    {c.addedDrivers.length === 0
+                      ? "—"
+                      : c.addedDrivers.map((d) => (
+                          <div key={d.code}>
+                            <span className="font-mono">{d.code}</span> {d.name}
+                          </div>
+                        ))}
+                  </td>
                   <td>
                     <PlainBadge tone={TONE[c.change.status]}>{c.change.status}</PlainBadge>
                   </td>

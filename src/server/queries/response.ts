@@ -344,14 +344,34 @@ export async function listValueChanges(projectId: string) {
     .innerJoin(toV, eq(toV.id, schema.valueChange.toVersionId))
     .where(eq(schema.valueChange.projectId, projectId))
     .orderBy(desc(schema.valueChange.createdAt));
+  // Phase 4D.4: drivers new to each proposed version (e.g. an included emerging driver), in one query.
+  const versionIds = rows.flatMap((r) => [r.change.fromVersionId, r.change.toVersionId]);
+  const membership = versionIds.length
+    ? await db()
+        .select({
+          versionId: schema.valueDriverVersion.valueCaseVersionId,
+          valueDriverId: schema.valueDriverVersion.valueDriverId,
+          code: schema.valueDriver.code,
+          name: schema.valueDriverVersion.name,
+        })
+        .from(schema.valueDriverVersion)
+        .innerJoin(schema.valueDriver, eq(schema.valueDriver.id, schema.valueDriverVersion.valueDriverId))
+        .where(inArray(schema.valueDriverVersion.valueCaseVersionId, versionIds))
+    : [];
   return Promise.all(
     rows.map(async (r) => {
       const [from, to] = await Promise.all([versionTotal(r.change.fromVersionId), versionTotal(r.change.toVersionId)]);
+      const inFrom = new Set(
+        membership.filter((m) => m.versionId === r.change.fromVersionId).map((m) => m.valueDriverId),
+      );
       return {
         ...r,
         fromTotal: from.total,
         toTotal: to.total,
         actualChange: toDbMoney(money(to.total).minus(money(from.total))),
+        addedDrivers: membership
+          .filter((m) => m.versionId === r.change.toVersionId && !inFrom.has(m.valueDriverId))
+          .map((m) => ({ code: m.code, name: m.name })),
       };
     }),
   );

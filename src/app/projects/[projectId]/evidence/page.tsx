@@ -4,7 +4,7 @@ import { recordEvidenceAction } from "@/server/actions/evidence";
 import { recordDocumentAction } from "@/server/actions/setup";
 import { getEvidenceRegister, nextEvidenceCode } from "@/server/queries/evidence";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
-import { LockedBadge, PlainBadge } from "@/ui/components/badges";
+import { GovernedTag, LockedBadge, PlainBadge, WorkingTag } from "@/ui/components/badges";
 import { Checkbox, DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@/ui/components/fields";
 import { Empty, Expander, Section, Table } from "@/ui/components/layout";
 import { formatDate } from "@/ui/format";
@@ -29,7 +29,15 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
         in violet) inform the consultant and never lock evidence.
       </p>
 
-      <Section title={`Evidence register (${entries.length})`}>
+      <Section
+        title={`Evidence register (${entries.length})`}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-2">
+            Why do we believe it? <GovernedTag>Formal reliance</GovernedTag> locks evidence once relied on;{" "}
+            <WorkingTag>Working link</WorkingTag> informs live work and never locks.
+          </span>
+        }
+      >
         {entries.length === 0 ? (
           <Empty>No evidence recorded yet.</Empty>
         ) : (
@@ -41,7 +49,8 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                 <th>Source</th>
                 <th>Evidence date</th>
                 <th>Document</th>
-                <th>Supports</th>
+                <th>Formal reliance</th>
+                <th>Working links</th>
                 <th>Flags</th>
               </tr>
             </thead>
@@ -62,13 +71,10 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                   <td>{e.sourcePersonName ?? "—"}</td>
                   <td className="whitespace-nowrap">{formatDate(e.evidence.evidenceDate)}</td>
                   <td className="max-w-[12rem] truncate">{e.documentTitle ?? "—"}</td>
-                  <td className="text-xs" data-testid="evidence-use">
-                    {e.links.length === 0 &&
-                      e.authorises.length === 0 &&
-                      e.reviewLinks.length === 0 &&
-                      e.matterLinks.length === 0 &&
-                      e.driverLinks.length === 0 &&
-                      e.fulfils.length === 0 && <span className="text-slate-400">Not linked</span>}
+                  <td className="text-xs" data-testid="evidence-formal">
+                    {e.links.length === 0 && e.authorises.length === 0 && e.reviewLinks.length === 0 && (
+                      <span className="text-slate-400">—</span>
+                    )}
                     {e.reviewLinks.map((l) => (
                       <div key={l.linkId}>Assurance Review #{l.sequence}</div>
                     ))}
@@ -81,6 +87,11 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                     {e.authorises.map((v) => (
                       <div key={v}>Authorises V{v}</div>
                     ))}
+                  </td>
+                  <td className="text-xs" data-testid="evidence-use">
+                    {e.matterLinks.length === 0 && e.driverLinks.length === 0 && e.fulfils.length === 0 && (
+                      <span className="text-slate-400">—</span>
+                    )}
                     {e.matterLinks.map((l) => (
                       <div key={l.linkId} className="text-violet-800">
                         Matter {l.code} <span className="text-violet-600">(working)</span>

@@ -71,7 +71,7 @@ export default async function ValueDriverPage({ params }: PageProps<"/projects/[
       <div className="mb-6 grid gap-3 sm:grid-cols-3" data-testid="driver-readings">
         <div className="rounded border border-dashed border-violet-300 bg-violet-50 p-3">
           <div className="text-xs font-semibold text-violet-800 uppercase">Working estimate</div>
-          <WorkingEstimate value={working?.workingEstimate} currency={currency} />
+          <WorkingEstimate value={working?.workingEstimate} currency={currency} noRecord={!record} />
         </div>
         <div className="rounded border border-slate-200 bg-white p-3">
           <div className="text-xs font-semibold text-slate-500 uppercase">Authorised Value</div>

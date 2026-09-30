@@ -51,11 +51,16 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
   return (
     <>
       <StateBanner status={v1?.status ?? null} versionNumber={v1?.versionNumber ?? 1} />
-      {v1 && (
-        <p className="-mt-2 mb-4 text-sm print:hidden">
-          <TextLink href={reportPreviewHref(projectId, "requalification", v1.id)}>Re-Qualification Report</TextLink>
-        </p>
-      )}
+      <p className="-mt-2 mb-4 text-sm text-slate-600 print:hidden" data-testid="requal-role">
+        Re-Qualification establishes the initial defensible Value Case and Authorised V1. For ongoing Value Driver
+        assessment, use <TextLink href={`/projects/${projectId}/value-drivers`}>Value Drivers</TextLink>.
+        {v1 && (
+          <>
+            {" "}
+            · <TextLink href={reportPreviewHref(projectId, "requalification", v1.id)}>Re-Qualification Report</TextLink>
+          </>
+        )}
+      </p>
 
       {/* ---- Headline comparison -------------------------------------------------- */}
       <div className="mb-6 grid gap-3 sm:grid-cols-3" data-testid="requal-headline">

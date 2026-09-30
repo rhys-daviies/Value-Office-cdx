@@ -1,7 +1,10 @@
 import { eq } from "drizzle-orm";
 
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
+import { createEmergingDriver } from "@/server/commands/drivers";
 import { recordEvidence } from "@/server/commands/evidence";
+import { documentMatterEvidence, requestMatterEvidence } from "@/server/commands/matter-evidence";
+import { assessMatterWorking, createMatter, setMatterRemediation, setMatterStage } from "@/server/commands/matters";
 import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { createProject } from "@/server/commands/project";
 import type { Actor } from "@/server/commands/run";
@@ -109,6 +112,69 @@ export async function seedCompactDecided(actor: Actor, opts: { code: string; nam
     decidedByPersonId: valueCase!.vcoPersonId!,
     decidedOn: today,
     rationale: "Synthetic decision",
+  });
+  return { project };
+}
+
+/**
+ * Phase 4D.4 "daily Value Office" fixture: a formal Review #1 (forecast $1.4m), and live Continuous
+ * Assurance work — an escalated quantified matter, an unquantified matter awaiting evidence with
+ * working evidence and an open request, and an emerging driver. Synthetic only.
+ */
+export async function seedCompactOperating(actor: Actor, opts: { code: string; name: string }) {
+  const { project } = await seedCompactAuthorised(actor, opts);
+  const drivers = await db()
+    .select({ id: schema.valueDriver.id, code: schema.valueDriver.code })
+    .from(schema.valueDriver)
+    .where(eq(schema.valueDriver.projectId, project.id));
+  const id = (c: string) => drivers.find((d) => d.code === c)!.id;
+  const [vco] = await db()
+    .select({ id: schema.valueCase.vcoPersonId })
+    .from(schema.valueCase)
+    .where(eq(schema.valueCase.projectId, project.id));
+  const today = new Date().toISOString().slice(0, 10);
+  const review = await createReview(actor, { projectId: project.id, trigger: "ad_hoc", reviewDate: today });
+  await upsertValuePositions(actor, {
+    reviewId: review.id,
+    positions: [
+      { valueDriverId: id("VD-01"), currentForecast: "900000.00" },
+      { valueDriverId: id("VD-02"), currentForecast: "500000.00" },
+      { valueDriverId: id("VD-03"), forecastRationale: "On track" },
+    ],
+  });
+  await finaliseReview(actor, { reviewId: review.id });
+
+  const escalated = await createMatter(actor, {
+    projectId: project.id,
+    code: "VL-101",
+    title: "Budget freeze on cutover",
+    responseOwnerPersonId: vco!.id!,
+    driverIds: [id("VD-01")],
+  });
+  await setMatterStage(actor, { matterId: escalated.id, stage: "escalated" });
+  await assessMatterWorking(actor, { matterId: escalated.id, workingTotalAmount: "300000.00" });
+
+  const awaiting = await createMatter(actor, {
+    projectId: project.id,
+    code: "VL-102",
+    title: "Supplier capacity unconfirmed",
+    driverIds: [id("VD-02")],
+  });
+  await setMatterStage(actor, { matterId: awaiting.id, stage: "awaiting_evidence" });
+  await documentMatterEvidence(actor, { matterId: awaiting.id, code: "E-003", title: "Supplier status letter" });
+  await requestMatterEvidence(actor, {
+    matterId: awaiting.id,
+    newRequestTitle: "Assurance evidence",
+    description: "Supplier capacity plan",
+  });
+  await setMatterRemediation(actor, { matterId: awaiting.id, remediationPlan: "Secondary supplier on standby" });
+
+  await createEmergingDriver(actor, {
+    projectId: project.id,
+    code: "VD-04",
+    name: "Automation Opportunity",
+    workingEstimate: "200000.00",
+    originValueLeakageId: awaiting.id,
   });
   return { project };
 }

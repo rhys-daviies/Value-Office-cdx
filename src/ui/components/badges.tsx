@@ -116,3 +116,24 @@ export function RequestItemBadge({ status }: { status: keyof typeof IR_ITEM_STAT
   const tone = { open: "amber", partially_received: "sky", received: "emerald", not_available: "slate" } as const;
   return <PlainBadge tone={tone[status]}>{IR_ITEM_STATUS_LABELS[status]}</PlainBadge>;
 }
+
+// Working vs formal visual language (Phase 4D.4). Working = living, editable, not formally reviewed,
+// not authorised: violet, dashed, always with words. Governed = authorised or finalised, point in
+// time: solid slate with a lock. Colour is never the only signal.
+
+export function WorkingTag({ children = "Working · not formally reviewed" }: { children?: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded border border-dashed border-violet-400 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-violet-800 uppercase">
+      {children}
+    </span>
+  );
+}
+
+export function GovernedTag({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded border border-slate-400 bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-slate-700 uppercase">
+      <span aria-hidden>🔒&nbsp;</span>
+      {children}
+    </span>
+  );
+}

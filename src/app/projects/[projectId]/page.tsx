@@ -1,23 +1,17 @@
-import { getNextAssuranceRequirement, getValuePositionSummary } from "@/server/queries/assurance";
 import { getProjectOverview } from "@/server/queries/projects";
-import { getResponseSummary } from "@/server/queries/response";
-import {
-  change,
-  Figure,
-  forecastHeadline,
-  headline,
-  NOT_ASSESSED,
-  realisedHeadline,
-  RequirementBadge,
-} from "@/ui/assurance/display";
+import { getOverviewValueOfficeState } from "@/server/queries/workspace";
+import { AttentionBadges } from "@/ui/assurance/matters";
+import { GovernedPosition, WorkingPicture } from "@/ui/assurance/picture";
+import { change, Figure, NOT_ASSESSED, RequirementBadge } from "@/ui/assurance/display";
 import {
   EvidenceBadge,
   NonFinancialBadge,
   QualificationBadge,
   RequestItemBadge,
+  GovernedTag,
   VersionBadge,
 } from "@/ui/components/badges";
-import { KeyValues, Missing, Notice, Section, TextLink } from "@/ui/components/layout";
+import { Empty, KeyValues, Missing, Notice, Section, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
 import { IR_STATUS_LABELS, KEY_DATE_LABELS } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
@@ -27,12 +21,12 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STA
 export default async function ProjectOverviewPage({ params }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
   await requireProject(projectId);
-  const [o, position, cadence, response] = await Promise.all([
+  const [o, state] = await Promise.all([
     getProjectOverview(projectId).then((x) => x!),
-    getValuePositionSummary(projectId),
-    getNextAssuranceRequirement(projectId),
-    getResponseSummary(projectId),
+    getOverviewValueOfficeState(projectId),
   ]);
+  const { position, cadence, response } = state;
+  const attentionMatters = state.workspace.matters.filter((m) => m.needsAttention);
   const { project, clientName, valueBasisLocked } = o.header;
   const base = `/projects/${projectId}`;
   const currency = project.currency;
@@ -53,129 +47,152 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
       )}
 
       {position.authorised && (
-        <Section
-          title="Value Assurance"
-          actions={<TextLink href={`${base}/assurance`}>Open Assurance</TextLink>}
-          description={
-            position.latest
-              ? `Latest finalised position: Review #${position.latest.review.sequence}, ${formatDate(position.latest.review.reviewDate)}`
-              : "No finalised Assurance Review yet."
-          }
-        >
-          <div className="grid gap-3 sm:grid-cols-4" data-testid="overview-assurance">
-            <Figure
-              label={`Authorised Value (V${position.authorised.versionNumber})`}
-              value={formatMoneyShort(position.authorisedTotal, currency)}
-              testId="overview-authorised-value"
+        <>
+          <div className="mb-3 grid gap-3" data-testid="overview-assurance">
+            <GovernedPosition
+              authorisedVersion={position.authorised.versionNumber}
+              authorisedTotal={position.authorisedTotal}
+              totals={position.latest?.totals ?? null}
+              reviewSequence={position.latest?.review.sequence ?? null}
+              currency={currency}
+              prefix="overview"
             />
-            <Figure
-              label="Current Forecast"
-              value={position.latest ? forecastHeadline(position.latest.totals, currency).value : NOT_ASSESSED}
-              testId="overview-forecast"
-              emphasis
-            />
-            <Figure
-              label="Realised Value"
-              value={position.latest ? realisedHeadline(position.latest.totals, currency).value : NOT_ASSESSED}
-              note={position.latest ? realisedHeadline(position.latest.totals, currency).note : undefined}
-              testId="overview-realised"
-            />
-            <Figure
-              label="Value Gap"
-              value={position.latest ? headline(position.latest.totals.valueGap, currency, "Incomplete") : NOT_ASSESSED}
-              note={
-                position.latest
-                  ? `Movement ${change(position.latest.totals.movement, currency, "incomplete")}`
-                  : undefined
-              }
-              testId="overview-gap"
-            />
+            <WorkingPicture workspace={state.workspace} currency={currency} href={`${base}/assurance#continuous`} />
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3" data-testid="overview-leakage">
-            <Figure
-              label={`Open Value Leakage (${response.openLeakageCount})`}
-              value={
-                response.leakage.total === null
-                  ? response.openLeakageCount
-                    ? NOT_ASSESSED
-                    : "None"
-                  : formatMoneyShort(response.leakage.total, currency)
-              }
-              note={
-                response.openLeakageCount
-                  ? `${response.leakage.assessedCount} of ${response.openLeakageCount} assessed in a finalised review`
-                  : "Independent of Value Gap"
-              }
-              testId="overview-leakage-total"
-            />
-            <Figure
-              label="Recoverable VL"
-              value={
-                response.leakage.recoverable === null ? "—" : formatMoneyShort(response.leakage.recoverable, currency)
-              }
-              testId="overview-leakage-recoverable"
-            />
-            <Figure
-              label="Unrecoverable VL"
-              value={
-                response.leakage.unrecoverable === null
-                  ? "—"
-                  : formatMoneyShort(response.leakage.unrecoverable, currency)
-              }
-              testId="overview-leakage-unrecoverable"
-            />
-          </div>
-          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-            <p data-testid="overview-authorised-version">
-              <span className="text-slate-500">Authorised Value Case in force: </span>
-              <TextLink href={`${base}/value-case/v/${position.authorised.versionNumber}`}>
-                V{position.authorised.versionNumber}
-              </TextLink>
-              {response.openChange && (
-                <>
-                  {" "}
-                  · open change{" "}
-                  <TextLink href={`${base}/changes/${response.openChange.id}`}>
-                    {response.openChange.code} ({response.openChange.status})
+
+          <div className="mb-6 grid gap-6 lg:grid-cols-[3fr_2fr]">
+            <Section
+              title="Needs attention"
+              description="Derived from open matters' stage, owner and dates. Nothing here is a task or a notification."
+              actions={<TextLink href={`${base}/assurance?stage=attention#continuous`}>All in Assurance</TextLink>}
+            >
+              {attentionMatters.length === 0 ? (
+                <Empty>No open Assurance matter needs attention.</Empty>
+              ) : (
+                <ul className="space-y-2 text-sm" data-testid="overview-attention">
+                  {attentionMatters.slice(0, 6).map((m) => (
+                    <li key={m.entry.leakage.id} className="flex flex-wrap items-start justify-between gap-2">
+                      <TextLink href={`${base}/assurance/matters/${m.entry.leakage.id}`}>
+                        {m.entry.leakage.code} {m.entry.leakage.title}
+                      </TextLink>
+                      <AttentionBadges items={m.attention} />
+                    </li>
+                  ))}
+                  {attentionMatters.length > 6 && (
+                    <li className="text-xs text-slate-500">+ {attentionMatters.length - 6} more in Assurance</li>
+                  )}
+                </ul>
+              )}
+            </Section>
+
+            <Section title="Governance">
+              <div className="space-y-2 text-sm">
+                <p data-testid="overview-authorised-version">
+                  <span className="text-slate-500">Authorised Value Case in force: </span>
+                  <TextLink href={`${base}/value-case/v/${position.authorised.versionNumber}`}>
+                    V{position.authorised.versionNumber}
                   </TextLink>
-                </>
-              )}
-            </p>
-            <p data-testid="overview-recommendation">
-              <span className="text-slate-500">Latest Cardaxia recommendation: </span>
-              {response.recommendation
-                ? `${response.recommendation.scenario.label} ${formatMoneyShort(response.recommendation.scenario.totalValue, currency)} (Review #${response.recommendation.review.sequence})`
-                : "None issued"}
-            </p>
-            <p data-testid="overview-decision">
-              <span className="text-slate-500">Latest client decision: </span>
-              {response.decision
-                ? `${response.decision.scenario.label} ${formatMoneyShort(response.decision.scenario.totalValue, currency)}${response.decision.difference ? ` (${change(response.decision.difference, currency)} vs recommendation)` : ""}`
-                : "None recorded"}
-            </p>
-            <p>
-              <span className="text-slate-500">Last Assurance Review: </span>
-              {position.reviews.length === 0 ? (
-                "None"
-              ) : (
-                <TextLink href={`${base}/assurance/${position.reviews.at(-1)!.review.id}`}>
-                  #{position.reviews.at(-1)!.review.sequence} ({position.reviews.at(-1)!.review.status})
-                </TextLink>
-              )}
-            </p>
-            <p data-testid="overview-next-requirement">
-              <span className="text-slate-500">Next Assurance Requirement: </span>
-              {cadence.next ? (
-                <>
-                  {cadence.next.label} <RequirementBadge status={cadence.next.status} />
-                  {cadence.next.date && ` ${formatDate(cadence.next.date)}`}
-                </>
-              ) : (
-                "None derivable"
-              )}
-            </p>
+                  {position.authorised.authorisedOn && ` · authorised ${formatDate(position.authorised.authorisedOn)}`}
+                  {response.openChange && (
+                    <>
+                      {" "}
+                      · open change{" "}
+                      <TextLink href={`${base}/changes/${response.openChange.id}`}>
+                        {response.openChange.code} ({response.openChange.status})
+                      </TextLink>
+                    </>
+                  )}
+                </p>
+                <p>
+                  <span className="text-slate-500">Last Assurance Review: </span>
+                  {state.lastReview ? (
+                    <TextLink href={`${base}/assurance/${state.lastReview.review.id}`}>
+                      #{state.lastReview.review.sequence} · {formatDate(state.lastReview.review.reviewDate)} (
+                      {state.lastReview.review.status})
+                    </TextLink>
+                  ) : (
+                    "None"
+                  )}
+                </p>
+                <p data-testid="overview-next-requirement">
+                  <span className="text-slate-500">Next Assurance Requirement: </span>
+                  {cadence.next ? (
+                    <>
+                      {cadence.next.label} <RequirementBadge status={cadence.next.status} />
+                      {cadence.next.date && ` ${formatDate(cadence.next.date)}`}
+                    </>
+                  ) : (
+                    "None derivable"
+                  )}
+                </p>
+                <p data-testid="overview-recommendation">
+                  <span className="text-slate-500">Latest Cardaxia recommendation: </span>
+                  {response.recommendation
+                    ? `${response.recommendation.scenario.label} ${formatMoneyShort(response.recommendation.scenario.totalValue, currency)} (Review #${response.recommendation.review.sequence})`
+                    : "None issued"}
+                </p>
+                <p data-testid="overview-decision">
+                  <span className="text-slate-500">Latest client decision: </span>
+                  {response.decision
+                    ? `${response.decision.scenario.label} ${formatMoneyShort(response.decision.scenario.totalValue, currency)}${response.decision.difference ? ` (${change(response.decision.difference, currency)} vs recommendation)` : ""}`
+                    : "None recorded"}
+                </p>
+                <p data-testid="overview-drivers">
+                  <span className="text-slate-500">Value Drivers: </span>
+                  <TextLink href={`${base}/value-drivers`}>
+                    {state.drivers.inValueCase} in Value Case
+                    {state.drivers.emerging > 0 && ` · ${state.drivers.emerging} emerging`}
+                    {state.drivers.outsideCurrent > 0 && ` · ${state.drivers.outsideCurrent} outside current`}
+                  </TextLink>
+                </p>
+              </div>
+            </Section>
           </div>
-        </Section>
+
+          <Section
+            title={
+              <span className="inline-flex flex-wrap items-center gap-2">
+                Formal Value Leakage <GovernedTag>Latest finalised assessments</GovernedTag>
+              </span>
+            }
+            description="What finalised Assurance Reviews have recorded for open matters. Independent of Value Gap and of the working picture above."
+          >
+            <div className="grid gap-3 sm:grid-cols-3" data-testid="overview-leakage">
+              <Figure
+                label={`Open Value Leakage (${response.openLeakageCount})`}
+                value={
+                  response.leakage.total === null
+                    ? response.openLeakageCount
+                      ? NOT_ASSESSED
+                      : "None"
+                    : formatMoneyShort(response.leakage.total, currency)
+                }
+                note={
+                  response.openLeakageCount
+                    ? `${response.leakage.assessedCount} of ${response.openLeakageCount} assessed in a finalised review`
+                    : "Independent of Value Gap"
+                }
+                testId="overview-leakage-total"
+              />
+              <Figure
+                label="Recoverable VL"
+                value={
+                  response.leakage.recoverable === null ? "—" : formatMoneyShort(response.leakage.recoverable, currency)
+                }
+                testId="overview-leakage-recoverable"
+              />
+              <Figure
+                label="Unrecoverable VL"
+                value={
+                  response.leakage.unrecoverable === null
+                    ? "—"
+                    : formatMoneyShort(response.leakage.unrecoverable, currency)
+                }
+                testId="overview-leakage-unrecoverable"
+              />
+            </div>
+          </Section>
+        </>
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">

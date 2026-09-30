@@ -1,4 +1,4 @@
-import { and, asc, eq, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { EvidenceStatus, QualificationStatus } from "@/domain/statuses";
@@ -15,6 +15,11 @@ import { listStakeholders } from "./mobilise";
 
 /** Derived, never stored: in the Value Case iff the identity is in the authorised version in force. */
 export type LivingStatus = "in_value_case" | "emerging";
+/**
+ * Display status (Phase 4D.4, PMO): a driver that was in an earlier authorised version but not in the
+ * one in force is "Outside Current Value Case", not "Emerging". Still derived; nothing is stored.
+ */
+export type DriverPresentation = "in_value_case" | "outside_current" | "emerging";
 
 type Working = {
   name: string;
@@ -74,6 +79,20 @@ export async function getDriverRegister(projectId: string) {
   ]);
 
   const inForce = summary.authorised;
+  // Informational only: identities in the proposed version of a draft or proposed Value Change.
+  const pending = await db()
+    .select({
+      valueDriverId: schema.valueDriverVersion.valueDriverId,
+      changeId: schema.valueChange.id,
+      code: schema.valueChange.code,
+      status: schema.valueChange.status,
+    })
+    .from(schema.valueChange)
+    .innerJoin(
+      schema.valueDriverVersion,
+      eq(schema.valueDriverVersion.valueCaseVersionId, schema.valueChange.toVersionId),
+    )
+    .where(and(eq(schema.valueChange.projectId, projectId), inArray(schema.valueChange.status, ["draft", "proposed"])));
   const latest =
     summary.latest && inForce && summary.latest.review.againstVersionId === inForce.id ? summary.latest : null;
   const forecastRows = latest ? ((await getAssuranceWorkspace(projectId, latest.review.id))?.rows ?? []) : [];
@@ -95,7 +114,14 @@ export async function getDriverRegister(projectId: string) {
         : null;
     const forecast = authorisedRow ? (forecastRows.find((r) => r.valueDriverId === driver.id) ?? null) : null;
     const status: LivingStatus = authorisedRow ? "in_value_case" : "emerging";
+    const everAuthorised = own.some((v) => v.version.status === "superseded" || v.version.status === "authorised");
+    const presentation: DriverPresentation = authorisedRow
+      ? "in_value_case"
+      : everAuthorised
+        ? "outside_current"
+        : "emerging";
     return {
+      presentation,
       driver,
       status,
       /** Null until a consultant starts the working record (existing drivers). */
@@ -124,6 +150,8 @@ export async function getDriverRegister(projectId: string) {
         : null,
       matters: matterLinks.filter((m) => m.valueDriverId === driver.id),
       workingEvidenceCount: evidenceLinks.filter((l) => l.valueDriverId === driver.id).length,
+      /** Draft/proposed Value Change whose proposed version contains this identity (context only). */
+      pendingChange: pending.find((p) => p.valueDriverId === driver.id) ?? null,
     };
   });
   return { entries, inForce, stakeholders, authorisedTotal: summary.authorisedTotal };
