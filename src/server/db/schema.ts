@@ -1047,6 +1047,108 @@ export const valueChange = pgTable(
   ],
 );
 
+// ---------------------------------------------------------------------------
+// Living Value Driver (Phase 4D.3)
+//
+// value_driver          – stable identity (VD-01), unchanged
+// value_driver_record   – Cardaxia's current WORKING understanding of that driver, one per identity.
+//                         Never part of any total; never rewrites a value_driver_version. Emerging
+//                         drivers have only this; existing drivers get one when a consultant starts it.
+// value_driver_version  – the governed content within one Value Case version, unchanged
+// Living status is derived, not stored: "in Value Case" = the identity is in the authorised version.
+
+export const valueDriverRecord = pgTable(
+  "value_driver_record",
+  {
+    id: id(),
+    valueDriverId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    name: text().notNull(),
+    description: text(),
+    metric: text(),
+    metricUnit: text(),
+    baselineValue: metricCol(),
+    targetValue: metricCol(),
+    calculationRationale: text(),
+    // WORKING / NOT AUTHORISED. Null = not yet quantified (never zero). Never summed into any total.
+    workingEstimate: moneyCol(),
+    estimateRecordedBy: uuid().references(() => appUser.id),
+    estimateRecordedAt: timestamp({ withTimezone: true }),
+    // Working AVO; value_driver_version.avo_person_id stays the AVO as at each version.
+    avoPersonId: uuid(),
+    qualificationStatus: qualificationStatus().notNull().default("unqualified"),
+    evidenceStatus: evidenceStatus().notNull().default("unevidenced"),
+    notes: text(),
+    // Emerging drivers: when and (optionally) in which Assurance matter it was identified.
+    identifiedOn: date(),
+    originValueLeakageId: uuid(),
+    // Existing drivers: the version whose content the working record started from.
+    initialisedFromVersionId: uuid(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("value_driver_record_driver_uq").on(t.valueDriverId),
+    unique("value_driver_record_id_project_uq").on(t.id, t.projectId),
+    foreignKey({
+      name: "value_driver_record_driver_fk",
+      columns: [t.valueDriverId, t.projectId],
+      foreignColumns: [valueDriver.id, valueDriver.projectId],
+    }),
+    foreignKey({
+      name: "value_driver_record_avo_fk",
+      columns: [t.projectId, t.avoPersonId],
+      foreignColumns: [projectStakeholder.projectId, projectStakeholder.personId],
+    }),
+    foreignKey({
+      name: "value_driver_record_origin_fk",
+      columns: [t.originValueLeakageId, t.projectId],
+      foreignColumns: [valueLeakage.id, valueLeakage.projectId],
+    }),
+    foreignKey({
+      name: "value_driver_record_initialised_from_fk",
+      columns: [t.initialisedFromVersionId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.projectId],
+    }),
+    check("value_driver_record_name_not_blank", sql`length(trim(${t.name})) > 0`),
+    check("value_driver_record_estimate_non_negative", sql`${t.workingEstimate} is null or ${t.workingEstimate} >= 0`),
+    check(
+      "value_driver_record_estimate_attribution",
+      sql`(${t.workingEstimate} is null) = (${t.estimateRecordedBy} is null and ${t.estimateRecordedAt} is null)`,
+    ),
+    check(
+      "value_driver_record_origin_shape",
+      sql`(${t.identifiedOn} is not null) <> (${t.initialisedFromVersionId} is not null)`,
+    ),
+  ],
+);
+
+/** Working assumptions of a living driver; copied (not linked) into a version when it is included. */
+export const valueDriverRecordAssumption = pgTable(
+  "value_driver_record_assumption",
+  {
+    id: id(),
+    valueDriverRecordId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    statement: text().notNull(),
+    evidenceStatus: evidenceStatus().notNull().default("unevidenced"),
+    notes: text(),
+    sortOrder: integer().notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "value_driver_record_assumption_record_fk",
+      columns: [t.valueDriverRecordId, t.projectId],
+      foreignColumns: [valueDriverRecord.id, valueDriverRecord.projectId],
+    }),
+    check("value_driver_record_assumption_not_blank", sql`length(trim(${t.statement})) > 0`),
+    index("value_driver_record_assumption_record_idx").on(t.valueDriverRecordId),
+  ],
+);
+
 /**
  * Links evidence to exactly one target. Formal reliance: a driver version, an assumption, or an
  * Assurance Review (evidence relevant to that review's value position). Working links (Phase 4D.2):

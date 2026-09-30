@@ -56,6 +56,17 @@ export const COMMANDS = {
   requestMatterEvidence: "matter.requestEvidence",
   linkDriverEvidence: "evidence.linkDriver", // trigger-checked
   unlinkDriverEvidence: "evidence.unlinkDriver", // trigger-checked
+  createEmergingDriver: "driver.createEmerging", // trigger-checked
+  initialiseDriverRecord: "driver.initialiseRecord", // trigger-checked
+  updateDriverWorking: "driver.updateWorking", // trigger-checked
+  setDriverAvo: "driver.setAvo", // trigger-checked
+  setDriverQualification: "driver.setQualification", // trigger-checked
+  setDriverEvidenceStatus: "driver.setEvidenceStatus", // trigger-checked
+  setDriverEstimate: "driver.setEstimate", // trigger-checked
+  addDriverAssumption: "driver.addAssumption", // trigger-checked
+  updateDriverAssumption: "driver.updateAssumption", // trigger-checked
+  removeDriverAssumption: "driver.removeAssumption", // trigger-checked
+  includeDriverInValueChange: "valueChange.includeDriver",
   updateLeakage: "leakage.update",
   setLeakageDrivers: "leakage.setDrivers",
   assessLeakage: "leakage.assess",

@@ -274,3 +274,95 @@ export const withdrawValueChange = defineCommand(
     return row!;
   },
 );
+
+/**
+ * Phase 4D.3: include an existing driver identity (typically an emerging one) in the draft version
+ * of a draft Value Change. The new value_driver_version starts from the living record — same stable
+ * identity — and its working assumptions are copied. From then on the draft row is its own governed
+ * copy: nothing synchronises it with the living record. Earlier versions are untouched, and the
+ * usual reconciliation, proposal and VCO authorisation still apply. Working evidence links on the
+ * identity are not copied: formal reliance on evidence stays a deliberate link on the version.
+ */
+export const includeDriverInValueChange = defineCommand(
+  COMMANDS.includeDriverInValueChange,
+  z.object({ changeId: uuid, valueDriverId: uuid }),
+  async ({ tx }, input) => {
+    const change = await getChange(tx, input.changeId);
+    if (change.status !== "draft") {
+      throw new DomainError(
+        "VO_VALUE_CHANGE_IMMUTABLE",
+        `${change.code} is ${change.status}; return it to draft first`,
+      );
+    }
+    const [version] = await tx
+      .select()
+      .from(schema.valueCaseVersion)
+      .where(eq(schema.valueCaseVersion.id, change.toVersionId))
+      .for("update");
+    if (version?.status !== "draft") {
+      throw new DomainError("VO_VERSION_IMMUTABLE", "The proposed Value Case version is not a draft");
+    }
+    const [driver] = await tx.select().from(schema.valueDriver).where(eq(schema.valueDriver.id, input.valueDriverId));
+    if (driver?.valueCaseId !== change.valueCaseId) throw new DomainError("VO_NOT_FOUND", "Value Driver not found");
+    const [existing] = await tx
+      .select({ id: schema.valueDriverVersion.id })
+      .from(schema.valueDriverVersion)
+      .where(
+        and(
+          eq(schema.valueDriverVersion.valueCaseVersionId, version.id),
+          eq(schema.valueDriverVersion.valueDriverId, driver.id),
+        ),
+      );
+    if (existing) {
+      throw new DomainError("VO_DRIVER_ALREADY_INCLUDED", `${driver.code} is already in V${version.versionNumber}`);
+    }
+    const [record] = await tx
+      .select()
+      .from(schema.valueDriverRecord)
+      .where(eq(schema.valueDriverRecord.valueDriverId, driver.id));
+    if (!record) {
+      throw new DomainError("VO_NO_WORKING_RECORD", `${driver.code} has no working record to start from`);
+    }
+    const [{ last } = { last: null }] = await tx
+      .select({ last: max(schema.valueDriverVersion.sortOrder) })
+      .from(schema.valueDriverVersion)
+      .where(eq(schema.valueDriverVersion.valueCaseVersionId, version.id));
+    const [driverVersion] = await tx
+      .insert(schema.valueDriverVersion)
+      .values({
+        valueCaseVersionId: version.id,
+        valueDriverId: driver.id,
+        valueCaseId: version.valueCaseId,
+        projectId: version.projectId,
+        name: record.name,
+        description: record.description,
+        metric: record.metric,
+        metricUnit: record.metricUnit,
+        baselineValue: record.baselineValue,
+        targetValue: record.targetValue,
+        calculationRationale: record.calculationRationale,
+        financialValue: record.workingEstimate,
+        avoPersonId: record.avoPersonId,
+        qualificationStatus: record.qualificationStatus,
+        evidenceStatus: record.evidenceStatus,
+        notes: record.notes,
+        sortOrder: (last ?? 0) + 1,
+      })
+      .returning();
+    const assumptions = await tx
+      .select()
+      .from(schema.valueDriverRecordAssumption)
+      .where(eq(schema.valueDriverRecordAssumption.valueDriverRecordId, record.id));
+    for (const a of assumptions) {
+      await tx.insert(schema.assumption).values({
+        valueDriverVersionId: driverVersion!.id,
+        projectId: a.projectId,
+        statement: a.statement,
+        evidenceStatus: a.evidenceStatus,
+        notes: a.notes,
+        sortOrder: a.sortOrder,
+      });
+    }
+    return driverVersion!;
+  },
+);

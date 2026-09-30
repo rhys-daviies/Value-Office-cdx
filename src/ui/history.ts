@@ -33,6 +33,7 @@ export function recordName(change: AuditRow): string {
     case "information_request_item":
       return `#${r.sequence} ${truncate(String(r.description ?? ""), 60)}`;
     case "assumption":
+    case "value_driver_record_assumption":
       return truncate(String(r.statement ?? ""), 60);
     case "key_date":
       return `${r.label} ${r.date}`;

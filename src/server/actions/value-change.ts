@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   authoriseValueChange,
   createValueChange,
+  includeDriverInValueChange,
   proposeValueChange,
   rejectValueChange,
   returnValueChange,
@@ -88,5 +89,16 @@ export async function withdrawValueChangeAction(_prev: ActionState, fd: FormData
   return perform(projectOf(fd), async (actor) => {
     const c = await withdrawValueChange(actor, { changeId: changeOf(fd), closureNote: required(fd, "closureNote") });
     return `${c.code} withdrawn`;
+  });
+}
+
+/** Phase 4D.3: add an existing (typically emerging) driver identity to the proposed version only. */
+export async function includeDriverAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    const dv = await includeDriverInValueChange(actor, {
+      changeId: changeOf(fd),
+      valueDriverId: required(fd, "valueDriverId"),
+    });
+    return `${dv.name} added to the proposed Value Case`;
   });
 }

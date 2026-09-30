@@ -139,6 +139,60 @@ describe("least-privilege application role", () => {
     ).rejects.toThrow(/VO_FIELD_IMMUTABLE/);
   });
 
+  it("works living and emerging Value Drivers (Phase 4D.3) under the same guards", async () => {
+    const actor = await newActor();
+    const { project } = await seedCompactAuthorised(actor, {
+      code: `R-${randomUUID().slice(0, 6)}`,
+      name: "Role drivers",
+    });
+    const run = async (command: string, statement: string, params: unknown[]) => {
+      await app.query("BEGIN");
+      await app.query("select set_config('vo.actor_id', $1, true), set_config('vo.command', $2, true)", [
+        actor.userId,
+        command,
+      ]);
+      try {
+        const res = await app.query(statement, params);
+        await app.query("COMMIT");
+        return res;
+      } catch (err) {
+        await app.query("ROLLBACK");
+        throw err;
+      }
+    };
+    const [driver] = (
+      await run(
+        "driver.createEmerging",
+        `insert into value_driver (value_case_id, project_id, code)
+         select c.id, c.project_id, 'VD-R9' from value_case c where c.project_id = $1 returning id`,
+        [project.id],
+      )
+    ).rows;
+    const [record] = (
+      await run(
+        "driver.createEmerging",
+        `insert into value_driver_record (value_driver_id, project_id, name, identified_on, created_by)
+         values ($1, $2, 'Role emerging', current_date, $3) returning id`,
+        [driver.id, project.id, actor.userId],
+      )
+    ).rows;
+    await run("driver.setEstimate", "update value_driver_record set working_estimate = 5 where id = $1", [record.id]);
+    const [row] = (await app.query("select estimate_recorded_by from value_driver_record where id = $1", [record.id]))
+      .rows;
+    expect(row.estimate_recorded_by).toBe(actor.userId);
+    await run(
+      "driver.addAssumption",
+      "insert into value_driver_record_assumption (value_driver_record_id, project_id, statement) values ($1, $2, 'A')",
+      [record.id, project.id],
+    );
+    await expect(
+      run("driver.setAvo", "update value_driver_record set working_estimate = 6 where id = $1", [record.id]),
+    ).rejects.toThrow(/VO_WRONG_COMMAND/);
+    await expect(run("driver.setAvo", "delete from value_driver where id = $1", [driver.id])).rejects.toThrow(
+      /VO_DRIVER_IN_USE/,
+    );
+  });
+
   it("cannot bypass the integrity model", async () => {
     expect(await refused("ALTER TABLE report_issue DISABLE TRIGGER vo_report_issue_guard")).toMatch(/must be owner/);
     expect(await refused("DROP TRIGGER vo_audit ON project")).toMatch(/must be owner/);

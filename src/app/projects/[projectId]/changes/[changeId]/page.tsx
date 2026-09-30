@@ -4,12 +4,14 @@ import { recordEvidenceAction } from "@/server/actions/evidence";
 import {
   authoriseValueChangeAction,
   proposeValueChangeAction,
+  includeDriverAction,
   rejectValueChangeAction,
   returnValueChangeAction,
   updateValueChangeAction,
   withdrawValueChangeAction,
 } from "@/server/actions/value-change";
 import { getCurrentActor } from "@/server/auth/actor";
+import { getDriverRegister } from "@/server/queries/drivers";
 import { nextEvidenceCode } from "@/server/queries/evidence";
 import { listEvidenceOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
@@ -22,6 +24,7 @@ import { KeyValues, Notice, Section, Table, TextLink } from "@/ui/components/lay
 import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate, formatDateTime, formatMoneyChange, formatMoneyShort, moneyInputValue } from "@/ui/format";
 import { isUuid, requireProject } from "@/ui/require";
+import { WorkingEstimate } from "@/ui/drivers/display";
 import { AddDriverForm, DriverEditor } from "@/ui/value-case/drivers";
 
 export const metadata = { title: "Value Change" };
@@ -42,11 +45,15 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
   if (!isUuid(changeId)) notFound();
   const d = await getValueChangeDetail(projectId, changeId);
   if (!d) notFound();
-  const [stakeholders, evidence, actor] = await Promise.all([
+  const [stakeholders, evidence, actor, register] = await Promise.all([
     listStakeholders(projectId),
     listEvidenceOptions(projectId),
     getCurrentActor().catch(() => null),
+    getDriverRegister(projectId),
   ]);
+  // Phase 4D.3: identities with a working record that are not yet in the proposed version.
+  const inProposed = new Set(d.toDrivers.map((drv) => drv.valueDriverId));
+  const includable = register.entries.filter((e) => e.record && !inProposed.has(e.driver.id));
   const { change } = d;
   const currency = project.currency;
   const base = `/projects/${projectId}`;
@@ -302,11 +309,47 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
               versionId={d.toVersion.id}
               ctx={ctx}
               nextCode={nextCode(
-                d.driverRows.map((r) => r.code),
+                register.entries.map((e) => e.driver.code),
                 "VD",
               )}
               sortOrder={d.toDrivers.length + 1}
             />
+          </div>
+        )}
+        {change.status === "draft" && includable.length > 0 && (
+          <div
+            className="mt-4 rounded border border-dashed border-violet-300 bg-violet-50 p-3"
+            data-testid="includable-drivers"
+          >
+            <h3 className="text-sm font-semibold text-violet-900">Include an existing Value Driver</h3>
+            <p className="mb-2 text-xs text-violet-800">
+              This adds the driver to the proposed Value Case only. It does not alter the current Authorised Value Case.
+              It starts from the driver&apos;s working record — its working estimate becomes the proposed financial
+              value, to reconcile and edit here like any other driver.
+            </p>
+            <ul className="space-y-1 text-sm">
+              {includable.map((e) => (
+                <li
+                  key={e.driver.id}
+                  className="flex flex-wrap items-center justify-between gap-2"
+                  data-testid="includable-driver"
+                >
+                  <span>
+                    <span className="font-mono text-slate-500">{e.driver.code}</span> {e.working?.name} ·{" "}
+                    <WorkingEstimate value={e.working?.workingEstimate} currency={currency} />
+                  </span>
+                  <ActionForm
+                    action={includeDriverAction}
+                    confirm={`Add ${e.driver.code} to proposed V${d.toVersion.versionNumber}? The current Authorised Value Case is not changed.`}
+                  >
+                    <Hidden name="projectId" value={projectId} />
+                    <Hidden name="changeId" value={change.id} />
+                    <Hidden name="valueDriverId" value={e.driver.id} />
+                    <SubmitButton variant="secondary">Include in proposed Value Case</SubmitButton>
+                  </ActionForm>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </Section>

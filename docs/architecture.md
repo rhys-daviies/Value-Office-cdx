@@ -209,6 +209,36 @@ created before 4D.2 keep a null purpose and read as Mobilisation. Nothing was ba
 Assurance matter (`information_request_item.value_leakage_id`), but only on an Assurance request, only while the
 matter is open, and the link is immutable. Information Request reports are unchanged.
 
+## Value Drivers: identity, living record, versioned snapshot (Phase 4D.3)
+
+| Layer                  | Record                                         | Changes how                                                   |
+| ---------------------- | ---------------------------------------------- | ------------------------------------------------------------- |
+| **Stable identity**    | `value_driver` (VD-04)                         | created once; never renamed; kept while anything refers to it |
+| **Living record**      | `value_driver_record` (+ working assumptions)  | bounded `driver.*` commands, any time; audited                |
+| **Versioned snapshot** | `value_driver_version` in a Value Case version | draft only; locked with its version                           |
+
+- **Living changes never rewrite authorised history.** The living record holds Cardaxia's current working
+  understanding: working AVO, qualification, evidence status, metric and target, rationale, notes, assumptions and a
+  **working estimate**. A null estimate reads "Not yet quantified". Each version keeps the content and AVO it had.
+  Totals, Value Positions and reports read versions only, so a working estimate can never reach Authorised Value,
+  Current Forecast, Value Gap or realised value.
+- **Emerging drivers.** Once the Value Case is authorised, `driver.createEmerging` adds a new identity with only a
+  living record. It may record the Assurance matter it came from. It has no version and no Value Position, and it
+  creates no Value Change.
+- **Status is derived, not stored.** A driver is **In Value Case** when its identity is in the authorised version in
+  force; otherwise it is **Emerging** (noting "was in Vn" if a Value Change dropped it). Nothing can drift out of sync.
+- **Existing drivers get a record lazily.** Until a consultant starts one (`driver.initialiseRecord`), the register
+  shows the governed content. Starting a record copies the in-force content once, and records
+  `initialised_from_version_id`. Nothing was backfilled.
+- **A Value Change is the only way in.** `valueChange.includeDriver` adds the identity to a draft Value Change's
+  proposed version, starting from the living record (working estimate → proposed financial value; assumptions
+  copied). The normal lifecycle still applies: reconciliation, proposal, VCO authorisation. There is no
+  synchronisation afterwards in either direction. Working evidence links on the identity (4D.2) are not copied;
+  formal reliance stays deliberate.
+- **Identity safety.** `valueCase.removeValueDriver` deletes an identity only when nothing refers to it: no version,
+  living record, position, working evidence, matter, request item or formal matter snapshot.
+  `vo_value_driver_identity_guard` refuses any other deletion.
+
 ## Client reports (Phase 4A)
 
 ```

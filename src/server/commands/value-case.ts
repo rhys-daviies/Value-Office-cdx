@@ -1,4 +1,4 @@
-import { and, eq, inArray, max } from "drizzle-orm";
+import { and, eq, inArray, max, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
@@ -297,7 +297,9 @@ export const updateDriverVersion = defineCommand(
 
 /**
  * Removes a driver from a draft version (its assumptions and links cascade).
- * The driver identity is deleted too unless another version still uses it.
+ * The driver identity is deleted too only when nothing else refers to it: no other version, and no
+ * living record, Value Position, working evidence link, Assurance matter, request item or formal
+ * matter snapshot (Phase 4D.3). An identity with working history survives as an emerging driver.
  */
 export const removeValueDriver = defineCommand(
   COMMANDS.removeValueDriver,
@@ -308,15 +310,26 @@ export const removeValueDriver = defineCommand(
       .where(eq(schema.valueDriverVersion.id, input.driverVersionId))
       .returning();
     if (!removed) throw new DomainError("VO_NOT_FOUND", "Driver version not found");
-    const [stillUsed] = await tx
-      .select({ id: schema.valueDriverVersion.id })
-      .from(schema.valueDriverVersion)
-      .where(eq(schema.valueDriverVersion.valueDriverId, removed.valueDriverId))
-      .limit(1);
-    if (!stillUsed) await tx.delete(schema.valueDriver).where(eq(schema.valueDriver.id, removed.valueDriverId));
+    if (!(await driverInUse(tx, removed.valueDriverId))) {
+      await tx.delete(schema.valueDriver).where(eq(schema.valueDriver.id, removed.valueDriverId));
+    }
     return removed;
   },
 );
+
+/** Mirrors vo_value_driver_identity_guard: every reference that must keep a driver identity alive. */
+export async function driverInUse(tx: Tx, valueDriverId: string): Promise<boolean> {
+  const result = await tx.execute<{ used: boolean }>(sql`
+    select exists (select 1 from value_driver_version where value_driver_id = ${valueDriverId})
+        or exists (select 1 from value_driver_record where value_driver_id = ${valueDriverId})
+        or exists (select 1 from value_position where value_driver_id = ${valueDriverId})
+        or exists (select 1 from evidence_link where value_driver_id = ${valueDriverId})
+        or exists (select 1 from value_leakage_driver where value_driver_id = ${valueDriverId})
+        or exists (select 1 from information_request_item where value_driver_id = ${valueDriverId})
+        or exists (select 1 from leakage_assessment where ${valueDriverId}::uuid = any (snapshot_driver_ids))
+      as used`);
+  return result.rows[0]!.used;
+}
 
 export const addAssumption = defineCommand(
   COMMANDS.addAssumption,
