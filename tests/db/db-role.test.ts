@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { register } from "@/instrumentation";
 import { resetEnvCache } from "@/server/env";
 
+import { seedCompactAuthorised } from "@/fixtures/compact";
 import { checkApplicationRole, grantAppRole, withClient } from "@/server/db/role";
 
 import { newActor } from "../support/fixtures";
@@ -58,6 +59,47 @@ describe("least-privilege application role", () => {
     await app.query("COMMIT");
     const audit = await app.query("select actor_user_id, command from audit_event where row_id = $1", [rows[0]!.id]);
     expect(audit.rows).toEqual([{ actor_user_id: actor.userId, command: "client.create" }]);
+  });
+
+  it("works Continuous Assurance matters (Phase 4D.1) under the same guards", async () => {
+    const actor = await newActor();
+    const { project } = await seedCompactAuthorised(actor, {
+      code: `R-${randomUUID().slice(0, 6)}`,
+      name: "Role matter",
+    });
+    const run = async (command: string, statement: string, params: unknown[]) => {
+      await app.query("BEGIN");
+      await app.query("select set_config('vo.actor_id', $1, true), set_config('vo.command', $2, true)", [
+        actor.userId,
+        command,
+      ]);
+      try {
+        const res = await app.query(statement, params);
+        await app.query("COMMIT");
+        return res;
+      } catch (err) {
+        await app.query("ROLLBACK");
+        throw err;
+      }
+    };
+    const { rows } = await run(
+      "matter.create",
+      `insert into value_leakage (project_id, value_case_id, code, title, identified_on, stage, created_by)
+       select p.id, c.id, 'VL-R1', 'Role matter', current_date, 'identified', $2 from project p join value_case c on c.project_id = p.id where p.id = $1
+       returning id`,
+      [project.id, actor.userId],
+    );
+    const id = rows[0]!.id as string;
+    await run(
+      "matter.assessWorking",
+      "update value_leakage set working_total_amount = 10, working_unrecoverable_amount = 0 where id = $1",
+      [id],
+    );
+    const [row] = (await app.query("select working_assessed_by from value_leakage where id = $1", [id])).rows;
+    expect(row.working_assessed_by).toBe(actor.userId);
+    await expect(
+      run("leakage.update", "update value_leakage set stage = 'assessing' where id = $1", [id]),
+    ).rejects.toThrow(/VO_WRONG_COMMAND/);
   });
 
   it("cannot bypass the integrity model", async () => {

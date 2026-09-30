@@ -20,6 +20,10 @@ import {
   RequirementBadge,
   ReviewStatusBadge,
 } from "@/ui/assurance/display";
+import { listDriverOptions } from "@/server/queries/information-request";
+import { listStakeholders } from "@/server/queries/mobilise";
+import { getContinuousAssurance } from "@/server/queries/response";
+import { ContinuousAssurance } from "@/ui/assurance/matters";
 import { formatDate, formatMoneyShort } from "@/ui/format";
 import { TRIGGER_LABELS } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
@@ -31,10 +35,13 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default async function AssurancePage({ params }: PageProps<"/projects/[projectId]/assurance">) {
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
-  const [summary, cadence, evidence] = await Promise.all([
+  const [summary, cadence, evidence, continuous, stakeholders, drivers] = await Promise.all([
     getValuePositionSummary(projectId),
     getNextAssuranceRequirement(projectId),
     listReviewEvidenceOptions(projectId),
+    getContinuousAssurance(projectId),
+    listStakeholders(projectId),
+    listDriverOptions(projectId),
   ]);
   const currency = project.currency;
   const base = `/projects/${projectId}`;
@@ -61,10 +68,22 @@ export default async function AssurancePage({ params }: PageProps<"/projects/[pr
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        What has changed since the previous value position, why does it matter economically, and where does the project
-        now stand? Forecasts and realised values are recorded in dated reviews — the Authorised Value Case is never
-        altered.
+        Continuous Assurance tracks what threatens the Authorised Value day to day. Formal Assurance Reviews record the
+        governed Value Position as at a date — forecasts and realised values — and snapshot every open matter. The
+        Authorised Value Case is never altered by either.
       </p>
+
+      <ContinuousAssurance
+        projectId={projectId}
+        currency={currency}
+        open={continuous.open}
+        closedCount={continuous.closed.length}
+        nextCode={continuous.nextCode}
+        stakeholders={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
+        drivers={drivers}
+      />
+
+      <h2 className="mt-8 mb-3 text-lg font-semibold text-slate-900">Formal Assurance Reviews</h2>
 
       <Section
         title="Value position"

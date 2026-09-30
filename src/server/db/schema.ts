@@ -27,6 +27,7 @@ import {
   EVIDENCE_STATUSES,
   INFORMATION_REQUEST_ITEM_STATUSES,
   LEAKAGE_STATUSES,
+  ASSURANCE_STAGES,
   SCENARIO_KINDS,
   VALUE_CHANGE_STATUSES,
   INFORMATION_REQUEST_STATUSES,
@@ -55,6 +56,7 @@ export const projectStatus = pgEnum("project_status", PROJECT_STATUSES);
 export const assuranceTrigger = pgEnum("assurance_trigger", ASSURANCE_TRIGGERS);
 export const assuranceReviewStatus = pgEnum("assurance_review_status", ASSURANCE_REVIEW_STATUSES);
 export const leakageStatus = pgEnum("leakage_status", LEAKAGE_STATUSES);
+export const assuranceStage = pgEnum("assurance_stage", ASSURANCE_STAGES);
 export const scenarioKind = pgEnum("scenario_kind", SCENARIO_KINDS);
 export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
 export const reportType = pgEnum("report_type", REPORT_TYPES);
@@ -562,6 +564,11 @@ export const assuranceReview = pgTable(
      */
     unattributedRealisedValue: moneyCol(),
     unattributedRealisedRationale: text(),
+    /**
+     * Set at finalisation (Phase 4D.1): the review snapshotted every open Assurance matter into
+     * leakage_assessment. Null on reviews finalised before then (legacy: read the live register).
+     */
+    matterSnapshotAt: timestamp({ withTimezone: true }),
     createdBy: uuid()
       .notNull()
       .references(() => appUser.id),
@@ -670,18 +677,51 @@ export const valueLeakage = pgTable(
     code: text().notNull(),
     title: text().notNull(),
     description: text(),
-    identifiedInReviewId: uuid().notNull(),
-    /** The AVO who owns the response (no separate Risk Owner). */
+    /** The review a matter was raised in; null for matters raised in Continuous Assurance (Phase 4D). */
+    identifiedInReviewId: uuid(),
+    /** Date raised outside a review (required when identifiedInReviewId is null). */
+    identifiedOn: date(),
+    /** Risk / Leakage Owner: may differ from the affected drivers' AVOs. */
     responseOwnerPersonId: uuid(),
     status: leakageStatus().notNull().default("open"),
+    /** Working stage while open (provisional, free movement). Null on legacy matters. */
+    stage: assuranceStage(),
     requiredDecisionDate: date(),
     consultantAssessment: text(),
+    // Working assessment — the consultant's current view, never a formal position. Formal figures
+    // live only in leakage_assessment for a review. Both amounts null = not yet quantified.
+    workingTotalAmount: moneyCol(),
+    workingUnrecoverableAmount: moneyCol(),
+    workingUnrecoverableRationale: text(),
+    workingAssessedBy: uuid().references(() => appUser.id),
+    workingAssessedAt: timestamp({ withTimezone: true }),
+    remediationPlan: text(),
+    monitorUntil: date(),
+    /** Resolved = status closed with this note. */
+    closureNote: text(),
     createdBy: uuid()
       .notNull()
       .references(() => appUser.id),
     createdAt: createdAt(),
   },
   (t) => [
+    check("value_leakage_origin", sql`${t.identifiedInReviewId} is not null or ${t.identifiedOn} is not null`),
+    check(
+      "value_leakage_working_pair",
+      sql`(${t.workingTotalAmount} is null) = (${t.workingUnrecoverableAmount} is null)`,
+    ),
+    check(
+      "value_leakage_working_range",
+      sql`${t.workingTotalAmount} is null or (${t.workingTotalAmount} >= 0 and ${t.workingUnrecoverableAmount} >= 0 and ${t.workingUnrecoverableAmount} <= ${t.workingTotalAmount})`,
+    ),
+    check(
+      "value_leakage_working_rationale",
+      sql`${t.workingUnrecoverableAmount} is null or ${t.workingUnrecoverableAmount} = 0 or ${t.workingUnrecoverableRationale} is not null`,
+    ),
+    check(
+      "value_leakage_working_attribution",
+      sql`${t.workingTotalAmount} is null or (${t.workingAssessedBy} is not null and ${t.workingAssessedAt} is not null)`,
+    ),
     unique("value_leakage_code_uq").on(t.projectId, t.code),
     unique("value_leakage_id_project_uq").on(t.id, t.projectId),
     unique("value_leakage_id_case_uq").on(t.id, t.valueCaseId),
@@ -741,15 +781,41 @@ export const leakageAssessment = pgTable(
     valueLeakageId: uuid().notNull(),
     assuranceReviewId: uuid().notNull(),
     projectId: uuid().notNull(),
-    totalAmount: moneyCol().notNull(),
-    unrecoverableAmount: moneyCol().notNull().default("0"),
+    // Formal quantification in this review. Both null = not yet quantified in this review
+    // (a finalisation snapshot of an unquantified matter). Never read as zero.
+    totalAmount: moneyCol(),
+    unrecoverableAmount: moneyCol().default("0"),
     unrecoverableRationale: text(),
     unrecoverableValidatedBy: uuid().references(() => appUser.id),
     assessmentNote: text(),
     assessedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    // Finalisation snapshot (Phase 4D.1): the matter as the formal review saw it, written only by
+    // assurance.finaliseReview so later edits to the living matter cannot rewrite history.
+    // Null on assessments of reviews finalised before 4D.1.
+    snapshotTakenAt: timestamp({ withTimezone: true }),
+    snapshotStatus: leakageStatus(),
+    snapshotStage: assuranceStage(),
+    snapshotTitle: text(),
+    snapshotDescription: text(),
+    snapshotOwnerPersonId: uuid(),
+    snapshotDriverIds: uuid().array(),
+    snapshotConsultantAssessment: text(),
+    snapshotRequiredDecisionDate: date(),
+    snapshotRemediationPlan: text(),
+    snapshotMonitorUntil: date(),
     createdAt: createdAt(),
   },
   (t) => [
+    check("leakage_assessment_quantified_pair", sql`(${t.totalAmount} is null) = (${t.unrecoverableAmount} is null)`),
+    check(
+      "leakage_assessment_snapshot_shape",
+      sql`${t.snapshotTakenAt} is null or (${t.snapshotStatus} is not null and ${t.snapshotTitle} is not null and ${t.snapshotDriverIds} is not null)`,
+    ),
+    foreignKey({
+      name: "leakage_assessment_snapshot_owner_fk",
+      columns: [t.projectId, t.snapshotOwnerPersonId],
+      foreignColumns: [projectStakeholder.projectId, projectStakeholder.personId],
+    }),
     unique("leakage_assessment_review_uq").on(t.valueLeakageId, t.assuranceReviewId),
     foreignKey({
       name: "leakage_assessment_leakage_fk",

@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
 import { money } from "@/domain/money";
-import { LEAKAGE_STATUSES } from "@/domain/statuses";
 import { schema, type Tx } from "@/server/db/client";
 
 import { COMMANDS } from "./names";
@@ -24,13 +23,17 @@ import {
 // Until sufficient evidence shows value is lost, leakage is recoverable
 // (unrecoverable defaults to 0). Leakage is independent of Value Gap.
 
-async function getLeakage(tx: Tx, leakageId: string) {
+export async function getLeakage(tx: Tx, leakageId: string) {
   const [row] = await tx.select().from(schema.valueLeakage).where(eq(schema.valueLeakage.id, leakageId));
   if (!row) throw new DomainError("VO_NOT_FOUND", "Value Leakage item not found");
   return row;
 }
 
-async function replaceDrivers(tx: Tx, leakage: typeof schema.valueLeakage.$inferSelect, driverIds: readonly string[]) {
+export async function replaceDrivers(
+  tx: Tx,
+  leakage: typeof schema.valueLeakage.$inferSelect,
+  driverIds: readonly string[],
+) {
   await tx.delete(schema.valueLeakageDriver).where(eq(schema.valueLeakageDriver.valueLeakageId, leakage.id));
   if (driverIds.length === 0) return;
   await tx.insert(schema.valueLeakageDriver).values(
@@ -65,6 +68,7 @@ export const createLeakage = defineCommand(
         projectId: review.projectId,
         valueCaseId: review.valueCaseId,
         identifiedInReviewId: review.id,
+        stage: "identified",
         createdBy: actor.userId,
       })
       .returning();
@@ -82,7 +86,7 @@ export const updateLeakage = defineCommand(
     responseOwnerPersonId: clearableUuid,
     requiredDecisionDate: clearableDate,
     consultantAssessment: clearableText,
-    status: z.enum(LEAKAGE_STATUSES).optional(),
+    // Status changes are matter.close / matter.reopen (a closure note is required).
   }),
   async ({ tx }, { leakageId, ...fields }) => {
     await getLeakage(tx, leakageId);

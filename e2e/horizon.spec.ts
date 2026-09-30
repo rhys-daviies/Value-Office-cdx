@@ -112,7 +112,7 @@ test("Project Horizon Phase 3: options, recommendation vs decision, unassessed l
   await expect(page.getByTestId("decision-selected")).toHaveText("$14.9m");
   await expect(page.getByTestId("decision-difference")).toHaveText("-$0.4m");
   const vl = page.getByTestId("leakage-VL-001");
-  await expect(vl.getByTestId("leakage-amounts")).toHaveText("Not assessed in this review");
+  await expect(vl.getByTestId("leakage-amounts")).toHaveText("Not yet quantified in this review");
   await vl.locator("summary").click();
   await expect(vl.getByTestId("leakage-description")).toContainText("do not reconcile");
 

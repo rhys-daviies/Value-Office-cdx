@@ -49,10 +49,21 @@ const CONSTRAINTS: Record<string, Explanation> = {
     message: "Trigger evidence must belong to this project.",
   },
   evidence_link_review_uq: { field: "evidenceId", message: "That evidence is already linked to this review." },
-  value_leakage_code_uq: { field: "code", message: "A leakage item with this code already exists in this project." },
+  value_leakage_code_uq: {
+    field: "code",
+    message: "An Assurance matter with this code already exists in this project.",
+  },
+  value_leakage_working_range: {
+    field: "workingUnrecoverableAmount",
+    message: "Working amounts cannot be negative, and unrecoverable cannot exceed the working total.",
+  },
+  value_leakage_working_rationale: {
+    field: "workingUnrecoverableRationale",
+    message: "Required when unrecoverable is above zero",
+  },
   value_leakage_owner_fk: {
     field: "responseOwnerPersonId",
-    message: "The response owner must be a stakeholder on this project.",
+    message: "The Risk / Leakage Owner must be a stakeholder on this project.",
   },
   value_leakage_driver_driver_fk: { field: "driverIds", message: "Affected drivers must belong to this Value Case." },
   leakage_assessment_unrecoverable_range: {

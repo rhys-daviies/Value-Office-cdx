@@ -53,9 +53,26 @@ export type AssuranceReviewStatus = (typeof ASSURANCE_REVIEW_STATUSES)[number];
 
 // Phase 3: management response.
 
-/** Workflow status of a Value Leakage register item. */
+/**
+ * Lifecycle of an Assurance matter (the value_leakage record). Authoritative: open | closed.
+ * Resolved = closed with a closure note.
+ */
 export const LEAKAGE_STATUSES = ["open", "closed"] as const;
 export type LeakageStatus = (typeof LEAKAGE_STATUSES)[number];
+
+/**
+ * Phase 4D (provisional, PMO): working stage of an open Assurance matter. Not a workflow —
+ * consultants move freely between stages; every change is audited. Null on legacy matters.
+ */
+export const ASSURANCE_STAGES = [
+  "identified",
+  "awaiting_evidence",
+  "assessing",
+  "remediation",
+  "monitoring",
+  "escalated",
+] as const;
+export type AssuranceStage = (typeof ASSURANCE_STAGES)[number];
 
 /** Alternative trajectory kinds. Values are consultant-entered, never derived. */
 export const SCENARIO_KINDS = ["current", "recommended", "alternative", "no_action"] as const;

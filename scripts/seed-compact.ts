@@ -6,16 +6,17 @@ import { closeDb, db, schema } from "@/server/db/client";
 
 import { loadLocalEnv } from "./load-env";
 
-// Seeds the synthetic "Assurance Compact" and "Response Compact" projects (Authorised V1, no reviews). Idempotent by code.
+// Seeds the synthetic "Assurance Compact", "Response Compact" and "Matters Compact" projects (Authorised V1, no reviews). Idempotent by code.
 loadLocalEnv();
 
 const email = process.env.VO_DEV_USER_EMAIL ?? "consultant@cardaxia.ai";
 try {
   const actor = await ensureUser(email, process.env.VO_DEV_USER_NAME ?? email);
-  // Two identical synthetic engagements so Phase 2 and Phase 3 journeys stay independent.
+  // Identical synthetic engagements so the Phase 2, Phase 3 and Phase 4D journeys stay independent.
   for (const [code, name] of [
     ["COMPACT", "Assurance Compact"],
     ["RESPONSE", "Response Compact"],
+    ["MATTERS", "Matters Compact"],
   ] as const) {
     const [existing] = await db().select().from(schema.project).where(eq(schema.project.code, code));
     if (existing) {

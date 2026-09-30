@@ -34,7 +34,7 @@ const CHANGE_STATUS = {
 function nextActionText(a: AssuranceNextAction): string {
   switch (a.kind) {
     case "leakage_response":
-      return `${a.code} ${a.title}: response owner ${a.owner ?? "not yet assigned"}${
+      return `${a.code} ${a.title}: Risk / Leakage Owner ${a.owner ?? "not yet assigned"}${
         a.requiredDecisionDate ? `; decision required by ${formatDate(a.requiredDecisionDate)}` : ""
       }${a.quantified ? "" : "; amount not yet quantified"}.`;
     case "value_change":
@@ -319,7 +319,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
                   <tr>
                     <th>Issue</th>
                     <th>Affected drivers</th>
-                    <th>Response owner (AVO)</th>
+                    <th>Risk / Leakage Owner</th>
                     <th class="num">Total VL</th>
                     <th class="num">Recoverable</th>
                     <th class="num">Unrecoverable</th>
@@ -355,7 +355,13 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
                     ${i.description ? text(i.description) : null}
                     <dl class="rpt-kv">
                       <dt>Identified</dt>
-                      <dd>Assurance Review ${i.identifiedInReview}</dd>
+                      <dd>
+                        ${
+                          i.identifiedInReview !== null
+                            ? `Assurance Review ${i.identifiedInReview}`
+                            : `Continuous Assurance${i.identifiedOn ? `, ${formatDate(i.identifiedOn)}` : ""}`
+                        }
+                      </dd>
                       ${
                         i.requiredDecisionDate
                           ? html`<dt>Decision required by</dt>

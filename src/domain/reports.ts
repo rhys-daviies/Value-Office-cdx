@@ -158,7 +158,10 @@ export type AssuranceLeakageItem = {
   status: "open" | "closed";
   requiredDecisionDate: string | null;
   consultantAssessment: string | null;
-  identifiedInReview: number;
+  /** Review the matter was raised in; null when raised in Continuous Assurance (Phase 4D). */
+  identifiedInReview: number | null;
+  /** Date raised in Continuous Assurance (absent on snapshots issued before Phase 4D). */
+  identifiedOn?: string | null;
   /** null = not yet quantified in this review. Never rendered as zero. */
   assessment: {
     total: string;

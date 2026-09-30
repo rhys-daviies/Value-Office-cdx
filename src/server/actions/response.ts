@@ -1,6 +1,6 @@
 "use server";
 
-import { LEAKAGE_STATUSES, SCENARIO_KINDS, type LeakageStatus, type ScenarioKind } from "@/domain/statuses";
+import { SCENARIO_KINDS, type ScenarioKind } from "@/domain/statuses";
 import { assessLeakage, createLeakage, setLeakageDrivers, updateLeakage } from "@/server/commands/leakage";
 import {
   issueRecommendation,
@@ -42,7 +42,6 @@ export async function createLeakageAction(_prev: ActionState, fd: FormData): Pro
 export async function updateLeakageAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return perform(projectOf(fd), async (actor) => {
     const leakageId = required(fd, "leakageId");
-    const status = required(fd, "status");
     await updateLeakage(actor, {
       leakageId,
       title: required(fd, "title"),
@@ -50,7 +49,6 @@ export async function updateLeakageAction(_prev: ActionState, fd: FormData): Pro
       responseOwnerPersonId: clear(fd, "responseOwnerPersonId"),
       requiredDecisionDate: clear(fd, "requiredDecisionDate"),
       consultantAssessment: clear(fd, "consultantAssessment"),
-      status: (LEAKAGE_STATUSES as readonly string[]).includes(status) ? (status as LeakageStatus) : undefined,
     });
     await setLeakageDrivers(actor, { leakageId, driverIds: driverIdsOf(fd) });
     return "Leakage item saved";

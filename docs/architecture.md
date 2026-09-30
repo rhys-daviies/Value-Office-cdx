@@ -139,6 +139,48 @@ value_change          VC code; from = version in force, to = copy-forward draft;
   authorised. Rejected/withdrawn changes and their versions are preserved and immutable. One open change at a time.
 - Old reviews keep the version they measured against; new reviews open against the version in force.
 
+## Three layers: commitment, continuous assurance, formal position (Phase 4D)
+
+| Layer                           | Question                                               | Record                                                                                              |
+| ------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Authorised Value Case**       | What has management formally committed to?             | `value_case_version` + driver versions — immutable; changes only through an authorised Value Change |
+| **Continuous Assurance matter** | What threatens that value today and what are we doing? | `value_leakage` — the living matter, worked on day to day                                           |
+| **Formal Assurance Review**     | Where do we officially stand as at this date?          | `assurance_review` + `value_position` + `leakage_assessment` — immutable once finalised             |
+
+**Continuous Assurance matter (4D.1).** An Assurance matter is raised with `matter.create`, without a review
+(`identified_on`; review-raised matters keep `identified_in_review_id`). While it is open, consultants can:
+
+- move it freely between the provisional working stages (`identified`, `awaiting_evidence`, `assessing`,
+  `remediation`, `monitoring`, `escalated`). This is not a workflow; every change is audited;
+- assign the **Risk / Leakage Owner**, who may differ from the drivers' AVOs;
+- record a **working assessment**: total and unrecoverable (Recoverable = Total − Unrecoverable), with a rationale
+  when unrecoverable is above zero. The database attributes it to the acting consultant at `now()`. A matter may stay
+  **not yet quantified**, which is never zero;
+- record a remediation plan and a monitor-until date.
+
+Resolved = `matter.close` with a closure note; `matter.reopen` reopens. Status open/closed stays authoritative.
+Matters are never deleted, and code and origin are immutable (`vo_value_leakage_guard`, per-command rules). Working
+figures never change Authorised Value, Current Forecast, Value Gap or any version.
+
+**Formal snapshot.** `leakage_assessment` remains "the matter's formal position in one review":
+
+- its amounts come only from that review's own assessment (`leakage.assess`). Null means not yet quantified in that
+  review;
+- when a review is finalised, `assurance.finaliseReview` writes `snapshot_*` columns (status, stage, title,
+  description, owner, affected drivers, consultant assessment, decision date, remediation, monitor-until) for every
+  open matter and every matter assessed in the review. Unassessed matters get a row with null amounts; working
+  figures are never copied;
+- only finalisation may write snapshot columns, and finalisation may not write amounts;
+- `vo_assurance_review_guard` refuses finalisation unless the snapshot is complete (`matter_snapshot_at`);
+- finalised rows are immutable.
+
+**Read models (`src/server/queries/response.ts`)** keep the layers apart:
+
+- `getContinuousAssurance` and `getAssuranceMatter` read the living matter;
+- `getReviewResponse` (and so the Assurance Report) reads a finalised review's snapshot, with working fields removed.
+
+Reviews finalised before 4D.1 (`matter_snapshot_at` null) read their matters live, as before. Nothing was backfilled.
+
 ## Client reports (Phase 4A)
 
 ```

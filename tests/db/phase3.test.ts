@@ -797,7 +797,11 @@ describe("Project Horizon Phase 3 acceptance", () => {
     // Vendor sequencing leakage: recorded, labelled, and deliberately unassessed.
     expect(resp.leakage).toHaveLength(1);
     expect(resp.leakage[0]!.leakage).toMatchObject({ code: "VL-001", title: "Vendor sequencing" });
-    expect(resp.leakage[0]!.assessments).toHaveLength(0);
+    // Phase 4D.1: finalising Review 1 snapshotted the open matter — with no formal amounts (not yet quantified).
+    expect(resp.leakage[0]!.assessments).toHaveLength(1);
+    expect(resp.leakage[0]!.assessments[0]).toMatchObject({ totalAmount: null, unrecoverableAmount: null });
+    expect(resp.leakage[0]!.thisReview!.amounts).toBeNull();
+    expect(resp.leakageBasis).toBe("snapshot");
     expect(resp.leakage[0]!.leakage.description).toMatch(/\[FIXTURE PLACEHOLDER\].*do not reconcile/);
 
     // VC-002: proposed, −$0.6m against V1 $15.5m → $14.9m if authorised; not yet reconcilable.

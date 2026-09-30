@@ -16,7 +16,6 @@ import {
   type RequalificationReport,
   type ValueChangeNotice,
 } from "@/domain/reports";
-import { summariseLeakage } from "@/domain/response";
 import { moneyChange } from "@/domain/value-case";
 import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, type ReportType } from "@/domain/statuses";
 import { db, schema } from "@/server/db/client";
@@ -236,11 +235,10 @@ export async function buildAssuranceReport(
   const { review, totals } = ws;
   const driverName = new Map(ws.rows.map((r) => [r.code, r.name]));
 
-  // Leakage known at this review: identified in it or an earlier review.
-  const leakage = response.leakage.filter((l) => l.identifiedInSequence <= review.sequence);
-  const leakageSummary = summariseLeakage(
-    leakage.filter((l) => l.leakage.status === "open").map((l) => ({ amounts: l.thisReview?.amounts ?? null })),
-  );
+  // The review's own view of its matters (its snapshot once finalised) and formal amounts only;
+  // working assessments never reach a report.
+  const leakage = response.leakage;
+  const leakageSummary = response.leakageSummary;
 
   const changes: AssuranceValueChange[] = [];
   for (const c of await listValueChanges(projectId)) {
@@ -348,7 +346,8 @@ export async function buildAssuranceReport(
           requiredDecisionDate: l.leakage.requiredDecisionDate,
           consultantAssessment: l.leakage.consultantAssessment,
           identifiedInReview: l.identifiedInSequence,
-          assessment: l.thisReview
+          identifiedOn: l.leakage.identifiedOn,
+          assessment: l.thisReview?.amounts
             ? {
                 ...l.thisReview.amounts,
                 unrecoverableRationale: l.thisReview.unrecoverableRationale,

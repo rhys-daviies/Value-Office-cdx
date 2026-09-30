@@ -15,18 +15,42 @@ import { db, schema } from "@/server/db/client";
 import { loadVersionDrivers } from "./value-case";
 
 // ---------------------------------------------------------------------------
-// Value Leakage
+// Value Leakage / Continuous Assurance matters
+//
+// Two views that are never merged:
+//   LIVING  the matter as it stands now (value_leakage), including the consultant's working
+//           assessment — the Continuous Assurance workspace reads this.
+//   FORMAL  a review's position (leakage_assessment): its own formal amounts (null = not yet
+//           quantified in that review) and, once finalised, the snapshot of the matter.
 
 type AssessmentRow = typeof schema.leakageAssessment.$inferSelect & { reviewSequence: number; reviewStatus: string };
+type MatterRow = typeof schema.valueLeakage.$inferSelect;
+
+/** Formal amounts of a review assessment; null = not yet quantified in that review (never zero). */
+export function formalAmounts(a: { totalAmount: string | null; unrecoverableAmount: string | null }) {
+  return a.totalAmount === null || a.unrecoverableAmount === null
+    ? null
+    : leakageAmounts(a.totalAmount, a.unrecoverableAmount);
+}
+
+/** Working amounts of a living matter; null = not yet quantified. Never a formal position. */
+export function workingAmounts(m: Pick<MatterRow, "workingTotalAmount" | "workingUnrecoverableAmount">) {
+  return m.workingTotalAmount === null || m.workingUnrecoverableAmount === null
+    ? null
+    : leakageAmounts(m.workingTotalAmount, m.workingUnrecoverableAmount);
+}
 
 export type LeakageEntry = {
-  leakage: typeof schema.valueLeakage.$inferSelect;
+  leakage: MatterRow;
   ownerName: string | null;
-  identifiedInSequence: number;
+  /** Review the matter was raised in; null when raised in Continuous Assurance. */
+  identifiedInSequence: number | null;
   drivers: { valueDriverId: string; code: string }[];
   assessments: AssessmentRow[];
-  /** Latest assessment from a finalised review (the authoritative current size). */
+  /** Latest formally quantified assessment from a finalised review (the authoritative current size). */
   latestFinalised: (AssessmentRow & { amounts: LeakageAmounts }) | null;
+  /** Living working assessment (null = not yet quantified). */
+  working: LeakageAmounts | null;
 };
 
 export async function getLeakageRegister(projectId: string): Promise<LeakageEntry[]> {
@@ -38,7 +62,7 @@ export async function getLeakageRegister(projectId: string): Promise<LeakageEntr
       identifiedInSequence: identifiedIn.sequence,
     })
     .from(schema.valueLeakage)
-    .innerJoin(identifiedIn, eq(identifiedIn.id, schema.valueLeakage.identifiedInReviewId))
+    .leftJoin(identifiedIn, eq(identifiedIn.id, schema.valueLeakage.identifiedInReviewId))
     .leftJoin(schema.person, eq(schema.person.id, schema.valueLeakage.responseOwnerPersonId))
     .where(eq(schema.valueLeakage.projectId, projectId))
     .orderBy(asc(schema.valueLeakage.code));
@@ -71,18 +95,153 @@ export async function getLeakageRegister(projectId: string): Promise<LeakageEntr
     const mine = assessments
       .filter((x) => x.a.valueLeakageId === leakage.id)
       .map((x) => ({ ...x.a, reviewSequence: x.reviewSequence, reviewStatus: x.reviewStatus }));
-    const latest = mine.filter((x) => x.reviewStatus === "finalised").at(-1) ?? null;
+    const latest = mine.filter((x) => x.reviewStatus === "finalised" && formalAmounts(x)).at(-1) ?? null;
     return {
       leakage,
       ownerName,
       identifiedInSequence,
       drivers: drivers.filter((d) => d.valueLeakageId === leakage.id),
       assessments: mine,
-      latestFinalised: latest
-        ? { ...latest, amounts: leakageAmounts(latest.totalAmount, latest.unrecoverableAmount) }
-        : null,
+      latestFinalised: latest ? { ...latest, amounts: formalAmounts(latest)! } : null,
+      working: workingAmounts(leakage),
     };
   });
+}
+
+/**
+ * A matter as a finalised review recorded it (its snapshot), with working information removed:
+ * a formal view never carries the living working assessment.
+ */
+function snapshotEntry(
+  entry: LeakageEntry,
+  row: AssessmentRow,
+  people: Map<string, string>,
+  driverCodes: Map<string, string>,
+): LeakageEntry {
+  return {
+    ...entry,
+    leakage: {
+      ...entry.leakage,
+      status: row.snapshotStatus!,
+      stage: row.snapshotStage,
+      title: row.snapshotTitle!,
+      description: row.snapshotDescription,
+      responseOwnerPersonId: row.snapshotOwnerPersonId,
+      consultantAssessment: row.snapshotConsultantAssessment,
+      requiredDecisionDate: row.snapshotRequiredDecisionDate,
+      remediationPlan: row.snapshotRemediationPlan,
+      monitorUntil: row.snapshotMonitorUntil,
+      closureNote: null,
+      workingTotalAmount: null,
+      workingUnrecoverableAmount: null,
+      workingUnrecoverableRationale: null,
+      workingAssessedBy: null,
+      workingAssessedAt: null,
+    },
+    ownerName: row.snapshotOwnerPersonId ? (people.get(row.snapshotOwnerPersonId) ?? null) : null,
+    drivers: (row.snapshotDriverIds ?? [])
+      .map((id) => ({ valueDriverId: id, code: driverCodes.get(id) ?? "?" }))
+      .sort((a, b) => a.code.localeCompare(b.code)),
+    working: null,
+  };
+}
+
+/**
+ * The matters a review covers, as that review sees them:
+ *   finalised with a snapshot (4D.1+)  exactly the snapshotted matters, as snapshotted;
+ *   finalised before 4D.1 (legacy)      matters raised in it or earlier reviews, or assessed in it — live details;
+ *   draft                               the whole register (open matters will be snapshotted at finalisation).
+ */
+async function reviewLeakage(projectId: string, reviewId: string, register: LeakageEntry[]) {
+  const [review] = await db()
+    .select()
+    .from(schema.assuranceReview)
+    .where(and(eq(schema.assuranceReview.projectId, projectId), eq(schema.assuranceReview.id, reviewId)));
+  const withAssessment = (entry: LeakageEntry) => {
+    const here = entry.assessments.find((a) => a.assuranceReviewId === reviewId) ?? null;
+    return { ...entry, thisReview: here ? { ...here, amounts: formalAmounts(here) } : null };
+  };
+  if (!review) return { basis: "live" as const, entries: register.map(withAssessment) };
+
+  if (review.status === "finalised" && review.matterSnapshotAt) {
+    const [people, driverRows] = await Promise.all([
+      db()
+        .select({ id: schema.person.id, name: schema.person.name })
+        .from(schema.projectStakeholder)
+        .innerJoin(schema.person, eq(schema.person.id, schema.projectStakeholder.personId))
+        .where(eq(schema.projectStakeholder.projectId, projectId)),
+      db()
+        .select({ id: schema.valueDriver.id, code: schema.valueDriver.code })
+        .from(schema.valueDriver)
+        .where(eq(schema.valueDriver.projectId, projectId)),
+    ]);
+    const names = new Map(people.map((p) => [p.id, p.name]));
+    const codes = new Map(driverRows.map((d) => [d.id, d.code]));
+    const entries = register.flatMap((entry) => {
+      const row = entry.assessments.find((a) => a.assuranceReviewId === reviewId && a.snapshotTakenAt);
+      return row ? [withAssessment(snapshotEntry(entry, row, names, codes))] : [];
+    });
+    return { basis: "snapshot" as const, entries };
+  }
+  if (review.status === "finalised") {
+    const entries = register
+      .filter(
+        (e) =>
+          (e.identifiedInSequence !== null && e.identifiedInSequence <= review.sequence) ||
+          e.assessments.some((a) => a.assuranceReviewId === reviewId),
+      )
+      .map(withAssessment);
+    return { basis: "legacy" as const, entries };
+  }
+  return { basis: "live" as const, entries: register.map(withAssessment) };
+}
+
+// ---------------------------------------------------------------------------
+// Continuous Assurance workspace (living matters)
+
+/** The project's Assurance matters as they stand now, open first. */
+export async function getContinuousAssurance(projectId: string) {
+  const register = await getLeakageRegister(projectId);
+  return {
+    open: register.filter((e) => e.leakage.status === "open"),
+    closed: register.filter((e) => e.leakage.status === "closed"),
+    nextCode: nextMatterCode(register.map((e) => e.leakage.code)),
+  };
+}
+
+/** One matter: its living state, and each finalised review's formal record of it. */
+export async function getAssuranceMatter(projectId: string, matterId: string) {
+  const entry = (await getLeakageRegister(projectId)).find((e) => e.leakage.id === matterId);
+  if (!entry) return null;
+  const [assessor] = entry.leakage.workingAssessedBy
+    ? await db()
+        .select({ name: schema.appUser.displayName })
+        .from(schema.appUser)
+        .where(eq(schema.appUser.id, entry.leakage.workingAssessedBy))
+    : [];
+  const identifiedIn = entry.leakage.identifiedInReviewId;
+  return {
+    ...entry,
+    identifiedInReviewId: identifiedIn,
+    workingAssessedByName: assessor?.name ?? null,
+    formal: entry.assessments
+      .filter((a) => a.reviewStatus === "finalised")
+      .map((a) => ({
+        reviewId: a.assuranceReviewId,
+        reviewSequence: a.reviewSequence,
+        amounts: formalAmounts(a),
+        snapshotted: a.snapshotTakenAt !== null,
+        stage: a.snapshotStage,
+        status: a.snapshotStatus,
+      })),
+  };
+}
+
+export type AssuranceMatter = NonNullable<Awaited<ReturnType<typeof getAssuranceMatter>>>;
+
+export function nextMatterCode(codes: readonly string[]): string {
+  const max = codes.reduce((m, c) => Math.max(m, Number(/^VL-(\d+)$/.exec(c)?.[1] ?? 0)), 0);
+  return `VL-${String(max + 1).padStart(3, "0")}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,13 +249,8 @@ export async function getLeakageRegister(projectId: string): Promise<LeakageEntr
 
 export async function getReviewResponse(projectId: string, reviewId: string) {
   const register = await getLeakageRegister(projectId);
-  const leakage = register.map((entry) => {
-    const here = entry.assessments.find((a) => a.assuranceReviewId === reviewId) ?? null;
-    return {
-      ...entry,
-      thisReview: here ? { ...here, amounts: leakageAmounts(here.totalAmount, here.unrecoverableAmount) } : null,
-    };
-  });
+  const { basis: leakageBasis, entries: leakage } = await reviewLeakage(projectId, reviewId, register);
+  // Formal summary: this review's formal amounts only; unquantified matters count but add nothing.
   const leakageSummary = summariseLeakage(
     leakage.filter((l) => l.leakage.status === "open").map((l) => ({ amounts: l.thisReview?.amounts ?? null })),
   );
@@ -140,6 +294,7 @@ export async function getReviewResponse(projectId: string, reviewId: string) {
 
   return {
     leakage,
+    leakageBasis,
     leakageSummary,
     scenarios,
     recommendation: rec ? { ...rec.recommendation, issuerName: rec.issuerName, scenario: recommendedScenario } : null,

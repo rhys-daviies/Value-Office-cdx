@@ -1,6 +1,6 @@
 import Decimal from "decimal.js";
 
-import { LEAKAGE_STATUSES, SCENARIO_KINDS } from "@/domain/statuses";
+import { SCENARIO_KINDS } from "@/domain/statuses";
 import {
   assessLeakageAction,
   createLeakageAction,
@@ -19,7 +19,7 @@ import { PlainBadge } from "../components/badges";
 import { DateField, FormGrid, Hidden, MoneyField, SelectField, TextArea, TextField } from "../components/fields";
 import { Empty, Expander, KeyValues, Notice, Section, Table, TextLink } from "../components/layout";
 import { formatDate, formatDateTime, formatMoneyChange, formatMoneyShort, moneyInputValue } from "../format";
-import { SCENARIO_KIND_LABELS } from "../labels";
+import { ASSURANCE_STAGE_LABELS, SCENARIO_KIND_LABELS } from "../labels";
 
 type Option = { value: string; label: string };
 type Driver = { driverId: string; code: string; name: string };
@@ -68,7 +68,7 @@ export async function ReviewResponse({
   currentForecastTotal: string | null;
 }) {
   const draft = review.status === "draft";
-  const { leakage, leakageSummary, scenarios, recommendation, decision } = response;
+  const { leakage, leakageBasis, leakageSummary, scenarios, recommendation, decision } = response;
   const issued = Boolean(recommendation?.issuedAt);
   const optionsEditable = draft && !issued;
   const base = `/projects/${projectId}`;
@@ -102,6 +102,12 @@ export async function ReviewResponse({
           />
         </div>
 
+        {leakageBasis === "snapshot" && (
+          <Notice tone="locked" title="As recorded at finalisation">
+            These Assurance matters are shown as this review&apos;s snapshot recorded them. Later changes to the living
+            matters appear only in Continuous Assurance and in later reviews.
+          </Notice>
+        )}
         {leakage.length === 0 && <Empty>No Value Leakage identified.</Empty>}
         <div className="space-y-2">
           {leakage.map((l) => {
@@ -115,18 +121,21 @@ export async function ReviewResponse({
                     <span className="font-mono text-slate-500">{l.leakage.code}</span>
                     <span className="font-semibold">{l.leakage.title}</span>
                     <PlainBadge tone={l.leakage.status === "open" ? "amber" : "slate"}>{l.leakage.status}</PlainBadge>
-                    {a ? (
+                    {l.leakage.status === "open" && l.leakage.stage && (
+                      <PlainBadge tone="sky">{ASSURANCE_STAGE_LABELS[l.leakage.stage]}</PlainBadge>
+                    )}
+                    {a?.amounts ? (
                       <span className="text-xs font-normal" data-testid="leakage-amounts">
                         Total {money(a.amounts.total, currency)} · Recoverable {money(a.amounts.recoverable, currency)}{" "}
                         · Unrecoverable {money(a.amounts.unrecoverable, currency)}
                       </span>
                     ) : (
                       <span className="text-xs font-normal text-amber-700" data-testid="leakage-amounts">
-                        Not assessed in this review
+                        Not yet quantified in this review
                       </span>
                     )}
                     <span className="text-xs font-normal text-slate-500">
-                      AVO {l.ownerName ?? "—"} ·{" "}
+                      Risk / Leakage Owner {l.ownerName ?? "—"} ·{" "}
                       {l.drivers.length ? l.drivers.map((d) => d.code).join(", ") : "no drivers linked"}
                     </span>
                   </span>
@@ -140,11 +149,22 @@ export async function ReviewResponse({
                         {l.leakage.description ?? "—"}
                       </span>,
                     ],
-                    ["Response owner (AVO)", l.ownerName ?? "—"],
+                    ["Risk / Leakage Owner", l.ownerName ?? "—"],
                     ["Affected drivers", l.drivers.map((d) => d.code).join(", ") || "—"],
                     ["Required decision date", formatDate(l.leakage.requiredDecisionDate)],
                     ["Consultant assessment", l.leakage.consultantAssessment ?? "—"],
-                    ["Identified in", `Review #${l.identifiedInSequence}`],
+                    [
+                      "Identified in",
+                      l.identifiedInSequence !== null
+                        ? `Review #${l.identifiedInSequence}`
+                        : `Continuous Assurance, ${formatDate(l.leakage.identifiedOn)}`,
+                    ],
+                    [
+                      "Assurance matter",
+                      <TextLink key="m" href={`${base}/assurance/matters/${l.leakage.id}`}>
+                        Open {l.leakage.code} in Continuous Assurance
+                      </TextLink>,
+                    ],
                     [
                       "Unrecoverable rationale",
                       a?.unrecoverableRationale
@@ -156,9 +176,10 @@ export async function ReviewResponse({
                       l.assessments.length === 0
                         ? "None"
                         : l.assessments
-                            .map(
-                              (x) =>
-                                `#${x.reviewSequence}: ${money(x.totalAmount, currency)} total, ${money(x.unrecoverableAmount, currency)} unrecoverable`,
+                            .map((x) =>
+                              x.totalAmount === null
+                                ? `#${x.reviewSequence}: not yet quantified`
+                                : `#${x.reviewSequence}: ${money(x.totalAmount, currency)} total, ${money(x.unrecoverableAmount, currency)} unrecoverable`,
                             )
                             .join(" · "),
                     ],
@@ -220,7 +241,7 @@ export async function ReviewResponse({
                         <FormGrid>
                           <SelectField
                             name="responseOwnerPersonId"
-                            label="Response owner (AVO)"
+                            label="Risk / Leakage Owner"
                             defaultValue={l.leakage.responseOwnerPersonId}
                             placeholder="—"
                             options={stakeholders}
@@ -229,13 +250,6 @@ export async function ReviewResponse({
                             name="requiredDecisionDate"
                             label="Required decision date"
                             defaultValue={l.leakage.requiredDecisionDate}
-                          />
-                          <SelectField
-                            name="status"
-                            label="Status"
-                            required
-                            defaultValue={l.leakage.status}
-                            options={LEAKAGE_STATUSES.map((s) => ({ value: s, label: s }))}
                           />
                         </FormGrid>
                         <TextArea
@@ -269,7 +283,7 @@ export async function ReviewResponse({
                     <TextField name="title" label="Issue" required />
                     <SelectField
                       name="responseOwnerPersonId"
-                      label="Response owner (AVO)"
+                      label="Risk / Leakage Owner"
                       placeholder="—"
                       options={stakeholders}
                     />

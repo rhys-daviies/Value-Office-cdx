@@ -1,4 +1,4 @@
-import type { EvidenceStatus, QualificationStatus, VersionStatus } from "@/domain/statuses";
+import type { AssuranceStage, EvidenceStatus, QualificationStatus, VersionStatus } from "@/domain/statuses";
 
 // Consultant-facing labels. Presentation only — no methodology lives here.
 
@@ -22,6 +22,16 @@ export const VERSION_STATUS_LABELS: Record<VersionStatus, string> = {
   superseded: "Superseded",
   rejected: "Rejected",
   withdrawn: "Withdrawn",
+};
+
+/** Continuous Assurance working stages (provisional, PMO Phase 4D). */
+export const ASSURANCE_STAGE_LABELS: Record<AssuranceStage, string> = {
+  identified: "Identified",
+  awaiting_evidence: "Awaiting evidence",
+  assessing: "Assessing",
+  remediation: "Remediation underway",
+  monitoring: "Monitoring",
+  escalated: "Escalated — decision required",
 };
 
 export const IR_ITEM_STATUS_LABELS = {
@@ -90,6 +100,13 @@ export const COMMAND_LABELS: Record<string, string> = {
   "assurance.unlinkEvidence": "Evidence unlinked from review",
   "assurance.finaliseReview": "Assurance Review finalised",
   "leakage.create": "Value Leakage identified",
+  "matter.create": "Assurance matter raised",
+  "matter.setStage": "Assurance matter stage changed",
+  "matter.setOwner": "Risk / Leakage Owner changed",
+  "matter.assessWorking": "Working Value Leakage assessed",
+  "matter.setRemediation": "Remediation updated",
+  "matter.close": "Assurance matter closed",
+  "matter.reopen": "Assurance matter reopened",
   "leakage.update": "Value Leakage updated",
   "leakage.setDrivers": "Leakage affected drivers updated",
   "leakage.assess": "Value Leakage assessed",

@@ -43,6 +43,13 @@ export const COMMANDS = {
   unlinkAssuranceEvidence: "assurance.unlinkEvidence",
   finaliseAssuranceReview: "assurance.finaliseReview", // trigger-checked
   createLeakage: "leakage.create",
+  createMatter: "matter.create", // trigger-checked
+  setMatterStage: "matter.setStage", // trigger-checked
+  setMatterOwner: "matter.setOwner",
+  assessMatterWorking: "matter.assessWorking", // trigger-checked
+  setMatterRemediation: "matter.setRemediation",
+  closeMatter: "matter.close", // trigger-checked
+  reopenMatter: "matter.reopen", // trigger-checked
   updateLeakage: "leakage.update",
   setLeakageDrivers: "leakage.setDrivers",
   assessLeakage: "leakage.assess",

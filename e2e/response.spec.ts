@@ -51,7 +51,7 @@ test("position → leakage → options → recommendation → decision → Value
   await open(page.getByTestId("add-leakage"));
   const addVl = page.getByTestId("add-leakage-form");
   await addVl.getByLabel("Issue").fill("Vendor delay");
-  await addVl.getByLabel("Response owner (AVO)").selectOption({ label: "Test VCO" });
+  await addVl.getByLabel("Risk / Leakage Owner").selectOption({ label: "Test VCO" });
   await addVl.getByLabel("Alpha Savings").check();
   await addVl.getByRole("button", { name: "Add leakage item" }).click();
   await saved(addVl, "VL-001 recorded");

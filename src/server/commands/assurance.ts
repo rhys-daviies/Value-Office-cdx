@@ -233,15 +233,82 @@ export const unlinkReviewEvidence = defineCommand(
  * Finalises a draft review: it and its positions become immutable. Requires a
  * Value Position for every driver in the authorised version (checked in the DB).
  */
+/**
+ * Phase 4D.1 formal snapshot: every open Assurance matter, and every matter formally assessed in
+ * this review, is recorded as the review saw it. Formal amounts come only from this review's own
+ * assessment; an unassessed matter is snapshotted as not yet quantified (null) — never as zero, and
+ * never from the working assessment. Runs inside the finalisation transaction.
+ */
+async function snapshotMatters(tx: Tx, review: typeof schema.assuranceReview.$inferSelect): Promise<Date> {
+  const takenAt = new Date();
+  const matters = await tx
+    .select()
+    .from(schema.valueLeakage)
+    .where(eq(schema.valueLeakage.projectId, review.projectId));
+  const assessed = new Set(
+    (
+      await tx
+        .select({ id: schema.leakageAssessment.valueLeakageId })
+        .from(schema.leakageAssessment)
+        .where(eq(schema.leakageAssessment.assuranceReviewId, review.id))
+    ).map((a) => a.id),
+  );
+  const links = await tx
+    .select({ matterId: schema.valueLeakageDriver.valueLeakageId, driverId: schema.valueLeakageDriver.valueDriverId })
+    .from(schema.valueLeakageDriver)
+    .where(eq(schema.valueLeakageDriver.projectId, review.projectId));
+
+  for (const m of matters.filter((m) => m.status === "open" || assessed.has(m.id))) {
+    const snapshot = {
+      snapshotTakenAt: takenAt,
+      snapshotStatus: m.status,
+      snapshotStage: m.stage,
+      snapshotTitle: m.title,
+      snapshotDescription: m.description,
+      snapshotOwnerPersonId: m.responseOwnerPersonId,
+      snapshotDriverIds: links
+        .filter((l) => l.matterId === m.id)
+        .map((l) => l.driverId)
+        .sort(),
+      snapshotConsultantAssessment: m.consultantAssessment,
+      snapshotRequiredDecisionDate: m.requiredDecisionDate,
+      snapshotRemediationPlan: m.remediationPlan,
+      snapshotMonitorUntil: m.monitorUntil,
+    };
+    if (assessed.has(m.id)) {
+      await tx
+        .update(schema.leakageAssessment)
+        .set(snapshot)
+        .where(
+          and(
+            eq(schema.leakageAssessment.valueLeakageId, m.id),
+            eq(schema.leakageAssessment.assuranceReviewId, review.id),
+          ),
+        );
+    } else {
+      await tx.insert(schema.leakageAssessment).values({
+        ...snapshot,
+        valueLeakageId: m.id,
+        assuranceReviewId: review.id,
+        projectId: review.projectId,
+        totalAmount: null,
+        unrecoverableAmount: null,
+      });
+    }
+  }
+  return takenAt;
+}
+
 export const finaliseReview = defineCommand(
   COMMANDS.finaliseAssuranceReview,
   z.object({ reviewId: uuid }),
   async ({ tx, actor }, input) => {
     const review = await getReview(tx, input.reviewId);
     requireDraft(review);
+    const matterSnapshotAt = await snapshotMatters(tx, review);
     const [row] = await tx
       .update(schema.assuranceReview)
-      .set({ status: "finalised", finalisedBy: actor.userId, finalisedAt: new Date() })
+      .set({ status: "finalised", finalisedBy: actor.userId, finalisedAt: new Date(), matterSnapshotAt })
       .where(eq(schema.assuranceReview.id, review.id))
       .returning();
     return row!;
