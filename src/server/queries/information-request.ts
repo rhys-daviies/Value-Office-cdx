@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { db, schema } from "@/server/db/client";
 
@@ -45,18 +45,25 @@ export async function getInformationRequestWorkspace(projectId: string) {
       driverCode: schema.valueDriver.code,
       evidenceCode: schema.evidence.code,
       evidenceTitle: schema.evidence.title,
+      matter: { id: schema.valueLeakage.id, code: schema.valueLeakage.code, title: schema.valueLeakage.title },
     })
     .from(schema.informationRequestItem)
     .leftJoin(schema.person, eq(schema.person.id, schema.informationRequestItem.requestedFromPersonId))
     .leftJoin(schema.valueDriver, eq(schema.valueDriver.id, schema.informationRequestItem.valueDriverId))
     .leftJoin(schema.evidence, eq(schema.evidence.id, schema.informationRequestItem.fulfilledByEvidenceId))
+    .leftJoin(schema.valueLeakage, eq(schema.valueLeakage.id, schema.informationRequestItem.valueLeakageId))
     .where(eq(schema.informationRequestItem.projectId, projectId))
     .orderBy(asc(schema.informationRequestItem.sequence));
 
-  const [stakeholders, drivers, evidence] = await Promise.all([
+  const [stakeholders, drivers, evidence, openMatters] = await Promise.all([
     listStakeholders(projectId),
     listDriverOptions(projectId),
     listEvidenceOptions(projectId),
+    db()
+      .select({ id: schema.valueLeakage.id, code: schema.valueLeakage.code, title: schema.valueLeakage.title })
+      .from(schema.valueLeakage)
+      .where(and(eq(schema.valueLeakage.projectId, projectId), eq(schema.valueLeakage.status, "open")))
+      .orderBy(asc(schema.valueLeakage.code)),
   ]);
 
   return {
@@ -64,6 +71,7 @@ export async function getInformationRequestWorkspace(projectId: string) {
     stakeholders,
     drivers,
     evidence,
+    openMatters,
   };
 }
 

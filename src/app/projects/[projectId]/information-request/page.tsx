@@ -7,17 +7,18 @@ import {
   updateRequestItemAction,
 } from "@/server/actions/information-request";
 import { getInformationRequestWorkspace, type InformationRequestWorkspace } from "@/server/queries/information-request";
-import { INFORMATION_REQUEST_ITEM_STATUSES } from "@/domain/statuses";
+import { formatRequestReference } from "@/server/commands/information-request";
+import { INFORMATION_REQUEST_ITEM_STATUSES, INFORMATION_REQUEST_PURPOSES } from "@/domain/statuses";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { PlainBadge, RequestItemBadge } from "@/ui/components/badges";
 import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@/ui/components/fields";
-import { ButtonLink, Empty, Expander, Notice, Section } from "@/ui/components/layout";
+import { ButtonLink, Empty, Expander, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate } from "@/ui/format";
-import { IR_ITEM_STATUS_LABELS, IR_STATUS_LABELS } from "@/ui/labels";
+import { IR_ITEM_STATUS_LABELS, IR_PURPOSE_LABELS, IR_STATUS_LABELS, irPurposeLabel } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
 
-export const metadata = { title: "Information Request" };
+export const metadata = { title: "Information Requests" };
 
 type Workspace = InformationRequestWorkspace;
 type RequestEntry = Workspace["requests"][number];
@@ -32,13 +33,15 @@ export default async function InformationRequestPage({
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        What Cardaxia needs from the client to re-qualify the Business Case. Track each item until it is received — and
-        link what arrives to the evidence register.
+        What Cardaxia needs from the client — to re-qualify the Business Case at Mobilisation, and as evidence for
+        Assurance matters throughout the engagement. Track each item until it is received, and link what arrives to the
+        evidence register.
       </p>
       {ws.requests.length === 0 ? (
         <Section title="Create the Information Request">
           <ActionForm action={createInformationRequestAction} testId="create-ir-form">
             <Hidden name="projectId" value={projectId} />
+            <Hidden name="purpose" value="mobilisation" />
             <FormGrid>
               <TextField name="reference" label="Reference" required defaultValue="IR-01" />
               <TextField name="title" label="Title" required defaultValue="Information Request — Re-Qualification" />
@@ -49,9 +52,73 @@ export default async function InformationRequestPage({
           </ActionForm>
         </Section>
       ) : (
-        ws.requests.map((entry) => <RequestPanel key={entry.request.id} projectId={projectId} entry={entry} ws={ws} />)
+        <>
+          <RequestIndex ws={ws} />
+          {ws.requests.map((entry) => (
+            <RequestPanel key={entry.request.id} projectId={projectId} entry={entry} ws={ws} />
+          ))}
+          <Section title="New Information Request" tone="muted">
+            <Expander summary="Raise another Information Request" testId="new-ir">
+              <ActionForm action={createInformationRequestAction} testId="new-ir-form">
+                <Hidden name="projectId" value={projectId} />
+                <FormGrid cols={3}>
+                  <TextField
+                    name="reference"
+                    label="Reference"
+                    required
+                    defaultValue={formatRequestReference(ws.requests.map((r) => r.request.reference))}
+                  />
+                  <TextField name="title" label="Title" required defaultValue="Assurance evidence request" />
+                  <SelectField
+                    name="purpose"
+                    label="Purpose"
+                    required
+                    defaultValue="assurance"
+                    options={INFORMATION_REQUEST_PURPOSES.map((p) => ({ value: p, label: IR_PURPOSE_LABELS[p] }))}
+                  />
+                </FormGrid>
+                <div className="mt-3">
+                  <SubmitButton>Create Information Request</SubmitButton>
+                </div>
+              </ActionForm>
+            </Expander>
+          </Section>
+        </>
       )}
     </>
+  );
+}
+
+function RequestIndex({ ws }: { ws: Workspace }) {
+  return (
+    <Section title={`Information Requests (${ws.requests.length})`}>
+      <Table>
+        <thead>
+          <tr>
+            <th>Request</th>
+            <th>Purpose</th>
+            <th>Status</th>
+            <th>Outstanding</th>
+            <th>Items</th>
+          </tr>
+        </thead>
+        <tbody>
+          {ws.requests.map(({ request, items }) => (
+            <tr key={request.id} data-testid="ir-index-row">
+              <td>
+                <TextLink href={`#ir-${request.id}`}>
+                  {request.reference} · {request.title}
+                </TextLink>
+              </td>
+              <td>{irPurposeLabel(request.purpose)}</td>
+              <td>{IR_STATUS_LABELS[request.status]}</td>
+              <td>{items.filter((i) => i.item.status === "open" || i.item.status === "partially_received").length}</td>
+              <td>{items.length}</td>
+            </tr>
+          ))}
+        </tbody>
+      </Table>
+    </Section>
   );
 }
 
@@ -61,13 +128,19 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
   const driverOptions = ws.drivers.map((d) => ({ value: d.driverId, label: `${d.code} ${d.name}` }));
   const evidenceOptions = ws.evidence.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }));
 
+  const matterOptions = ws.openMatters.map((m) => ({ value: m.id, label: `${m.code} ${m.title}` }));
+
   return (
     <Section
+      id={`ir-${request.id}`}
       title={
         <span className="inline-flex items-center gap-2">
           {request.reference} · {request.title}
           <PlainBadge tone={request.status === "draft" ? "amber" : request.status === "issued" ? "sky" : "slate"}>
             {IR_STATUS_LABELS[request.status]}
+          </PlainBadge>
+          <PlainBadge tone={request.purpose === "assurance" ? "violet" : "slate"}>
+            {irPurposeLabel(request.purpose)}
           </PlainBadge>
         </span>
       }
@@ -119,7 +192,7 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
               {IR_ITEM_STATUS_LABELS[status]} ({group.length})
             </h3>
             <div className="space-y-2">
-              {group.map(({ item, requestedFromName, driverCode, evidenceCode, evidenceTitle }) => (
+              {group.map(({ item, requestedFromName, driverCode, evidenceCode, evidenceTitle, matter }) => (
                 <Expander
                   key={item.id}
                   testId="ir-item"
@@ -130,6 +203,7 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
                       <RequestItemBadge status={item.status} />
                       <span className="font-normal text-slate-500">
                         {[
+                          matter && `matter ${matter.code}`,
                           requestedFromName && `from ${requestedFromName}`,
                           item.dueOn && `due ${formatDate(item.dueOn)}`,
                           driverCode,
@@ -141,6 +215,14 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
                     </span>
                   }
                 >
+                  {matter && (
+                    <p className="mb-2 text-sm">
+                      Evidence for Assurance matter{" "}
+                      <TextLink href={`/projects/${projectId}/assurance/matters/${matter.id}`}>
+                        {matter.code} {matter.title}
+                      </TextLink>
+                    </p>
+                  )}
                   {request.status === "closed" ? (
                     <p className="text-sm text-slate-600">
                       Request closed. {evidenceCode ? `Fulfilled by ${evidenceCode} ${evidenceTitle}.` : ""}
@@ -246,6 +328,14 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
                   placeholder="— Not driver-specific —"
                   options={driverOptions}
                 />
+                {request.purpose === "assurance" && (
+                  <SelectField
+                    name="valueLeakageId"
+                    label="Assurance matter"
+                    placeholder="— Not matter-specific —"
+                    options={matterOptions}
+                  />
+                )}
               </FormGrid>
               <SubmitButton>Add item</SubmitButton>
             </div>

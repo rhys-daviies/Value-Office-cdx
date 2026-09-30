@@ -1,6 +1,6 @@
 "use server";
 
-import { recordEvidence, updateEvidence } from "@/server/commands/evidence";
+import { linkDriverEvidence, recordEvidence, unlinkDriverEvidence, updateEvidence } from "@/server/commands/evidence";
 import { linkEvidence, unlinkEvidence } from "@/server/commands/value-case";
 
 import { bool, clear, opt, required } from "./form";
@@ -64,5 +64,24 @@ export async function unlinkEvidenceAction(_prev: ActionState, fd: FormData): Pr
   return perform(projectOf(fd), async (actor) => {
     await unlinkEvidence(actor, { evidenceLinkId: required(fd, "evidenceLinkId") });
     return "Evidence unlinked";
+  });
+}
+
+/** Working link to a stable Value Driver identity (not a version; never locks the evidence). */
+export async function linkDriverEvidenceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await linkDriverEvidence(actor, {
+      evidenceId: required(fd, "evidenceId"),
+      valueDriverId: required(fd, "valueDriverId"),
+      relevanceNote: opt(fd, "relevanceNote"),
+    });
+    return "Working link to Value Driver added";
+  });
+}
+
+export async function unlinkDriverEvidenceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await unlinkDriverEvidence(actor, { evidenceLinkId: required(fd, "evidenceLinkId") });
+    return "Working link removed";
   });
 }

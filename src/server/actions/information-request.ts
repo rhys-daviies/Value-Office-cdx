@@ -1,6 +1,6 @@
 "use server";
 
-import { INFORMATION_REQUEST_ITEM_STATUSES } from "@/domain/statuses";
+import { INFORMATION_REQUEST_ITEM_STATUSES, INFORMATION_REQUEST_PURPOSES } from "@/domain/statuses";
 import {
   addInformationRequestItem,
   closeInformationRequest,
@@ -23,6 +23,7 @@ export async function createInformationRequestAction(_prev: ActionState, fd: For
       projectId: projectOf(fd),
       reference: required(fd, "reference"),
       title: required(fd, "title"),
+      purpose: INFORMATION_REQUEST_PURPOSES.find((p) => p === opt(fd, "purpose")),
     });
     return "Information Request created";
   });
@@ -36,6 +37,7 @@ export async function addRequestItemAction(_prev: ActionState, fd: FormData): Pr
       requestedFromPersonId: opt(fd, "requestedFromPersonId"),
       dueOn: opt(fd, "dueOn"),
       valueDriverId: opt(fd, "valueDriverId"),
+      valueLeakageId: opt(fd, "valueLeakageId"),
       notes: opt(fd, "notes"),
     });
     return "Item added";

@@ -9,10 +9,13 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+import { fulfilRequestItemAction, requestMatterEvidenceAction } from "@/server/actions/matters";
 import { createProjectAction } from "@/server/actions/projects";
 import { IDLE } from "@/server/actions/state";
 import { authoriseInitialVersionAction, updateDriverVersionAction } from "@/server/actions/value-case";
-import { addValueDriver, createDraftVersion } from "@/server/commands/value-case";
+import { recordEvidence } from "@/server/commands/evidence";
+import { createMatter } from "@/server/commands/matters";
+import { addValueDriver, authoriseInitialVersion, createDraftVersion } from "@/server/commands/value-case";
 import { db, schema } from "@/server/db/client";
 
 import { newActor, newProject, proposedV1, uid } from "../support/fixtures";
@@ -122,5 +125,49 @@ describe("server actions adapt forms to commands", () => {
       .innerJoin(schema.appUser, eq(schema.appUser.id, schema.valueCaseVersion.authorisationRecordedBy))
       .where(eq(schema.valueCaseVersion.id, v1.id));
     expect(row).toEqual({ status: "authorised", email: process.env.VO_DEV_USER_EMAIL });
+  });
+
+  it("requests matter evidence on a new Assurance request, then records its fulfilment", async () => {
+    const actor = await newActor();
+    const ctx = await proposedV1(actor);
+    await authoriseInitialVersion(actor, {
+      versionId: ctx.v1.id,
+      authorisedByPersonId: ctx.vco.id,
+      authorisedOn: new Date().toISOString().slice(0, 10),
+      authorisationEvidenceId: ctx.evidence.id,
+    });
+    const matter = await createMatter(actor, { projectId: ctx.project.id, code: "VL-A1", title: "Delay" });
+    const base = { projectId: ctx.project.id, matterId: matter.id };
+    const missing = await requestMatterEvidenceAction(
+      IDLE,
+      form({ ...base, informationRequestId: "new", description: "x" }),
+    );
+    expect(missing.status).toBe("error"); // a new request needs a title
+    const ok = await requestMatterEvidenceAction(
+      IDLE,
+      form({ ...base, informationRequestId: "new", newRequestTitle: "Assurance evidence", description: "Schedule" }),
+    );
+    expect(ok.status).toBe("ok");
+    const [item] = await db()
+      .select()
+      .from(schema.informationRequestItem)
+      .where(eq(schema.informationRequestItem.valueLeakageId, matter.id));
+    const [request] = await db()
+      .select()
+      .from(schema.informationRequest)
+      .where(eq(schema.informationRequest.id, item!.informationRequestId));
+    expect(request).toMatchObject({ reference: "IR-01", purpose: "assurance" });
+
+    const e = await recordEvidence(actor, { projectId: ctx.project.id, code: "E-A1", title: "Schedule v2" });
+    const fulfilled = await fulfilRequestItemAction(
+      IDLE,
+      form({ projectId: ctx.project.id, itemId: item!.id, status: "received", fulfilledByEvidenceId: e.id }),
+    );
+    expect(fulfilled.status).toBe("ok");
+    const [after] = await db()
+      .select()
+      .from(schema.informationRequestItem)
+      .where(eq(schema.informationRequestItem.id, item!.id));
+    expect(after).toMatchObject({ status: "received", fulfilledByEvidenceId: e.id, description: "Schedule" });
   });
 });

@@ -2,7 +2,14 @@
 
 import { redirect } from "next/navigation";
 
-import { ASSURANCE_STAGES, type AssuranceStage } from "@/domain/statuses";
+import { ASSURANCE_STAGES, type AssuranceStage, INFORMATION_REQUEST_ITEM_STATUSES } from "@/domain/statuses";
+import { updateInformationRequestItem } from "@/server/commands/information-request";
+import {
+  documentMatterEvidence,
+  linkMatterEvidence,
+  requestMatterEvidence,
+  unlinkMatterEvidence,
+} from "@/server/commands/matter-evidence";
 import {
   assessMatterWorking,
   closeMatter,
@@ -17,7 +24,7 @@ import { clear, FormInputError, moneyField, opt, required } from "./form";
 import { perform } from "./perform";
 import type { ActionState } from "./state";
 
-// Continuous Assurance matter actions (Phase 4D.1): FormData → one named command each.
+// Continuous Assurance matter actions (Phases 4D.1–4D.2): FormData → one named command each.
 
 const projectOf = (fd: FormData) => required(fd, "projectId");
 const matterOf = (fd: FormData) => required(fd, "matterId");
@@ -98,5 +105,77 @@ export async function reopenMatterAction(_prev: ActionState, fd: FormData): Prom
   return perform(projectOf(fd), async (actor) => {
     await reopenMatter(actor, { matterId: matterOf(fd) });
     return "Matter reopened";
+  });
+}
+
+// --- Evidence for a matter (Phase 4D.2) ----------------------------------------
+// Working links only. None of these moves the matter's stage or working figures.
+
+export async function documentMatterEvidenceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    const e = await documentMatterEvidence(actor, {
+      matterId: matterOf(fd),
+      code: required(fd, "code").toUpperCase(),
+      title: required(fd, "title"),
+      summary: opt(fd, "summary"),
+      sourcePersonId: opt(fd, "sourcePersonId"),
+      evidenceDate: opt(fd, "evidenceDate"),
+      receivedOn: opt(fd, "receivedOn"),
+      relevanceNote: opt(fd, "relevanceNote"),
+      valueDriverId: opt(fd, "valueDriverId"),
+    });
+    return `Evidence ${e.code} recorded and linked to this matter`;
+  });
+}
+
+export async function linkMatterEvidenceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await linkMatterEvidence(actor, {
+      matterId: matterOf(fd),
+      evidenceId: required(fd, "evidenceId"),
+      relevanceNote: opt(fd, "relevanceNote"),
+    });
+    return "Evidence linked to this matter";
+  });
+}
+
+export async function unlinkMatterEvidenceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await unlinkMatterEvidence(actor, { evidenceLinkId: required(fd, "evidenceLinkId") });
+    return "Working link removed";
+  });
+}
+
+/** `informationRequestId` = "new" raises a new Assurance Information Request in the same transaction. */
+export async function requestMatterEvidenceAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    const target = required(fd, "informationRequestId");
+    const item = await requestMatterEvidence(actor, {
+      matterId: matterOf(fd),
+      informationRequestId: target && target !== "new" ? target : undefined,
+      newRequestTitle: target === "new" || !target ? required(fd, "newRequestTitle") || undefined : undefined,
+      description: required(fd, "description"),
+      requestedFromPersonId: opt(fd, "requestedFromPersonId"),
+      dueOn: opt(fd, "dueOn"),
+      valueDriverId: opt(fd, "valueDriverId"),
+      notes: opt(fd, "notes"),
+    });
+    return `Evidence requested (item #${item.sequence})`;
+  });
+}
+
+/** Records what arrived against a request item, through the existing fulfilment mechanism. */
+export async function fulfilRequestItemAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    const status = required(fd, "status");
+    if (!(INFORMATION_REQUEST_ITEM_STATUSES as readonly string[]).includes(status)) {
+      throw new FormInputError("status", "Choose a status");
+    }
+    await updateInformationRequestItem(actor, {
+      itemId: required(fd, "itemId"),
+      status: status as (typeof INFORMATION_REQUEST_ITEM_STATUSES)[number],
+      fulfilledByEvidenceId: clear(fd, "fulfilledByEvidenceId"),
+    });
+    return "Request item updated";
   });
 }

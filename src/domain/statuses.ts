@@ -39,6 +39,9 @@ export type KeyDateKind = (typeof KEY_DATE_KINDS)[number];
 export const PROJECT_STATUSES = ["active", "archived"] as const;
 
 export const INFORMATION_REQUEST_STATUSES = ["draft", "issued", "closed"] as const;
+/** Why an Information Request was raised (Phase 4D.2). Legacy requests have none and read as Mobilisation. */
+export const INFORMATION_REQUEST_PURPOSES = ["mobilisation", "assurance"] as const;
+export type InformationRequestPurpose = (typeof INFORMATION_REQUEST_PURPOSES)[number];
 
 export const INFORMATION_REQUEST_ITEM_STATUSES = ["open", "partially_received", "received", "not_available"] as const;
 

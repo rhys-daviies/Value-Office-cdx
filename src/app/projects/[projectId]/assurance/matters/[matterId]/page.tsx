@@ -9,8 +9,10 @@ import {
   setMatterRemediationAction,
   setMatterStageAction,
 } from "@/server/actions/matters";
+import { getMatterEvidence } from "@/server/queries/evidence";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getAssuranceMatter } from "@/server/queries/response";
+import { MatterEvidenceSections } from "@/ui/assurance/matter-evidence";
 import { StageBadge, WORKING_LABEL, WorkingAmount } from "@/ui/assurance/matters";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { DateField, FormGrid, Hidden, MoneyField, SelectField, TextArea } from "@/ui/components/fields";
@@ -27,7 +29,11 @@ export default async function AssuranceMatterPage({
   const { projectId, matterId } = await params;
   const { project } = await requireProject(projectId);
   if (!isUuid(matterId)) notFound();
-  const [m, stakeholders] = await Promise.all([getAssuranceMatter(projectId, matterId), listStakeholders(projectId)]);
+  const [m, stakeholders, ev] = await Promise.all([
+    getAssuranceMatter(projectId, matterId),
+    listStakeholders(projectId),
+    getMatterEvidence(projectId, matterId),
+  ]);
   if (!m) notFound();
   const { leakage } = m;
   const currency = project.currency;
@@ -133,6 +139,13 @@ export default async function AssuranceMatterPage({
           )}
         </Section>
       </div>
+
+      <MatterEvidenceSections
+        projectId={projectId}
+        entry={m}
+        ev={ev}
+        stakeholders={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
+      />
 
       <Section
         title={WORKING_LABEL}

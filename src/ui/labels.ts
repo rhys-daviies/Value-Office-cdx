@@ -43,6 +43,11 @@ export const IR_ITEM_STATUS_LABELS = {
 
 export const IR_STATUS_LABELS = { draft: "Draft", issued: "Issued", closed: "Closed" } as const;
 
+/** Legacy requests (no purpose) were raised for Mobilisation / Re-Qualification. */
+export const IR_PURPOSE_LABELS = { mobilisation: "Mobilisation", assurance: "Assurance" } as const;
+export const irPurposeLabel = (purpose: keyof typeof IR_PURPOSE_LABELS | null) =>
+  IR_PURPOSE_LABELS[purpose ?? "mobilisation"];
+
 export const KEY_DATE_LABELS = {
   kickoff: "Kick-off",
   go_live: "Go-Live",
@@ -107,6 +112,12 @@ export const COMMAND_LABELS: Record<string, string> = {
   "matter.setRemediation": "Remediation updated",
   "matter.close": "Assurance matter closed",
   "matter.reopen": "Assurance matter reopened",
+  "matter.documentEvidence": "Evidence documented for Assurance matter",
+  "matter.linkEvidence": "Evidence linked to Assurance matter",
+  "matter.unlinkEvidence": "Evidence unlinked from Assurance matter",
+  "matter.requestEvidence": "Evidence requested for Assurance matter",
+  "evidence.linkDriver": "Evidence linked to Value Driver (working)",
+  "evidence.unlinkDriver": "Evidence unlinked from Value Driver",
   "leakage.update": "Value Leakage updated",
   "leakage.setDrivers": "Leakage affected drivers updated",
   "leakage.assess": "Value Leakage assessed",

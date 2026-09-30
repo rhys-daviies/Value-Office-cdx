@@ -1,8 +1,11 @@
-import { and, asc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, eq, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { db, schema } from "@/server/db/client";
 
+import { formatRequestReference } from "@/server/commands/information-request";
+
+import { listDriverOptions } from "./information-request";
 import { listDocuments, listStakeholders } from "./mobilise";
 
 const supersedes = alias(schema.evidence, "supersedes");
@@ -98,6 +101,7 @@ export async function getEvidenceRegister(projectId: string) {
     listDocuments(projectId),
     listStakeholders(projectId),
   ]);
+  const { matterLinks, driverLinks, fulfils } = await listWorkingUse(projectId);
 
   const entries = rows.map((r) => ({
     ...r,
@@ -105,6 +109,9 @@ export async function getEvidenceRegister(projectId: string) {
     links: links.filter((l) => l.evidenceId === r.evidence.id),
     reviewLinks: reviewLinks.filter((l) => l.evidenceId === r.evidence.id),
     authorises: authorisations.filter((a) => a.evidenceId === r.evidence.id).map((a) => a.versionNumber),
+    matterLinks: matterLinks.filter((l) => l.evidenceId === r.evidence.id),
+    driverLinks: driverLinks.filter((l) => l.evidenceId === r.evidence.id),
+    fulfils: fulfils.filter((f) => f.evidenceId === r.evidence.id),
     locked: locked.has(r.evidence.id),
   }));
   return { entries, documents, stakeholders };
@@ -112,6 +119,59 @@ export async function getEvidenceRegister(projectId: string) {
 
 export type EvidenceRegister = Awaited<ReturnType<typeof getEvidenceRegister>>;
 export type EvidenceEntry = EvidenceRegister["entries"][number];
+
+/**
+ * Working use of evidence (Phase 4D.2): links to living Assurance matters and stable Value Driver
+ * identities, and the request items it fulfilled. None of these is formal reliance.
+ */
+async function listWorkingUse(projectId: string) {
+  const [matterLinks, driverLinks, fulfils] = await Promise.all([
+    db()
+      .select({
+        linkId: schema.evidenceLink.id,
+        evidenceId: schema.evidenceLink.evidenceId,
+        matterId: schema.valueLeakage.id,
+        code: schema.valueLeakage.code,
+        title: schema.valueLeakage.title,
+        status: schema.valueLeakage.status,
+      })
+      .from(schema.evidenceLink)
+      .innerJoin(schema.valueLeakage, eq(schema.valueLeakage.id, schema.evidenceLink.valueLeakageId))
+      .where(eq(schema.evidenceLink.projectId, projectId))
+      .orderBy(asc(schema.valueLeakage.code)),
+    db()
+      .select({
+        linkId: schema.evidenceLink.id,
+        evidenceId: schema.evidenceLink.evidenceId,
+        driverId: schema.valueDriver.id,
+        code: schema.valueDriver.code,
+      })
+      .from(schema.evidenceLink)
+      .innerJoin(schema.valueDriver, eq(schema.valueDriver.id, schema.evidenceLink.valueDriverId))
+      .where(eq(schema.evidenceLink.projectId, projectId))
+      .orderBy(asc(schema.valueDriver.code)),
+    db()
+      .select({
+        evidenceId: schema.informationRequestItem.fulfilledByEvidenceId,
+        requestId: schema.informationRequest.id,
+        reference: schema.informationRequest.reference,
+        sequence: schema.informationRequestItem.sequence,
+      })
+      .from(schema.informationRequestItem)
+      .innerJoin(
+        schema.informationRequest,
+        eq(schema.informationRequest.id, schema.informationRequestItem.informationRequestId),
+      )
+      .where(
+        and(
+          eq(schema.informationRequestItem.projectId, projectId),
+          isNotNull(schema.informationRequestItem.fulfilledByEvidenceId),
+        ),
+      )
+      .orderBy(asc(schema.informationRequest.reference), asc(schema.informationRequestItem.sequence)),
+  ]);
+  return { matterLinks, driverLinks, fulfils };
+}
 
 /** Mirrors vo_evidence_is_locked(): relied on by a non-draft version. */
 async function lockedEvidenceIds(projectId: string): Promise<Set<string>> {
@@ -153,6 +213,8 @@ export async function getEvidenceDetail(projectId: string, evidenceId: string) {
     .where(and(eq(schema.assumption.projectId, projectId), eq(schema.valueCaseVersion.status, "draft")))
     .orderBy(asc(schema.valueDriver.code));
 
+  const drivers = await listDriverOptions(projectId);
+
   return {
     entry,
     documents: register.documents,
@@ -160,7 +222,103 @@ export async function getEvidenceDetail(projectId: string, evidenceId: string) {
     otherEvidence: register.entries.filter((e) => e.evidence.id !== evidenceId).map((e) => e.evidence),
     draftTargets,
     draftAssumptions,
+    // Working-link targets: stable driver identities not yet linked.
+    driverTargets: drivers.filter((d) => !entry.driverLinks.some((l) => l.driverId === d.driverId)),
   };
+}
+
+/**
+ * Evidence around one Assurance matter (Phase 4D.2): what supports it (working links), what is still
+ * required (items on Assurance Information Requests), and what fulfilled each request.
+ */
+export async function getMatterEvidence(projectId: string, matterId: string) {
+  const fulfilled = alias(schema.evidence, "fulfilled");
+  const [linked, items, requests, allEvidence, locked, drivers] = await Promise.all([
+    db()
+      .select({
+        linkId: schema.evidenceLink.id,
+        relevanceNote: schema.evidenceLink.relevanceNote,
+        linkedAt: schema.evidenceLink.createdAt,
+        evidence: schema.evidence,
+        sourcePersonName: schema.person.name,
+      })
+      .from(schema.evidenceLink)
+      .innerJoin(schema.evidence, eq(schema.evidence.id, schema.evidenceLink.evidenceId))
+      .leftJoin(schema.person, eq(schema.person.id, schema.evidence.sourcePersonId))
+      .where(and(eq(schema.evidenceLink.projectId, projectId), eq(schema.evidenceLink.valueLeakageId, matterId)))
+      .orderBy(asc(schema.evidence.code)),
+    db()
+      .select({
+        item: schema.informationRequestItem,
+        request: {
+          id: schema.informationRequest.id,
+          reference: schema.informationRequest.reference,
+          title: schema.informationRequest.title,
+          status: schema.informationRequest.status,
+        },
+        requestedFromName: schema.person.name,
+        driverCode: schema.valueDriver.code,
+        evidence: { id: fulfilled.id, code: fulfilled.code, title: fulfilled.title },
+      })
+      .from(schema.informationRequestItem)
+      .innerJoin(
+        schema.informationRequest,
+        eq(schema.informationRequest.id, schema.informationRequestItem.informationRequestId),
+      )
+      .leftJoin(schema.person, eq(schema.person.id, schema.informationRequestItem.requestedFromPersonId))
+      .leftJoin(schema.valueDriver, eq(schema.valueDriver.id, schema.informationRequestItem.valueDriverId))
+      .leftJoin(fulfilled, eq(fulfilled.id, schema.informationRequestItem.fulfilledByEvidenceId))
+      .where(
+        and(
+          eq(schema.informationRequestItem.projectId, projectId),
+          eq(schema.informationRequestItem.valueLeakageId, matterId),
+        ),
+      )
+      .orderBy(asc(schema.informationRequest.reference), asc(schema.informationRequestItem.sequence)),
+    db()
+      .select()
+      .from(schema.informationRequest)
+      .where(eq(schema.informationRequest.projectId, projectId))
+      .orderBy(asc(schema.informationRequest.createdAt)),
+    db()
+      .select({ id: schema.evidence.id, code: schema.evidence.code, title: schema.evidence.title })
+      .from(schema.evidence)
+      .where(eq(schema.evidence.projectId, projectId))
+      .orderBy(asc(schema.evidence.code)),
+    lockedEvidenceIds(projectId),
+    listDriverOptions(projectId),
+  ]);
+  const linkedIds = new Set(linked.map((l) => l.evidence.id));
+  return {
+    linked: linked.map((l) => ({ ...l, locked: locked.has(l.evidence.id) })),
+    items,
+    /** Assurance requests that can take another item. */
+    assuranceRequests: requests.filter((r) => r.purpose === "assurance" && r.status !== "closed"),
+    nextRequestReference: formatRequestReference(requests.map((r) => r.reference)),
+    nextEvidenceCode: nextEvidenceCode(allEvidence.map((e) => e.code)),
+    linkableEvidence: allEvidence.filter((e) => !linkedIds.has(e.id)),
+    fulfilmentEvidence: allEvidence,
+    drivers,
+  };
+}
+
+export type MatterEvidence = Awaited<ReturnType<typeof getMatterEvidence>>;
+
+/** Evidence linked to the project's open Assurance matters, for deliberate use as review evidence. */
+export async function listOpenMatterEvidence(projectId: string) {
+  return db()
+    .select({
+      evidenceId: schema.evidence.id,
+      code: schema.evidence.code,
+      title: schema.evidence.title,
+      matterId: schema.valueLeakage.id,
+      matterCode: schema.valueLeakage.code,
+    })
+    .from(schema.evidenceLink)
+    .innerJoin(schema.evidence, eq(schema.evidence.id, schema.evidenceLink.evidenceId))
+    .innerJoin(schema.valueLeakage, eq(schema.valueLeakage.id, schema.evidenceLink.valueLeakageId))
+    .where(and(eq(schema.evidenceLink.projectId, projectId), ne(schema.valueLeakage.status, "closed")))
+    .orderBy(asc(schema.valueLeakage.code), asc(schema.evidence.code));
 }
 
 export function nextEvidenceCode(codes: readonly string[]): string {

@@ -61,7 +61,7 @@ describe("least-privilege application role", () => {
     expect(audit.rows).toEqual([{ actor_user_id: actor.userId, command: "client.create" }]);
   });
 
-  it("works Continuous Assurance matters (Phase 4D.1) under the same guards", async () => {
+  it("works Continuous Assurance matters and their evidence (Phases 4D.1–4D.2) under the same guards", async () => {
     const actor = await newActor();
     const { project } = await seedCompactAuthorised(actor, {
       code: `R-${randomUUID().slice(0, 6)}`,
@@ -100,6 +100,43 @@ describe("least-privilege application role", () => {
     await expect(
       run("leakage.update", "update value_leakage set stage = 'assessing' where id = $1", [id]),
     ).rejects.toThrow(/VO_WRONG_COMMAND/);
+
+    // Phase 4D.2: matter evidence and Assurance requests, under the same guards.
+    const [evidence] = (
+      await run(
+        "evidence.record",
+        "insert into evidence (project_id, code, title, recorded_by) values ($1, 'E-R1', 'Role evidence', $2) returning id",
+        [project.id, actor.userId],
+      )
+    ).rows;
+    const [link] = (
+      await run(
+        "matter.linkEvidence",
+        "insert into evidence_link (evidence_id, project_id, value_leakage_id) values ($1, $2, $3) returning id",
+        [evidence.id, project.id, id],
+      )
+    ).rows;
+    await expect(run("valueCase.unlinkEvidence", "delete from evidence_link where id = $1", [link.id])).rejects.toThrow(
+      /VO_WRONG_COMMAND/,
+    );
+    await run("matter.unlinkEvidence", "delete from evidence_link where id = $1", [link.id]);
+    const [request] = (
+      await run(
+        "matter.requestEvidence",
+        "insert into information_request (project_id, reference, title, purpose) values ($1, 'IR-R1', 'Role', 'assurance') returning id",
+        [project.id],
+      )
+    ).rows;
+    await run(
+      "matter.requestEvidence",
+      "insert into information_request_item (information_request_id, project_id, sequence, description, value_leakage_id) values ($1, $2, 1, 'Schedule', $3)",
+      [request.id, project.id, id],
+    );
+    await expect(
+      run("informationRequest.create", "update information_request set purpose = 'mobilisation' where id = $1", [
+        request.id,
+      ]),
+    ).rejects.toThrow(/VO_FIELD_IMMUTABLE/);
   });
 
   it("cannot bypass the integrity model", async () => {

@@ -23,8 +23,10 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        Every item of evidence the Value Case relies on, where it came from, and what it supports. Evidence relied on by
-        a locked Value Case version is frozen — record superseding evidence instead of editing it.
+        Every item of evidence, where it came from, and what it supports. Formal reliance — a locked Value Case version,
+        a finalised Assurance Review, an authorised Value Change or a recorded decision — freezes evidence: record
+        superseding evidence instead of editing it. Working links to a living Assurance matter or a Value Driver (shown
+        in violet) inform the consultant and never lock evidence.
       </p>
 
       <Section title={`Evidence register (${entries.length})`}>
@@ -60,10 +62,13 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                   <td>{e.sourcePersonName ?? "—"}</td>
                   <td className="whitespace-nowrap">{formatDate(e.evidence.evidenceDate)}</td>
                   <td className="max-w-[12rem] truncate">{e.documentTitle ?? "—"}</td>
-                  <td className="text-xs">
-                    {e.links.length === 0 && e.authorises.length === 0 && e.reviewLinks.length === 0 && (
-                      <span className="text-slate-400">Not linked</span>
-                    )}
+                  <td className="text-xs" data-testid="evidence-use">
+                    {e.links.length === 0 &&
+                      e.authorises.length === 0 &&
+                      e.reviewLinks.length === 0 &&
+                      e.matterLinks.length === 0 &&
+                      e.driverLinks.length === 0 &&
+                      e.fulfils.length === 0 && <span className="text-slate-400">Not linked</span>}
                     {e.reviewLinks.map((l) => (
                       <div key={l.linkId}>Assurance Review #{l.sequence}</div>
                     ))}
@@ -75,6 +80,21 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                     ))}
                     {e.authorises.map((v) => (
                       <div key={v}>Authorises V{v}</div>
+                    ))}
+                    {e.matterLinks.map((l) => (
+                      <div key={l.linkId} className="text-violet-800">
+                        Matter {l.code} <span className="text-violet-600">(working)</span>
+                      </div>
+                    ))}
+                    {e.driverLinks.map((l) => (
+                      <div key={l.linkId} className="text-violet-800">
+                        Value Driver {l.code} <span className="text-violet-600">(working)</span>
+                      </div>
+                    ))}
+                    {e.fulfils.map((f) => (
+                      <div key={`${f.requestId}-${f.sequence}`} className="text-slate-500">
+                        Fulfils {f.reference} #{f.sequence}
+                      </div>
                     ))}
                   </td>
                   <td className="space-y-1">

@@ -9,6 +9,7 @@ import {
   updateReviewAction,
 } from "@/server/actions/assurance";
 import { getAssuranceWorkspace, listReviewEvidenceOptions, type AssuranceWorkspace } from "@/server/queries/assurance";
+import { listOpenMatterEvidence } from "@/server/queries/evidence";
 import { listDriverOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getReviewResponse } from "@/server/queries/response";
@@ -47,7 +48,10 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   if (!isUuid(reviewId)) notFound();
   const ws = await getAssuranceWorkspace(projectId, reviewId);
   if (!ws) notFound();
-  const evidenceOptions = await listReviewEvidenceOptions(projectId);
+  const [evidenceOptions, matterEvidence] = await Promise.all([
+    listReviewEvidenceOptions(projectId),
+    listOpenMatterEvidence(projectId),
+  ]);
 
   const { review, totals } = ws;
   const currency = project.currency;
@@ -219,6 +223,11 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
               <p className="mt-1 text-xs text-slate-500">
                 New evidence is recorded in the <TextLink href={`${base}/evidence`}>Evidence register</TextLink>.
               </p>
+              <MatterEvidenceCandidates
+                projectId={projectId}
+                reviewId={review.id}
+                candidates={matterEvidence.filter((c) => !ws.evidence.some((e) => e.evidenceId === c.evidenceId))}
+              />
             </div>
           )}
         </Section>
@@ -593,6 +602,63 @@ function PositionEditor({ ws, projectId, currency }: { ws: AssuranceWorkspace; p
           <SubmitButton>Save Value Positions</SubmitButton>
         </div>
       </ActionForm>
+    </div>
+  );
+}
+
+/**
+ * Phase 4D.2: evidence attached to open Assurance matters is working evidence. It becomes review
+ * evidence only when the consultant deliberately links it here (the existing formal link); once the
+ * review is finalised, the usual formal locking applies.
+ */
+function MatterEvidenceCandidates({
+  projectId,
+  reviewId,
+  candidates,
+}: {
+  projectId: string;
+  reviewId: string;
+  candidates: Awaited<ReturnType<typeof listOpenMatterEvidence>>;
+}) {
+  const byEvidence = new Map<string, { evidenceId: string; code: string; title: string; matters: string[] }>();
+  for (const c of candidates) {
+    const e = byEvidence.get(c.evidenceId) ?? { evidenceId: c.evidenceId, code: c.code, title: c.title, matters: [] };
+    e.matters.push(c.matterCode);
+    byEvidence.set(c.evidenceId, e);
+  }
+  if (byEvidence.size === 0) return null;
+  return (
+    <div
+      className="mt-4 rounded border border-dashed border-violet-300 bg-violet-50 p-3"
+      data-testid="matter-evidence-candidates"
+    >
+      <h4 className="text-sm font-semibold text-violet-900">Matter evidence — not relied on by this review</h4>
+      <p className="mb-2 text-xs text-violet-800">
+        Working evidence linked to open Assurance matters. It is not review evidence unless you link it deliberately.
+      </p>
+      <ul className="space-y-1 text-sm">
+        {[...byEvidence.values()].map((c) => (
+          <li
+            key={c.evidenceId}
+            className="flex items-center justify-between gap-2"
+            data-testid="matter-evidence-candidate"
+          >
+            <span>
+              <TextLink href={`/projects/${projectId}/evidence/${c.evidenceId}`}>
+                {c.code} {c.title}
+              </TextLink>{" "}
+              <span className="text-xs text-violet-700">· matter {c.matters.join(", ")}</span>
+            </span>
+            <ActionForm action={linkReviewEvidenceAction} showSuccess={false}>
+              <Hidden name="projectId" value={projectId} />
+              <Hidden name="reviewId" value={reviewId} />
+              <Hidden name="evidenceId" value={c.evidenceId} />
+              <Hidden name="relevanceNote" value={`Supports Assurance matter ${c.matters.join(", ")}`} />
+              <SubmitButton variant="secondary">Rely on in this review</SubmitButton>
+            </ActionForm>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

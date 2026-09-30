@@ -30,6 +30,7 @@ import {
   ASSURANCE_STAGES,
   SCENARIO_KINDS,
   VALUE_CHANGE_STATUSES,
+  INFORMATION_REQUEST_PURPOSES,
   INFORMATION_REQUEST_STATUSES,
   KEY_DATE_KINDS,
   PROJECT_STATUSES,
@@ -61,6 +62,7 @@ export const scenarioKind = pgEnum("scenario_kind", SCENARIO_KINDS);
 export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
 export const reportType = pgEnum("report_type", REPORT_TYPES);
 export const informationRequestStatus = pgEnum("information_request_status", INFORMATION_REQUEST_STATUSES);
+export const informationRequestPurpose = pgEnum("information_request_purpose", INFORMATION_REQUEST_PURPOSES);
 export const informationRequestItemStatus = pgEnum(
   "information_request_item_status",
   INFORMATION_REQUEST_ITEM_STATUSES,
@@ -1046,8 +1048,9 @@ export const valueChange = pgTable(
 );
 
 /**
- * Links evidence to exactly one target: a driver version, an assumption, or an
- * Assurance Review (evidence relevant to that review's value position).
+ * Links evidence to exactly one target. Formal reliance: a driver version, an assumption, or an
+ * Assurance Review (evidence relevant to that review's value position). Working links (Phase 4D.2):
+ * a living Assurance matter or a stable Value Driver identity — these never lock the evidence.
  */
 export const evidenceLink = pgTable(
   "evidence_link",
@@ -1058,6 +1061,8 @@ export const evidenceLink = pgTable(
     valueDriverVersionId: uuid(),
     assumptionId: uuid(),
     assuranceReviewId: uuid(),
+    valueLeakageId: uuid(),
+    valueDriverId: uuid(),
     relevanceNote: text(),
     createdAt: createdAt(),
   },
@@ -1082,9 +1087,19 @@ export const evidenceLink = pgTable(
       columns: [t.assuranceReviewId, t.projectId],
       foreignColumns: [assuranceReview.id, assuranceReview.projectId],
     }).onDelete("cascade"),
+    foreignKey({
+      name: "evidence_link_matter_fk",
+      columns: [t.valueLeakageId, t.projectId],
+      foreignColumns: [valueLeakage.id, valueLeakage.projectId],
+    }),
+    foreignKey({
+      name: "evidence_link_driver_fk",
+      columns: [t.valueDriverId, t.projectId],
+      foreignColumns: [valueDriver.id, valueDriver.projectId],
+    }),
     check(
       "evidence_link_exactly_one_target",
-      sql`num_nonnulls(${t.valueDriverVersionId}, ${t.assumptionId}, ${t.assuranceReviewId}) = 1`,
+      sql`num_nonnulls(${t.valueDriverVersionId}, ${t.assumptionId}, ${t.assuranceReviewId}, ${t.valueLeakageId}, ${t.valueDriverId}) = 1`,
     ),
     uniqueIndex("evidence_link_driver_version_uq")
       .on(t.evidenceId, t.valueDriverVersionId)
@@ -1095,6 +1110,15 @@ export const evidenceLink = pgTable(
     uniqueIndex("evidence_link_review_uq")
       .on(t.evidenceId, t.assuranceReviewId)
       .where(sql`${t.assuranceReviewId} is not null`),
+    uniqueIndex("evidence_link_matter_uq")
+      .on(t.evidenceId, t.valueLeakageId)
+      .where(sql`${t.valueLeakageId} is not null`),
+    uniqueIndex("evidence_link_driver_uq")
+      .on(t.evidenceId, t.valueDriverId)
+      .where(sql`${t.valueDriverId} is not null`),
+    index("evidence_link_matter_idx")
+      .on(t.valueLeakageId)
+      .where(sql`${t.valueLeakageId} is not null`),
   ],
 );
 
@@ -1111,6 +1135,8 @@ export const informationRequest = pgTable(
     reference: text().notNull(),
     title: text().notNull(),
     status: informationRequestStatus().notNull().default("draft"),
+    // Null for requests created before Phase 4D.2 (read as Mobilisation); required for new ones.
+    purpose: informationRequestPurpose(),
     issuedOn: date(),
     closedOn: date(),
     createdAt: createdAt(),
@@ -1137,6 +1163,8 @@ export const informationRequestItem = pgTable(
     valueDriverId: uuid(),
     status: informationRequestItemStatus().notNull().default("open"),
     fulfilledByEvidenceId: uuid(),
+    // The Assurance matter this item gathers evidence for (Assurance requests only).
+    valueLeakageId: uuid(),
     notes: text(),
     createdAt: createdAt(),
   },
@@ -1162,6 +1190,14 @@ export const informationRequestItem = pgTable(
       columns: [t.fulfilledByEvidenceId, t.projectId],
       foreignColumns: [evidence.id, evidence.projectId],
     }),
+    foreignKey({
+      name: "information_request_item_matter_fk",
+      columns: [t.valueLeakageId, t.projectId],
+      foreignColumns: [valueLeakage.id, valueLeakage.projectId],
+    }),
+    index("information_request_item_matter_idx")
+      .on(t.valueLeakageId)
+      .where(sql`${t.valueLeakageId} is not null`),
   ],
 );
 

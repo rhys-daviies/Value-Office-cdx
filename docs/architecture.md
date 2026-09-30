@@ -93,7 +93,7 @@ from Zod issue paths or known constraint names (`src/server/actions/errors.ts`).
 assurance_review  draft → finalised (immutable)   against_version_id = Authorised version in force at opening
   └ previous_review_id = latest finalised review (null for the first) — one draft at a time keeps the chain linear
 value_position    one per (review, driver): current_forecast, realised_value (cumulative), rationales
-evidence_link     + assurance_review_id target (review-relevant evidence)
+evidence_link     + assurance_review_id target (review-relevant evidence); 4D.2 adds working targets (below)
 ```
 
 - Reviews never write to Value Case tables; Authorised V1 is untouched by Assurance.
@@ -180,6 +180,34 @@ figures never change Authorised Value, Current Forecast, Value Gap or any versio
 - `getReviewResponse` (and so the Assurance Report) reads a finalised review's snapshot, with working fields removed.
 
 Reviews finalised before 4D.1 (`matter_snapshot_at` null) read their matters live, as before. Nothing was backfilled.
+
+**Evidence in Continuous Assurance (4D.2).** Evidence can support a living matter as well as a formal position. The
+consultant either **documents** evidence already held (`matter.documentEvidence`, or `matter.linkEvidence` for
+existing evidence) or **requests** what is missing (`matter.requestEvidence`: an item on an Assurance Information
+Request). When it arrives, the item is fulfilled with that evidence through the existing
+`informationRequest.updateItem`, so the trail is matter → request item → evidence.
+
+Two kinds of `evidence_link` are kept apart. Exactly one target is still set:
+
+| Kind                | Targets                                                                         | Effect                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Formal reliance** | driver version, assumption, Assurance Review (+ authorisation/decision columns) | locks the evidence once the version is locked / the review finalised (`vo_evidence_is_locked`)    |
+| **Working link**    | `value_leakage_id` (living matter), `value_driver_id` (stable driver identity)  | informs the consultant; never locks, never unlocks; written only by its own commands (DB-checked) |
+
+- Matter links change only while the matter is open; driver-identity links never touch a `value_driver_version`.
+  They are the foundation for the living-driver record (4D.3).
+- Formal review evidence stays deliberate: nothing copies matter evidence into a review. A draft review lists open
+  matters' evidence and the consultant may link any of it with `assurance.linkEvidence`. Finalising then applies
+  the usual locking. Unlinked working evidence stays editable.
+- Evidence never drives anything by itself: no trigger moves a matter's stage or working figures, and nothing
+  changes forecast, Value Gap, Authorised Value, qualification or Value Changes. The UI may suggest a next step;
+  the consultant acts.
+
+**Information Requests throughout the engagement.** A project may have many requests. Each new request has a
+`purpose`, `mobilisation` or `assurance`; the purpose is required on insert and immutable afterwards. Requests
+created before 4D.2 keep a null purpose and read as Mobilisation. Nothing was backfilled. An item may belong to one
+Assurance matter (`information_request_item.value_leakage_id`), but only on an Assurance request, only while the
+matter is open, and the link is immutable. Information Request reports are unchanged.
 
 ## Client reports (Phase 4A)
 

@@ -19,7 +19,7 @@ import { clearableDate, clearableText, isoDate, moneyString, nonBlank, optionalT
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-async function openMatter(tx: Tx, matterId: string) {
+export async function openMatter(tx: Tx, matterId: string) {
   const matter = await getLeakage(tx, matterId);
   if (matter.status !== "open") throw new DomainError("VO_MATTER_CLOSED", `${matter.code} is closed; reopen it first`);
   return matter;

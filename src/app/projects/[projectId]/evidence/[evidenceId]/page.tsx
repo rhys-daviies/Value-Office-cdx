@@ -1,6 +1,12 @@
 import { notFound } from "next/navigation";
 
-import { linkEvidenceAction, unlinkEvidenceAction, updateEvidenceAction } from "@/server/actions/evidence";
+import {
+  linkDriverEvidenceAction,
+  linkEvidenceAction,
+  unlinkDriverEvidenceAction,
+  unlinkEvidenceAction,
+  updateEvidenceAction,
+} from "@/server/actions/evidence";
 import { getEvidenceDetail } from "@/server/queries/evidence";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { LockedBadge, PlainBadge } from "@/ui/components/badges";
@@ -19,7 +25,7 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
   if (!isUuid(evidenceId)) notFound();
   const detail = await getEvidenceDetail(projectId, evidenceId);
   if (!detail) notFound();
-  const { entry, documents, stakeholders, otherEvidence, draftTargets, draftAssumptions } = detail;
+  const { entry, documents, stakeholders, otherEvidence, draftTargets, draftAssumptions, driverTargets } = detail;
   const e = entry.evidence;
 
   const linkTargets = [
@@ -42,7 +48,7 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
         <h2 className="text-lg font-semibold">
           <span className="font-mono">{e.code}</span> · {e.title}
         </h2>
-        {entry.locked && <LockedBadge label="Locked — relied on by a locked version or finalised review" />}
+        {entry.locked && <LockedBadge label="Locked — formally relied on" />}
         {e.isMaterialChange && <PlainBadge tone="red">Material change</PlainBadge>}
       </div>
 
@@ -75,11 +81,14 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
           />
         </Section>
 
-        <Section title="Supports" description="Value Drivers and assumptions that rely on this evidence.">
+        <Section
+          title="Formal reliance"
+          description="Value Case versions, drivers, assumptions and Assurance Reviews that rely on this evidence. Once the version is locked or the review finalised, the evidence is frozen."
+        >
           {entry.links.length === 0 && entry.authorises.length === 0 && entry.reviewLinks.length === 0 ? (
-            <Empty>Not linked to anything yet.</Empty>
+            <Empty>Not formally relied on.</Empty>
           ) : (
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-sm" data-testid="formal-reliance">
               {entry.reviewLinks.map((l) => (
                 <li key={l.linkId}>
                   <TextLink href={`/projects/${projectId}/assurance/${l.reviewId}`}>
@@ -140,11 +149,80 @@ export default async function EvidenceDetailPage({ params }: PageProps<"/project
         </Section>
       </div>
 
+      <Section
+        title="Working links"
+        description="Living Assurance matters and continuing Value Drivers this evidence informs. Working links are not formal reliance: they never lock the evidence and never change figures."
+      >
+        {entry.matterLinks.length === 0 && entry.driverLinks.length === 0 && entry.fulfils.length === 0 ? (
+          <Empty>No working links.</Empty>
+        ) : (
+          <ul className="space-y-2 text-sm" data-testid="working-links">
+            {entry.matterLinks.map((l) => (
+              <li key={l.linkId}>
+                <PlainBadge tone="violet">Working link</PlainBadge> Assurance matter{" "}
+                <TextLink href={`/projects/${projectId}/assurance/matters/${l.matterId}`}>
+                  {l.code} {l.title}
+                </TextLink>
+                {l.status === "closed" && <span className="text-xs text-slate-500"> (closed)</span>}
+              </li>
+            ))}
+            {entry.driverLinks.map((l) => (
+              <li key={l.linkId} className="flex items-start justify-between gap-2">
+                <span>
+                  <PlainBadge tone="violet">Working link</PlainBadge> Value Driver {l.code}
+                </span>
+                <ActionForm action={unlinkDriverEvidenceAction} confirm="Remove this working link?" showSuccess={false}>
+                  <Hidden name="projectId" value={projectId} />
+                  <Hidden name="evidenceLinkId" value={l.linkId} />
+                  <SubmitButton variant="danger">Unlink</SubmitButton>
+                </ActionForm>
+              </li>
+            ))}
+            {entry.fulfils.map((f) => (
+              <li key={`${f.requestId}-${f.sequence}`}>
+                Fulfils{" "}
+                <TextLink href={`/projects/${projectId}/information-request#ir-${f.requestId}`}>
+                  {f.reference} #{f.sequence}
+                </TextLink>
+              </li>
+            ))}
+          </ul>
+        )}
+        {driverTargets.length > 0 && (
+          <div className="mt-4">
+            <ActionForm action={linkDriverEvidenceAction} resetOnSuccess testId="link-driver-evidence-form">
+              <Hidden name="projectId" value={projectId} />
+              <Hidden name="evidenceId" value={e.id} />
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-60 flex-1">
+                  <SelectField
+                    name="valueDriverId"
+                    label="Link to Value Driver (working)"
+                    required
+                    placeholder="— Choose —"
+                    options={driverTargets.map((d) => ({ value: d.driverId, label: `${d.code} ${d.name}` }))}
+                  />
+                </div>
+                <div className="min-w-48 flex-1">
+                  <TextField name="relevanceNote" label="Relevance note" />
+                </div>
+                <SubmitButton variant="secondary">Link</SubmitButton>
+              </div>
+            </ActionForm>
+            <p className="mt-1 text-xs text-slate-500">
+              Links the continuing driver, not a Value Case version — no authorised figure changes. Matter evidence is
+              linked from the Assurance matter.
+            </p>
+          </div>
+        )}
+      </Section>
+
       <Section title="Edit evidence">
         {entry.locked ? (
           <Notice tone="locked" title="Frozen">
-            This evidence is relied on by a proposed, recorded or authorised version, or by a finalised Assurance
-            Review. Record new evidence that supersedes it rather than editing it.
+            This evidence is formally relied on — by a proposed, recorded or authorised version, a finalised Assurance
+            Review, an authorised Value Change or a recorded decision. Working links do not change that. Record new
+            evidence that supersedes it rather than editing it.
           </Notice>
         ) : (
           <ActionForm action={updateEvidenceAction}>

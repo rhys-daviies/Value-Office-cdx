@@ -50,6 +50,12 @@ export const COMMANDS = {
   setMatterRemediation: "matter.setRemediation",
   closeMatter: "matter.close", // trigger-checked
   reopenMatter: "matter.reopen", // trigger-checked
+  documentMatterEvidence: "matter.documentEvidence", // trigger-checked
+  linkMatterEvidence: "matter.linkEvidence", // trigger-checked
+  unlinkMatterEvidence: "matter.unlinkEvidence", // trigger-checked
+  requestMatterEvidence: "matter.requestEvidence",
+  linkDriverEvidence: "evidence.linkDriver", // trigger-checked
+  unlinkDriverEvidence: "evidence.unlinkDriver", // trigger-checked
   updateLeakage: "leakage.update",
   setLeakageDrivers: "leakage.setDrivers",
   assessLeakage: "leakage.assess",

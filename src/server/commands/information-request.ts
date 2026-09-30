@@ -2,50 +2,93 @@ import { and, eq, max } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
-import { INFORMATION_REQUEST_ITEM_STATUSES } from "@/domain/statuses";
-import { schema } from "@/server/db/client";
+import { INFORMATION_REQUEST_ITEM_STATUSES, INFORMATION_REQUEST_PURPOSES } from "@/domain/statuses";
+import { schema, type Tx } from "@/server/db/client";
 
 import { COMMANDS } from "./names";
 import { defineCommand } from "./run";
 import { clearableDate, clearableText, clearableUuid, isoDate, nonBlank, optionalText, uuid } from "./schemas";
 
+/**
+ * Information Requests can be raised throughout the engagement (Phase 4D.2): for Mobilisation /
+ * Re-Qualification, or for Assurance evidence. Requests from before 4D.2 have no purpose and read
+ * as Mobilisation.
+ */
 export const createInformationRequest = defineCommand(
   COMMANDS.createInformationRequest,
-  z.object({ projectId: uuid, reference: nonBlank, title: nonBlank }),
+  z.object({
+    projectId: uuid,
+    reference: nonBlank,
+    title: nonBlank,
+    purpose: z.enum(INFORMATION_REQUEST_PURPOSES).default("mobilisation"),
+  }),
   async ({ tx }, input) => {
     const [row] = await tx.insert(schema.informationRequest).values(input).returning();
     return row!;
   },
 );
 
+/** The next free IR-nn reference in the project. */
+export async function nextRequestReference(tx: Tx, projectId: string): Promise<string> {
+  const rows = await tx
+    .select({ reference: schema.informationRequest.reference })
+    .from(schema.informationRequest)
+    .where(eq(schema.informationRequest.projectId, projectId));
+  return formatRequestReference(rows.map((r) => r.reference));
+}
+
+export function formatRequestReference(references: readonly string[]): string {
+  const last = references.reduce((m, r) => Math.max(m, Number(/^IR-(\d+)$/.exec(r)?.[1] ?? 0)), 0);
+  return `IR-${String(last + 1).padStart(2, "0")}`;
+}
+
+export const itemFields = {
+  description: nonBlank,
+  requestedFromPersonId: uuid.optional(),
+  dueOn: isoDate.optional(),
+  valueDriverId: uuid.optional(),
+  notes: optionalText,
+};
+
+type NewItem = {
+  informationRequestId: string;
+  description: string;
+  requestedFromPersonId?: string;
+  dueOn?: string;
+  valueDriverId?: string;
+  valueLeakageId?: string;
+  notes?: string;
+};
+
+/** Appends an item to a request (shared by addItem and matter.requestEvidence). */
+export async function insertRequestItem(tx: Tx, input: NewItem) {
+  const [request] = await tx
+    .select({ projectId: schema.informationRequest.projectId })
+    .from(schema.informationRequest)
+    .where(eq(schema.informationRequest.id, input.informationRequestId));
+  if (!request) throw new DomainError("VO_NOT_FOUND", "Information Request not found");
+
+  const [{ last } = { last: null }] = await tx
+    .select({ last: max(schema.informationRequestItem.sequence) })
+    .from(schema.informationRequestItem)
+    .where(eq(schema.informationRequestItem.informationRequestId, input.informationRequestId));
+
+  const [row] = await tx
+    .insert(schema.informationRequestItem)
+    .values({ ...input, projectId: request.projectId, sequence: (last ?? 0) + 1 })
+    .returning();
+  return row!;
+}
+
 export const addInformationRequestItem = defineCommand(
   COMMANDS.addInformationRequestItem,
   z.object({
     informationRequestId: uuid,
-    description: nonBlank,
-    requestedFromPersonId: uuid.optional(),
-    dueOn: isoDate.optional(),
-    valueDriverId: uuid.optional(),
-    notes: optionalText,
+    ...itemFields,
+    // Assurance requests only (checked in the database).
+    valueLeakageId: uuid.optional(),
   }),
-  async ({ tx }, input) => {
-    const [request] = await tx
-      .select({ projectId: schema.informationRequest.projectId })
-      .from(schema.informationRequest)
-      .where(eq(schema.informationRequest.id, input.informationRequestId));
-    if (!request) throw new DomainError("VO_NOT_FOUND", "Information Request not found");
-
-    const [{ last } = { last: null }] = await tx
-      .select({ last: max(schema.informationRequestItem.sequence) })
-      .from(schema.informationRequestItem)
-      .where(eq(schema.informationRequestItem.informationRequestId, input.informationRequestId));
-
-    const [row] = await tx
-      .insert(schema.informationRequestItem)
-      .values({ ...input, projectId: request.projectId, sequence: (last ?? 0) + 1 })
-      .returning();
-    return row!;
-  },
+  async ({ tx }, input) => insertRequestItem(tx, input),
 );
 
 export const updateInformationRequestItem = defineCommand(
