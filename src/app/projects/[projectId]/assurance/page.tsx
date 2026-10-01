@@ -36,7 +36,8 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default async function AssurancePage({ params, searchParams }: PageProps<"/projects/[projectId]/assurance">) {
   const { projectId } = await params;
-  const filter = parseMatterFilter((await searchParams).stage);
+  const query = await searchParams;
+  const filter = parseMatterFilter(query.stage);
   const { project } = await requireProject(projectId);
   const [summary, cadence, evidence, workspace, stakeholders, drivers] = await Promise.all([
     getValuePositionSummary(projectId),
@@ -71,6 +72,7 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
           authorisedTotal={summary.authorisedTotal}
           totals={latest?.totals ?? null}
           reviewSequence={latest?.review.sequence ?? null}
+          againstVersion={latest?.againstVersionNumber ?? null}
           currency={currency}
           prefix="assurance"
         />
@@ -84,6 +86,7 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
         filter={filter}
         stakeholders={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
         drivers={drivers}
+        raiseOpen={query.raise === "1"}
       />
 
       <section

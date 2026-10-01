@@ -51,6 +51,11 @@ test("daily Value Office: overview → assurance → matter → formal → drive
   await expect(formal.getByTestId("review-row")).toHaveCount(1);
   await expect(continuous.getByTestId("review-row")).toHaveCount(0);
 
+  // The primary call to action lands on the raise-matter form already open (Phase 4D.8A release fix).
+  await continuous.getByRole("link", { name: "+ Raise Assurance Matter" }).click();
+  await expect(page).toHaveURL(/raise=1#raise-matter$/);
+  await expect(continuous.getByTestId("create-matter-form")).toBeVisible();
+
   await page
     .getByTestId("matter-filters")
     .getByRole("link", { name: /Awaiting evidence/ })

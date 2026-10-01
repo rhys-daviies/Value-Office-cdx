@@ -189,6 +189,9 @@ describe("Assurance report model v2 snapshots", () => {
     expect(o.outcomes.find((x) => x.kind === "current")!.totalValue).toBe("14700000.00");
 
     const text = textOf(renderReportArticle(m, preview));
+    // v2 uses the Phase 4D.1 terminology (v1 snapshots keep "Response owner (AVO)").
+    expect(text).toContain("Risk / Leakage Owner");
+    expect(text).not.toContain("Response owner (AVO)");
     const ev = text.slice(text.indexOf("2. Value Case Evolution"), text.indexOf("3. Review context"));
     for (const v of ["$18.0m", "$15.5m", "$14.7m", "$2.8m", "$0.8m", "Not dated"]) expect(ev).toContain(v);
     const out = text.slice(text.indexOf("7. Alternative Value Outcomes"), text.indexOf("8. Cardaxia recommendation"));
@@ -201,25 +204,30 @@ describe("report-model compatibility", () => {
   const golden = "tests/fixtures/reports/assurance-v1";
   const v1 = () => JSON.parse(readFileSync(`${golden}.model.json`, "utf8")) as ReportModel;
 
-  it("renders a v1 snapshot byte-for-byte as before 4D.7, with no charts", () => {
+  it("renders a v1 snapshot byte-for-byte as the released renderer (a88cc72) did, with no charts", () => {
     const m = v1();
     expect(m.header.modelVersion).toBe(1);
     expect("evolution" in m).toBe(false);
     expect(sha256(Buffer.from(canonicalJson(m)))).toBe(
-      "75e4677faac35ce644914baacf3db868bdaa29c2ac12ee71b04bc1cbe1e5ab60",
+      "c1585b234aa9a2d989396d95cd60047c133c6aec4f1aaf83ce0134e6e0558565",
     ); // the stored snapshot itself is untouched
     const issued = { state: "issued", issueNumber: 1, issuedOn: "2026-07-01", issuedBy: "Golden Consultant" } as const;
     const article = renderReportArticle(m, preview);
-    // The goldens were captured from the pre-4D.7 renderer (38594d3); their hashes pin them.
+    // Production baseline (Phase 4D.8A): a real model-v1 snapshot issued by the released code (a88cc72)
+    // and that release's own rendering of it. Their hashes pin them.
     expect(sha256(readFileSync(`${golden}.preview.html`))).toBe(
-      "de5337de1c3d5ebfff07d79d749cb51e6c0fe0882f98b00e418da9fb243ace33",
+      "fa2e7b4b78d59904a23b4742ca1743882139d62c4ef29e8e2e2116b817c40550",
     );
     expect(sha256(readFileSync(`${golden}.issued.html`))).toBe(
-      "f749102a0bb6a01ecd8354d463b58440cc7c182cedf23c8a5eba083dacdb0341",
+      "ff50c92ecb29a65822909e16d31b892008dd2ec96f77c0e3fc316b7b01c41c48",
     );
     expect(article).toBe(readFileSync(`${golden}.preview.html`, "utf8"));
     expect(renderReportDocument(m, issued)).toBe(readFileSync(`${golden}.issued.html`, "utf8"));
     expect(article).toContain("6. Alternative trajectories");
+    // v1 keeps its issued wording (Phase 4D.1 renamed these only for new models).
+    expect(article).toContain("<th>Response owner (AVO)</th>");
+    expect(article).toContain("response owner");
+    expect(article).not.toContain("Risk / Leakage Owner");
     expect(article).not.toMatch(/as-evolution|as-outcomes|<svg class="rpt-svg"/);
     expect(JSON.stringify(m)).toBe(JSON.stringify(v1())); // rendering never mutates the snapshot
   });

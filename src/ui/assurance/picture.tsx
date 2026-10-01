@@ -13,6 +13,7 @@ export function GovernedPosition({
   authorisedTotal,
   totals,
   reviewSequence,
+  againstVersion = null,
   currency,
   prefix,
 }: {
@@ -20,6 +21,8 @@ export function GovernedPosition({
   authorisedTotal: string | null;
   totals: PositionTotals | null;
   reviewSequence: number | null;
+  /** Version the latest review measured against; after a Value Change it can predate the version in force. */
+  againstVersion?: number | null;
   currency: string;
   /** Test-id prefix, kept per page for the existing journeys ("assurance" / "overview"). */
   prefix: "assurance" | "overview";
@@ -30,13 +33,16 @@ export function GovernedPosition({
   const realised = totals
     ? realisedHeadline(totals, currency)
     : { value: NOT_ASSESSED, note: "No finalised review yet" };
+  // The latest formal position keeps its own basis: its Value Gap is against the version it measured,
+  // never recomputed against a later Authorised version. Say so when the two differ.
+  const olderBasis = totals !== null && againstVersion !== null && againstVersion !== authorisedVersion;
   return (
     <div className="rounded-lg border border-slate-300 bg-slate-50 p-3" data-testid={`${prefix}-governed`}>
       <h3 className="mb-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-800">
         Governed position
         <GovernedTag>
           Authorised V{authorisedVersion}
-          {reviewSequence !== null ? ` · Review #${reviewSequence}` : ""}
+          {reviewSequence !== null ? ` · Review #${reviewSequence}${olderBasis ? ` vs V${againstVersion}` : ""}` : ""}
         </GovernedTag>
       </h3>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -57,9 +63,11 @@ export function GovernedPosition({
           label="Value Gap"
           value={totals ? headline(totals.valueGap, currency, "Incomplete") : NOT_ASSESSED}
           note={
-            totals
-              ? `Authorised − Forecast · movement ${change(totals.movement, currency, "incomplete")}`
-              : "Authorised − Forecast"
+            olderBasis
+              ? `Review #${reviewSequence} vs Authorised V${againstVersion} (${formatMoneyShort(totals!.authorisedTotal, currency)}) · no formal review against V${authorisedVersion} yet`
+              : totals
+                ? `Authorised − Forecast · movement ${change(totals.movement, currency, "incomplete")}`
+                : "Authorised − Forecast"
           }
           testId={`${prefix}-gap`}
         />

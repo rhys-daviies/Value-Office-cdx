@@ -62,6 +62,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
               authorisedTotal={position.authorisedTotal}
               totals={position.latest?.totals ?? null}
               reviewSequence={position.latest?.review.sequence ?? null}
+              againstVersion={position.latest?.againstVersionNumber ?? null}
               currency={currency}
               prefix="overview"
             />

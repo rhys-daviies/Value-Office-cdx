@@ -103,6 +103,7 @@ export function ContinuousAssurance({
   filter,
   stakeholders,
   drivers,
+  raiseOpen = false,
 }: {
   projectId: string;
   currency: string;
@@ -110,6 +111,8 @@ export function ContinuousAssurance({
   filter: MatterFilter;
   stakeholders: Option[];
   drivers: Driver[];
+  /** `?raise=1`: the "Raise Assurance Matter" call to action lands on the form already open. */
+  raiseOpen?: boolean;
 }) {
   const base = `/projects/${projectId}/assurance`;
   const { matters, stageCounts, attention } = workspace;
@@ -139,7 +142,7 @@ export function ContinuousAssurance({
           </p>
         </div>
         <a
-          href="#raise-matter"
+          href={`${filter === "all" ? "?" : `?stage=${filter}&`}raise=1#raise-matter`}
           className="rounded bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
         >
           + Raise Assurance Matter
@@ -239,7 +242,12 @@ export function ContinuousAssurance({
       )}
 
       <div className="mt-4 scroll-mt-4" id="raise-matter">
-        <Expander summary="+ Raise an Assurance matter" testId="create-matter">
+        <Expander
+          key={raiseOpen ? "open" : "closed"}
+          open={raiseOpen}
+          summary="+ Raise an Assurance matter"
+          testId="create-matter"
+        >
           <ActionForm action={createMatterAction} testId="create-matter-form">
             <Hidden name="projectId" value={projectId} />
             <div className="space-y-2">

@@ -1,143 +1,128 @@
 {
   "header": {
-    "modelVersion": 1,
+    "asAt": "2026-10-01",
     "type": "assurance",
     "title": "Value Assurance Report",
-    "subjectLabel": "Assurance Review 1",
-    "subjectStatus": "finalised",
-    "clientName": "[FIXTURE PLACEHOLDER] Horizon client",
-    "projectName": "Project Horizon",
-    "projectCode": "HORIZON-GOLDEN",
     "currency": "USD",
-    "asAt": "2026-06-30",
+    "clientName": "[FIXTURE PLACEHOLDER] Horizon client",
     "valueBasis": {
+      "periodEnd": null,
       "description": "[FIXTURE PLACEHOLDER] Value Basis not yet specified for Project Horizon",
-      "periodStart": null,
-      "periodEnd": null
-    }
+      "periodStart": null
+    },
+    "projectCode": "HORIZON",
+    "projectName": "Project Horizon",
+    "modelVersion": 1,
+    "subjectLabel": "Assurance Review 1",
+    "subjectStatus": "finalised"
   },
   "review": {
-    "sequence": 1,
-    "reviewDate": "2026-06-30",
+    "summary": "[FIXTURE PLACEHOLDER] Realised Value of $2.8m is known only as a project-level aggregate and is recorded as unattributed realised value. Per-driver realised values are not specified, so none are recorded.",
     "trigger": "ad_hoc",
-    "triggerEvidence": null,
-    "againstVersion": {
-      "number": 1,
-      "title": "Re-Qualified Value Case"
-    },
+    "evidence": [],
     "previous": null,
+    "sequence": 1,
+    "reviewDate": "2026-10-01",
+    "finalisedBy": "RC Consultant",
     "finalisedOn": "2026-10-01",
-    "finalisedBy": "Consultant 27917024",
     "whatChanged": "[FIXTURE PLACEHOLDER] What changed since Authorised V1 is not yet specified.",
     "whyItMatters": "[FIXTURE PLACEHOLDER] Economic significance not yet specified.",
-    "summary": "[FIXTURE PLACEHOLDER] Realised Value of $2.8m is known only as a project-level aggregate and is recorded as unattributed realised value. Per-driver realised values are not specified, so none are recorded.",
-    "evidence": []
-  },
-  "position": {
-    "financialDriverCount": 6,
-    "authorisedTotal": "15500000.00",
-    "previousTotal": "15500000.00",
-    "forecastAssessed": 6,
-    "forecastTotal": "14700000.00",
-    "valueGap": "800000.00",
-    "movement": "-800000.00",
-    "realisedAssessed": 0,
-    "realisedAttributedTotal": null,
-    "unattributedRealised": "2800000.00",
-    "realisedTotal": "2800000.00",
-    "forecastBlockers": [],
-    "unattributedRationale": "[FIXTURE PLACEHOLDER] $2.8m realised is known only at project level; no reliable per-driver attribution is available."
+    "againstVersion": {
+      "title": "Re-Qualified Value Case",
+      "number": 1
+    },
+    "triggerEvidence": null
   },
   "drivers": [
     {
       "code": "VD-01",
       "name": "Service Productivity",
-      "financial": true,
-      "authorisedValue": "4800000.00",
-      "previousForecast": "4800000.00",
-      "currentForecast": "4400000.00",
-      "forecastNotAssessed": false,
-      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
       "movement": "-400000.00",
       "valueGap": "400000.00",
+      "financial": true,
       "realisedValue": null,
-      "qualificationStatus": "unqualified",
-      "evidenceStatus": "unevidenced"
+      "evidenceStatus": "unevidenced",
+      "authorisedValue": "4800000.00",
+      "currentForecast": "4400000.00",
+      "previousForecast": "4800000.00",
+      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
+      "forecastNotAssessed": false,
+      "qualificationStatus": "unqualified"
     },
     {
       "code": "VD-02",
       "name": "Customer Retention",
-      "financial": true,
-      "authorisedValue": "3600000.00",
-      "previousForecast": "3600000.00",
-      "currentForecast": "3200000.00",
-      "forecastNotAssessed": false,
-      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
       "movement": "-400000.00",
       "valueGap": "400000.00",
+      "financial": true,
       "realisedValue": null,
-      "qualificationStatus": "unqualified",
-      "evidenceStatus": "unevidenced"
+      "evidenceStatus": "unevidenced",
+      "authorisedValue": "3600000.00",
+      "currentForecast": "3200000.00",
+      "previousForecast": "3600000.00",
+      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
+      "forecastNotAssessed": false,
+      "qualificationStatus": "unqualified"
     },
     {
       "code": "VD-03",
       "name": "Technology Run Cost",
-      "financial": true,
-      "authorisedValue": "2400000.00",
-      "previousForecast": "2400000.00",
-      "currentForecast": "2200000.00",
-      "forecastNotAssessed": false,
-      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
       "movement": "-200000.00",
       "valueGap": "200000.00",
+      "financial": true,
       "realisedValue": null,
-      "qualificationStatus": "unqualified",
-      "evidenceStatus": "unevidenced"
+      "evidenceStatus": "unevidenced",
+      "authorisedValue": "2400000.00",
+      "currentForecast": "2200000.00",
+      "previousForecast": "2400000.00",
+      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
+      "forecastNotAssessed": false,
+      "qualificationStatus": "unqualified"
     },
     {
       "code": "VD-04",
       "name": "Contact Avoidance",
-      "financial": true,
-      "authorisedValue": "2100000.00",
-      "previousForecast": "2100000.00",
-      "currentForecast": "2000000.00",
-      "forecastNotAssessed": false,
-      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
       "movement": "-100000.00",
       "valueGap": "100000.00",
+      "financial": true,
       "realisedValue": null,
-      "qualificationStatus": "unqualified",
-      "evidenceStatus": "unevidenced"
+      "evidenceStatus": "unevidenced",
+      "authorisedValue": "2100000.00",
+      "currentForecast": "2000000.00",
+      "previousForecast": "2100000.00",
+      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
+      "forecastNotAssessed": false,
+      "qualificationStatus": "unqualified"
     },
     {
       "code": "VD-05",
       "name": "Quality / Rework",
-      "financial": true,
-      "authorisedValue": "2200000.00",
-      "previousForecast": "2200000.00",
-      "currentForecast": "2500000.00",
-      "forecastNotAssessed": false,
-      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
       "movement": "300000.00",
       "valueGap": "-300000.00",
+      "financial": true,
       "realisedValue": null,
-      "qualificationStatus": "unqualified",
-      "evidenceStatus": "unevidenced"
+      "evidenceStatus": "unevidenced",
+      "authorisedValue": "2200000.00",
+      "currentForecast": "2500000.00",
+      "previousForecast": "2200000.00",
+      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
+      "forecastNotAssessed": false,
+      "qualificationStatus": "unqualified"
     },
     {
       "code": "VD-06",
       "name": "New Automation",
-      "financial": true,
-      "authorisedValue": "400000.00",
-      "previousForecast": "400000.00",
-      "currentForecast": "400000.00",
-      "forecastNotAssessed": false,
-      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
       "movement": "0.00",
       "valueGap": "0.00",
+      "financial": true,
       "realisedValue": null,
-      "qualificationStatus": "unqualified",
-      "evidenceStatus": "unevidenced"
+      "evidenceStatus": "unevidenced",
+      "authorisedValue": "400000.00",
+      "currentForecast": "400000.00",
+      "previousForecast": "400000.00",
+      "forecastRationale": "[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.",
+      "forecastNotAssessed": false,
+      "qualificationStatus": "unqualified"
     }
   ],
   "leakage": {
@@ -145,101 +130,115 @@
       {
         "code": "VL-001",
         "title": "Vendor sequencing",
-        "description": "[FIXTURE PLACEHOLDER] Vendor sequencing issue identified in Assurance Review 1. Amounts have not been reliably established: the earlier prototype figures do not reconcile under the clarified Value Leakage definition (Total = Recoverable + Unrecoverable), so no amount is recorded pending PMO confirmation. Affected drivers and AVO not specified.",
-        "drivers": [],
-        "responseOwner": null,
         "status": "open",
-        "requiredDecisionDate": null,
-        "consultantAssessment": "[FIXTURE PLACEHOLDER] Not assessed under the clarified Value Leakage definition.",
+        "drivers": [],
+        "assessment": null,
+        "description": "[FIXTURE PLACEHOLDER] Vendor sequencing issue identified in Assurance Review 1. Amounts have not been reliably established: the earlier prototype figures do not reconcile under the clarified Value Leakage definition (Total = Recoverable + Unrecoverable), so no amount is recorded pending PMO confirmation. Affected drivers and AVO not specified.",
+        "responseOwner": null,
         "identifiedInReview": 1,
-        "identifiedOn": null,
-        "assessment": null
+        "consultantAssessment": "[FIXTURE PLACEHOLDER] Not assessed under the clarified Value Leakage definition.",
+        "requiredDecisionDate": null
       }
     ],
     "summary": {
-      "itemCount": 1,
-      "assessedCount": 0,
       "total": null,
+      "itemCount": 1,
       "recoverable": null,
+      "assessedCount": 0,
       "unrecoverable": null
     }
   },
+  "decision": {
+    "kind": "alternative",
+    "label": "[FIXTURE PLACEHOLDER] Client-selected option",
+    "evidence": null,
+    "decidedBy": "[FIXTURE PLACEHOLDER] Client decision maker",
+    "decidedOn": "2026-10-01",
+    "rationale": "[FIXTURE PLACEHOLDER] Decision rationale not specified.",
+    "totalValue": "14900000.00",
+    "economicConsequence": null,
+    "clientElectedDifference": "-400000.00"
+  },
+  "position": {
+    "movement": "-800000.00",
+    "valueGap": "800000.00",
+    "forecastTotal": "14700000.00",
+    "previousTotal": "15500000.00",
+    "realisedTotal": "2800000.00",
+    "authorisedTotal": "15500000.00",
+    "forecastAssessed": 6,
+    "forecastBlockers": [],
+    "realisedAssessed": 0,
+    "financialDriverCount": 6,
+    "unattributedRealised": "2800000.00",
+    "unattributedRationale": "[FIXTURE PLACEHOLDER] $2.8m realised is known only at project level; no reliable per-driver attribution is available.",
+    "realisedAttributedTotal": null
+  },
   "scenarios": [
     {
-      "label": "Current trajectory",
       "kind": "current",
-      "totalValue": "14700000.00",
+      "label": "Current trajectory",
       "narrative": null,
       "vsCurrent": "0.00",
+      "totalValue": "14700000.00",
       "vsRecommended": "-600000.00",
       "isRecommendation": false,
       "isClientSelection": false
     },
     {
-      "label": "Cardaxia recommendation",
       "kind": "recommended",
-      "totalValue": "15300000.00",
+      "label": "Cardaxia recommendation",
       "narrative": "[FIXTURE PLACEHOLDER] Actions and timing not specified.",
       "vsCurrent": "600000.00",
+      "totalValue": "15300000.00",
       "vsRecommended": "0.00",
       "isRecommendation": true,
       "isClientSelection": false
     },
     {
-      "label": "[FIXTURE PLACEHOLDER] Client-selected option",
       "kind": "alternative",
-      "totalValue": "14900000.00",
+      "label": "[FIXTURE PLACEHOLDER] Client-selected option",
       "narrative": "[FIXTURE PLACEHOLDER] Option definition (e.g. timing) not specified.",
       "vsCurrent": "200000.00",
+      "totalValue": "14900000.00",
       "vsRecommended": "-400000.00",
       "isRecommendation": false,
       "isClientSelection": true
     }
   ],
-  "recommendation": {
-    "label": "Cardaxia recommendation",
-    "totalValue": "15300000.00",
-    "narrative": "[FIXTURE PLACEHOLDER] Cardaxia recommendation narrative not specified.",
-    "issuedOn": "2026-10-01"
-  },
-  "decision": {
-    "label": "[FIXTURE PLACEHOLDER] Client-selected option",
-    "kind": "alternative",
-    "totalValue": "14900000.00",
-    "decidedBy": "[FIXTURE PLACEHOLDER] Client decision maker",
-    "decidedOn": "2026-06-30",
-    "rationale": "[FIXTURE PLACEHOLDER] Decision rationale not specified.",
-    "economicConsequence": null,
-    "evidence": null,
-    "clientElectedDifference": "-400000.00"
-  },
+  "nextActions": [
+    {
+      "code": "VL-001",
+      "kind": "leakage_response",
+      "owner": null,
+      "title": "Vendor sequencing",
+      "quantified": false,
+      "requiredDecisionDate": null
+    },
+    {
+      "code": "VC-002",
+      "kind": "value_change",
+      "reconciled": false
+    }
+  ],
   "valueChanges": [
     {
       "code": "VC-002",
+      "reason": "[FIXTURE PLACEHOLDER] Reflects the client-selected option (−$0.6m against Authorised V1).",
       "status": "proposed",
-      "fromVersion": 1,
-      "toVersion": 2,
-      "fromTotal": "15500000.00",
       "toTotal": "15500000.00",
-      "statedChange": "-600000.00",
-      "projectedValue": "14900000.00",
+      "fromTotal": "15500000.00",
+      "toVersion": 2,
       "reconciled": false,
-      "reason": "[FIXTURE PLACEHOLDER] Reflects the client-selected option (−$0.6m against Authorised V1)."
+      "fromVersion": 1,
+      "statedChange": "-600000.00",
+      "projectedValue": "14900000.00"
     }
   ],
-  "nextActions": [
-    {
-      "kind": "leakage_response",
-      "code": "VL-001",
-      "title": "Vendor sequencing",
-      "owner": null,
-      "requiredDecisionDate": null,
-      "quantified": true
-    },
-    {
-      "kind": "value_change",
-      "code": "VC-002",
-      "reconciled": false
-    }
-  ]
+  "recommendation": {
+    "label": "Cardaxia recommendation",
+    "issuedOn": "2026-10-01",
+    "narrative": "[FIXTURE PLACEHOLDER] Cardaxia recommendation narrative not specified.",
+    "totalValue": "15300000.00"
+  }
 }

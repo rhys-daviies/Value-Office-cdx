@@ -37,10 +37,11 @@ const CHANGE_STATUS = {
   withdrawn: "Withdrawn",
 } as const;
 
-function nextActionText(a: AssuranceNextAction): string {
+/** `v2`: model-version-2 wording. v1 snapshots keep the wording they were issued with (a88cc72). */
+function nextActionText(a: AssuranceNextAction, v2: boolean): string {
   switch (a.kind) {
     case "leakage_response":
-      return `${a.code} ${a.title}: Risk / Leakage Owner ${a.owner ?? "not yet assigned"}${
+      return `${a.code} ${a.title}: ${v2 ? "Risk / Leakage Owner" : "response owner"} ${a.owner ?? "not yet assigned"}${
         a.requiredDecisionDate ? `; decision required by ${formatDate(a.requiredDecisionDate)}` : ""
       }${a.quantified ? "" : "; amount not yet quantified"}.`;
     case "value_change":
@@ -393,7 +394,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
                   <tr>
                     <th>Issue</th>
                     <th>Affected drivers</th>
-                    <th>Risk / Leakage Owner</th>
+                    <th>${v2 ? "Risk / Leakage Owner" : "Response owner (AVO)"}</th>
                     <th class="num">Total VL</th>
                     <th class="num">Recoverable</th>
                     <th class="num">Unrecoverable</th>
@@ -429,13 +430,13 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
                     ${i.description ? text(i.description) : null}
                     <dl class="rpt-kv">
                       <dt>Identified</dt>
-                      <dd>
+                      ${v2 ? html`<dd>
                         ${
                           i.identifiedInReview !== null
                             ? `Assurance Review ${i.identifiedInReview}`
                             : `Continuous Assurance${i.identifiedOn ? `, ${formatDate(i.identifiedOn)}` : ""}`
                         }
-                      </dd>
+                      </dd>` : html`<dd>Assurance Review ${i.identifiedInReview}</dd>`}
                       ${
                         i.requiredDecisionDate
                           ? html`<dt>Decision required by</dt>
@@ -582,7 +583,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
       ${
         m.nextActions.length
           ? html`<ul class="rpt-list" data-testid="as-next-actions">
-                ${m.nextActions.map((a) => html`<li>${nextActionText(a)}</li>`)}
+                ${m.nextActions.map((a) => html`<li>${nextActionText(a, v2)}</li>`)}
               </ul>
               <p class="rpt-small rpt-muted">Only actions recorded in the Value Record are listed.</p>`
           : html`<p class="rpt-muted"><em>No outstanding actions are recorded.</em></p>`
