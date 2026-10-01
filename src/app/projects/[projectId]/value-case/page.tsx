@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { moneyChange, versionAuthority } from "@/domain/value-case";
 import { createInheritedBusinessCaseAction } from "@/server/actions/value-case";
+import { getValueCaseEvolution } from "@/server/queries/evolution";
 import { getValueCaseTimeline, type TimelineEntry } from "@/server/queries/value-case";
 import { getGovernedCommitment } from "@/server/queries/workspace";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
@@ -18,6 +19,7 @@ import {
 import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields";
 import { ButtonLink, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
+import { ValueCaseEvolution } from "@/ui/evolution/evolution";
 import { requireProject } from "@/ui/require";
 
 export const metadata = { title: "Value Case" };
@@ -25,7 +27,11 @@ export const metadata = { title: "Value Case" };
 export default async function ValueCasePage({ params }: PageProps<"/projects/[projectId]/value-case">) {
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
-  const [timeline, commitment] = await Promise.all([getValueCaseTimeline(projectId), getGovernedCommitment(projectId)]);
+  const [timeline, commitment, evolution] = await Promise.all([
+    getValueCaseTimeline(projectId),
+    getGovernedCommitment(projectId),
+    getValueCaseEvolution(projectId),
+  ]);
   const inherited = timeline.find((t) => t.version.kind === "inherited_business_case");
   const valueCases = timeline.filter((t) => t.version.kind === "value_case");
   const base = `/projects/${projectId}`;
@@ -117,6 +123,8 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
           </div>
         </section>
       )}
+
+      {commitment && <ValueCaseEvolution evolution={evolution} id="evolution" tableOpen />}
 
       <h2 className="mb-2 text-base font-semibold text-slate-900">Version history</h2>
       <ol className="max-w-3xl space-y-2" data-testid="value-case-timeline">

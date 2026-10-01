@@ -1,4 +1,5 @@
 import { getProjectOverview } from "@/server/queries/projects";
+import { getValueCaseEvolution } from "@/server/queries/evolution";
 import { getOverviewValueOfficeState } from "@/server/queries/workspace";
 import { AttentionBadges } from "@/ui/assurance/matters";
 import { GovernedPosition, WorkingPicture } from "@/ui/assurance/picture";
@@ -14,6 +15,7 @@ import {
 import { Empty, KeyValues, Missing, Notice, Section, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
 import { IR_STATUS_LABELS, KEY_DATE_LABELS } from "@/ui/labels";
+import { ValueCaseEvolution } from "@/ui/evolution/evolution";
 import { requireProject } from "@/ui/require";
 import { moneyChange, versionAuthority } from "@/domain/value-case";
 import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STATUSES } from "@/domain/statuses";
@@ -21,9 +23,10 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STA
 export default async function ProjectOverviewPage({ params }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
   await requireProject(projectId);
-  const [o, state] = await Promise.all([
+  const [o, state, evolution] = await Promise.all([
     getProjectOverview(projectId).then((x) => x!),
     getOverviewValueOfficeState(projectId),
+    getValueCaseEvolution(projectId),
   ]);
   const { position, cadence, response } = state;
   const attentionMatters = state.workspace.matters.filter((m) => m.needsAttention);
@@ -46,6 +49,8 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
         </Notice>
       )}
 
+      {!position.authorised && <ValueCaseEvolution evolution={evolution} id="evolution" />}
+
       {position.authorised && (
         <>
           <div className="mb-3 grid gap-3" data-testid="overview-assurance">
@@ -59,6 +64,8 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
             />
             <WorkingPicture workspace={state.workspace} currency={currency} href={`${base}/assurance#continuous`} />
           </div>
+
+          <ValueCaseEvolution evolution={evolution} id="evolution" />
 
           <div className="mb-6 grid gap-6 lg:grid-cols-[3fr_2fr]">
             <Section

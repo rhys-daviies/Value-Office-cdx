@@ -285,6 +285,20 @@ Labels always accompany colour.
 
 A driver in a draft or proposed Value Change is noted for information only.
 
+## Value Case Evolution (Phase 4D.5)
+
+Value Case Evolution is the **governed historical view** of a project's value position:
+
+- the **Original Business Case** (recorded V0 headline) — the inherited starting point; it has no governed date and is shown as "Not dated";
+- each **Authorised Value Case version** (authorised or since superseded) at its recorded VCO authorisation date — a step line, in force until superseded;
+- each **finalised Assurance Review**'s formal **Current Forecast** and **Realised Value**, at its review date, with the version it was measured against.
+
+It **excludes** working driver estimates, emerging drivers, working Value Leakage, draft Assurance Reviews and draft/proposed/rejected/withdrawn versions and Value Changes. Formal Value Leakage and Value Gap are not series (Value Gap appears in the review tooltip and table).
+
+- Read model: `getValueCaseEvolution` (`src/server/queries/evolution.ts`) returns decimal strings exactly as derived by existing domain code (`getVersionTotal`, `computeValuePosition`); ordering is the pure `orderEvolutionEvents` (`src/domain/evolution.ts`): a review always follows the authorisation of the version it measured; one measured against an older version is placed by date and never reassigned.
+- Presentation: `ValueCaseEvolution` (`src/ui/evolution/`) — one component on Overview (companion table collapsed) and the Value Case page (table open). The client-only Recharts chart converts strings to numbers solely to position marks; every value read is server-formatted. The x-axis is event order, not elapsed time; forecast/realised connectors show sequence only. The companion table carries the full governed history for non-visual use.
+- Not in reports (Phase 4D.7).
+
 ## Client reports (Phase 4A)
 
 ```
