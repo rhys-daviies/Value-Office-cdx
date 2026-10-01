@@ -243,5 +243,8 @@ describe("Value Case Evolution component", () => {
     }
     expect(html).not.toContain("VC-002");
     expect(html).not.toContain("$1.8m"); // draft V3 total (1.75m)
+    // 4D.6 refinement: the forecast connector breaks at the V1 → V2 change; the table is unaffected.
+    expect(html).toContain('data-forecast-connectors="r1&gt;r2|r3"');
+    expect((html.match(/data-testid="evolution-row-/g) ?? []).length).toBe(6);
   });
 });

@@ -55,6 +55,10 @@ test("Value Case Evolution: governed history on Overview and Value Case", async 
     await expect(chart.getByRole("img", { name, exact: true })).toHaveCount(1);
   }
   await expect(chart.getByRole("img")).toHaveCount(9);
+  // 4D.6 refinement: forecast connectors run only within one measured-against version — Reviews #1–#2
+  // (V1) are joined, Review #3 (V2) starts a new run. Every forecast marker remains.
+  await expect(chart).toHaveAttribute("data-forecast-connectors", "r1>r2|r3");
+  await expect(chart.getByRole("img", { name: /^Formal Forecast, Review #\d/ })).toHaveCount(3);
   // Not plotted: pending VC-002 / draft V3, the emerging driver's working estimate, working leakage.
   await expect(chart.getByRole("img", { name: /V3|\$1\.8m|\$0\.2m|\$0\.5m/ })).toHaveCount(0);
   await expect(section).not.toContainText("VC-002");

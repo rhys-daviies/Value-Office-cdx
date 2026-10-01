@@ -299,6 +299,17 @@ It **excludes** working driver estimates, emerging drivers, working Value Leakag
 - Presentation: `ValueCaseEvolution` (`src/ui/evolution/`) — one component on Overview (companion table collapsed) and the Value Case page (table open). The client-only Recharts chart converts strings to numbers solely to position marks; every value read is server-formatted. The x-axis is event order, not elapsed time; forecast/realised connectors show sequence only. The companion table carries the full governed history for non-visual use.
 - Not in reports (Phase 4D.7).
 
+## Alternative Value Outcomes (Phase 4D.6)
+
+Alternative Value Outcomes is a **point-in-time comparison of stored, quantified management-response scenarios and decision economics** for one Assurance Review. It is **not** a time-phased trajectory, a predictive model or a forecast engine: each scenario is one consultant-entered total, and nothing is interpolated between them.
+
+- References (not options): the Authorised Value of the version **that review** measured against, and **that review's** formal Current Forecast — never a later version or a later review.
+- Outcomes: the review's stored scenarios. Cardaxia's recommendation is the **issued** recommendation only (a saved draft is not shown as Cardaxia's position); the client-selected outcome comes from the decision. Order is semantic, never by value: recommendation, other options in stored order, client choice; a scenario holding both roles appears once with both labels. Difference from Cardaxia recommendation = selected − recommended (decimal, signed; zero preserved), neutral wording.
+- Under the current domain model a persisted scenario **always has a quantified total** (required by the command and `NOT NULL` in the database), and a recommendation must reference the review's `recommended`-kind scenario. Unquantified options are therefore not a stored state.
+- Excluded: Value Changes (e.g. Horizon VC-002), working Value Leakage, emerging-driver working estimates, draft reviews.
+- Read model `getAlternativeValueOutcomes` / `getLatestValueDecision` (`src/server/queries/outcomes.ts`), pure ordering in `src/domain/outcomes.ts`; one component (`src/ui/outcomes/`) — full on finalised reviews, compact "Latest Value Decision" on Overview only when the latest finalised review has options plus a recommendation or decision. Horizontal dot plot on a zero-inclusive scale (a narrow domain would exaggerate small differences); it replaced the earlier option bars, whose truncated baseline did. Not in reports (Phase 4D.7).
+- 4D.5 refinement: Value Case Evolution's forecast connector now runs only between reviews measured against the same version (`src/ui/evolution/segments.ts`); realised value is cumulative and stays connected.
+
 ## Client reports (Phase 4A)
 
 ```

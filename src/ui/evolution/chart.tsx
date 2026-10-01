@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
+import { forecastConnectorRuns } from "./segments";
 import { SERIES } from "./series";
 
 // Value Case Evolution chart (Phase 4D.5). Client-only presentation of a governed history that the
@@ -31,6 +32,8 @@ export type ChartPoint = {
   /** Authorised Value in force at this point (the step line). */
   authorised: string | null;
   forecast: string | null;
+  /** Review events: the version the forecast was measured against (breaks the forecast connector). */
+  againstVersionNumber: number | null;
   realised: string | null;
   /** Pre-formatted tooltip lines; first is the heading. */
   tooltip: string[];
@@ -43,6 +46,8 @@ type Row = Omit<ChartPoint, "original" | "authorised" | "forecast" | "realised">
   authorised: number | null;
   forecast: number | null;
   realised: number | null;
+  /** Connector values, one key per run of same-version forecasts (fc0, fc1, …). */
+  [connector: `fc${number}`]: number | null;
 };
 
 // Presentation boundary: the only place a decimal string becomes a number, for mark position only.
@@ -117,19 +122,30 @@ export function EvolutionChart({
   currencyTicks: [string, string][];
   ariaLabel: string;
 }) {
-  const rows: Row[] = points.map((p) => ({
-    ...p,
-    original: y(p.original),
-    authorised: y(p.authorised),
-    forecast: y(p.forecast),
-    realised: y(p.realised),
-  }));
+  const runs = forecastConnectorRuns(points);
+  const rows: Row[] = points.map((p) => {
+    const row: Row = {
+      ...p,
+      original: y(p.original),
+      authorised: y(p.authorised),
+      forecast: y(p.forecast),
+      realised: y(p.realised),
+    };
+    runs.forEach((keys, i) => (row[`fc${i}`] = keys.includes(p.key) ? y(p.forecast) : null));
+    return row;
+  });
   const ticks = currencyTicks.map(([v]) => Number(v));
   const tickLabel = new Map(currencyTicks.map(([v, l]) => [Number(v), l]));
   const top = ticks.at(-1) ?? 0;
 
   return (
-    <div className="h-72 w-full" role="figure" aria-label={ariaLabel} data-testid="evolution-chart">
+    <div
+      className="h-72 w-full"
+      role="figure"
+      aria-label={ariaLabel}
+      data-testid="evolution-chart"
+      data-forecast-connectors={runs.map((keys) => keys.join(">")).join("|")}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={rows} margin={{ top: 12, right: 24, bottom: 20, left: 8 }}>
           <CartesianGrid vertical={false} stroke="#e2e8f0" />
@@ -168,16 +184,28 @@ export function EvolutionChart({
             connectNulls={false}
             isAnimationActive={false}
           />
+          {runs.map((keys, i) => (
+            <Line
+              key={keys.join(">")}
+              dataKey={`fc${i}`}
+              legendType="none"
+              tooltipType="none"
+              type="linear"
+              stroke={SERIES.forecast.color}
+              strokeWidth={1.5}
+              strokeDasharray="2 4"
+              dot={false}
+              activeDot={false}
+              connectNulls
+              isAnimationActive={false}
+            />
+          ))}
           <Line
             dataKey="forecast"
             name={SERIES.forecast.label}
-            type="linear"
-            stroke={SERIES.forecast.color}
-            strokeWidth={1.5}
-            strokeDasharray="2 4"
+            stroke="none"
             dot={ForecastDot}
             activeDot={false}
-            connectNulls
             isAnimationActive={false}
           />
           <Line

@@ -368,3 +368,76 @@ export async function seedCompactEvolution(actor: Actor, opts: { code: string; n
   if (autoInV3) await updateDriverVersion(actor, { driverVersionId: autoInV3.id, financialValue: "450000.00" });
   return { project };
 }
+
+/**
+ * Phase 4D.6 "Alternative Value Outcomes" fixture. Synthetic only. Authorised V1 $1.5m; Review #1
+ * finalised, formal forecast $1.4m, with four stored options — Current trajectory $1.4m, Accelerate
+ * supplier onboarding $1.9m (Cardaxia recommendation), Phase the rollout $1.6m (client selected),
+ * Defer remediation $1.2m. Difference from recommendation: −$0.3m. Not options, so never shown as
+ * outcomes: draft VC-001 (+$0.25m → $1.75m), working matter VL-301 ($0.35m), emerging VD-04 ($0.2m).
+ */
+export async function seedCompactDecision(actor: Actor, opts: { code: string; name: string }) {
+  const { project } = await seedCompactAuthorised(actor, opts);
+  const drivers = await db()
+    .select({ id: schema.valueDriver.id, code: schema.valueDriver.code })
+    .from(schema.valueDriver)
+    .where(eq(schema.valueDriver.projectId, project.id));
+  const id = (c: string) => drivers.find((d) => d.code === c)!.id;
+  const [valueCase] = await db().select().from(schema.valueCase).where(eq(schema.valueCase.projectId, project.id));
+  const today = new Date().toISOString().slice(0, 10);
+  const review = await createReview(actor, { projectId: project.id, trigger: "ad_hoc", reviewDate: today });
+  await upsertValuePositions(actor, {
+    reviewId: review.id,
+    positions: [
+      { valueDriverId: id("VD-01"), currentForecast: "900000.00" },
+      { valueDriverId: id("VD-02"), currentForecast: "500000.00" },
+      { valueDriverId: id("VD-03"), forecastRationale: "On track" },
+    ],
+  });
+  const option = (
+    label: string,
+    kind: "current" | "recommended" | "alternative" | "no_action",
+    total: string,
+    n: number,
+  ) => upsertScenario(actor, { reviewId: review.id, label, kind, totalValue: total, sortOrder: n });
+  await option("Current trajectory", "current", "1400000.00", 1);
+  const accelerate = await option("Accelerate supplier onboarding", "recommended", "1900000.00", 2);
+  const phase = await option("Phase the rollout", "alternative", "1600000.00", 3);
+  await option("Defer remediation", "no_action", "1200000.00", 4);
+  await saveRecommendation(actor, {
+    reviewId: review.id,
+    scenarioId: accelerate.id,
+    narrative: "Bring the second supplier on now",
+  });
+  await issueRecommendation(actor, { reviewId: review.id });
+  await finaliseReview(actor, { reviewId: review.id });
+  const decision = await recordDecision(actor, {
+    reviewId: review.id,
+    selectedScenarioId: phase.id,
+    decidedByPersonId: valueCase!.vcoPersonId!,
+    decidedOn: today,
+    rationale: "Budget phasing",
+  });
+  await createValueChange(actor, {
+    projectId: project.id,
+    code: "VC-001",
+    reason: "Reflect the phased rollout",
+    statedChangeAmount: "250000.00",
+    assuranceReviewId: review.id,
+    decisionId: decision.id,
+  });
+  const matter = await createMatter(actor, {
+    projectId: project.id,
+    code: "VL-301",
+    title: "Onboarding slippage",
+    driverIds: [id("VD-02")],
+  });
+  await assessMatterWorking(actor, { matterId: matter.id, workingTotalAmount: "350000.00" });
+  await createEmergingDriver(actor, {
+    projectId: project.id,
+    code: "VD-04",
+    name: "Automation Opportunity",
+    workingEstimate: "200000.00",
+  });
+  return { project, review };
+}

@@ -1,5 +1,3 @@
-import Decimal from "decimal.js";
-
 import { SCENARIO_KINDS } from "@/domain/statuses";
 import {
   assessLeakageAction,
@@ -57,6 +55,7 @@ export async function ReviewResponse({
   drivers,
   evidence,
   currentForecastTotal,
+  outcomes,
 }: {
   projectId: string;
   currency: string;
@@ -66,6 +65,8 @@ export async function ReviewResponse({
   drivers: Driver[];
   evidence: Option[];
   currentForecastTotal: string | null;
+  /** Phase 4D.6: the Alternative Value Outcomes visual (finalised reviews), placed after the decision. */
+  outcomes?: React.ReactNode;
 }) {
   const draft = review.status === "draft";
   const { leakage, leakageBasis, leakageSummary, scenarios, recommendation, decision } = response;
@@ -306,7 +307,7 @@ export async function ReviewResponse({
       {/* ---- Options / trajectories ------------------------------------------------------ */}
       <Section
         id="options"
-        title="Options / alternative trajectories"
+        title="Options / alternative outcomes"
         description="Consultant-entered projected totals for each option. Differences are calculated; the values themselves are never derived."
       >
         {issued && <Notice tone="locked">Options are frozen: Cardaxia&apos;s recommendation has been issued.</Notice>}
@@ -370,7 +371,11 @@ export async function ReviewResponse({
                 ))}
               </tbody>
             </Table>
-            <TrajectoryChart scenarios={scenarios} currency={currency} />
+            {draft && (
+              <p className="mt-2 text-xs text-slate-500" data-testid="outcomes-pending">
+                Alternative Value Outcomes are shown once this review is finalised.
+              </p>
+            )}
           </>
         )}
         {currentForecastTotal && !scenarios.some((s) => s.kind === "current") && optionsEditable && (
@@ -567,6 +572,8 @@ export async function ReviewResponse({
         )}
       </Section>
 
+      {outcomes}
+
       {/* ---- Value Change --------------------------------------------------------------- */}
       <Section
         id="value-change"
@@ -636,38 +643,6 @@ function Stat({ label, value, note, testId }: { label: string; value: string; no
         {value}
       </p>
       {note && <p className="text-xs text-slate-500">{note}</p>}
-    </div>
-  );
-}
-
-/** Simple horizontal comparison of consultant-entered option totals (presentation only). */
-function TrajectoryChart({ scenarios, currency }: { scenarios: Response["scenarios"]; currency: string }) {
-  const values = scenarios.map((s) => new Decimal(s.totalValue));
-  const max = Decimal.max(...values);
-  const min = Decimal.min(...values);
-  const span = max.minus(min);
-  // Start bars below the lowest option so differences are visible.
-  const floor = span.isZero() ? Decimal.min(0, min) : min.minus(span);
-  const width = (v: Decimal) =>
-    max.equals(floor) ? 100 : v.minus(floor).dividedBy(max.minus(floor)).times(100).toNumber();
-  const tone = {
-    current: "bg-slate-400",
-    recommended: "bg-emerald-500",
-    alternative: "bg-sky-400",
-    no_action: "bg-red-300",
-  };
-  return (
-    <div className="mt-4 space-y-1" aria-label="Option comparison" data-testid="trajectory-chart">
-      {scenarios.map((s, i) => (
-        <div key={s.id} className="flex items-center gap-2 text-xs">
-          <span className="w-48 truncate text-slate-600">{s.label}</span>
-          <div className="h-4 flex-1 rounded bg-slate-100">
-            <div className={`h-4 rounded ${tone[s.kind]}`} style={{ width: `${Math.max(width(values[i]!), 2)}%` }} />
-          </div>
-          <span className="w-16 text-right font-medium">{formatMoneyShort(s.totalValue, currency)}</span>
-        </div>
-      ))}
-      <p className="text-xs text-slate-400">Bars start below the lowest option to make differences visible.</p>
     </div>
   );
 }

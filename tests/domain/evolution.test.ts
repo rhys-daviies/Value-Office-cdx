@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { orderEvolutionEvents } from "@/domain/evolution";
+import { forecastConnectorRuns } from "@/ui/evolution/segments";
 
 // Phase 4D.5: merging authorisations and finalised reviews into one governed order, without dates
 // being invented or reviews being reassigned to another version.
@@ -50,5 +51,35 @@ describe("orderEvolutionEvents", () => {
   it("handles no reviews and no authorisations", () => {
     expect(ids(orderEvolutionEvents([v(1, "2026-01-01")], []))).toEqual(["V1"]);
     expect(orderEvolutionEvents([], [])).toEqual([]);
+  });
+});
+
+describe("forecastConnectorRuns (4D.5 refinement)", () => {
+  const p = (key: string, forecast: string | null, againstVersionNumber: number | null) => ({
+    key,
+    forecast,
+    againstVersionNumber,
+  });
+
+  it("connects forecasts measured against the same version and breaks when the version changes", () => {
+    const events = [
+      p("original", null, null),
+      p("v1", null, null),
+      p("r1", "1400000.00", 1),
+      p("r2", "1300000.00", 1),
+      p("v2", null, null),
+      p("r3", "1200000.00", 2),
+    ];
+    expect(forecastConnectorRuns(events)).toEqual([["r1", "r2"], ["r3"]]);
+  });
+
+  it("skips incomplete forecasts without inventing a connection, and keeps every point", () => {
+    expect(forecastConnectorRuns([p("r1", "1.00", 1), p("r2", null, 1), p("r3", "2.00", 1)])).toEqual([["r1", "r3"]]);
+    // A later return to an older version starts a new run rather than reconnecting.
+    expect(forecastConnectorRuns([p("r1", "1.00", 1), p("r2", "2.00", 2), p("r3", "3.00", 1)])).toEqual([
+      ["r1"],
+      ["r2"],
+      ["r3"],
+    ]);
   });
 });

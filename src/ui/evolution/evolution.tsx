@@ -38,6 +38,7 @@ function toPoint(e: EvolutionEvent, currency: string): ChartPoint {
       original: o.value,
       authorised: null,
       forecast: null,
+      againstVersionNumber: null,
       realised: null,
       display: { original: m(o.value) },
       tooltip: ["Original Business Case", m(o.value), "Inherited starting position · no governed date"],
@@ -53,6 +54,7 @@ function toPoint(e: EvolutionEvent, currency: string): ChartPoint {
       original: null,
       authorised: a.authorisedValue,
       forecast: null,
+      againstVersionNumber: null,
       realised: null,
       display: { authorised: m(a.authorisedValue) },
       tooltip: [
@@ -73,6 +75,7 @@ function toPoint(e: EvolutionEvent, currency: string): ChartPoint {
     original: null,
     authorised: e.inForceValue,
     forecast: p.currentForecast,
+    againstVersionNumber: p.againstVersionNumber,
     realised: p.realisedValue,
     display: { forecast: m(p.currentForecast), realised: m(p.realisedValue) },
     tooltip: [
@@ -308,7 +311,8 @@ export function ValueCaseEvolution({
           />
           <p className="mb-3 text-xs text-slate-500">
             Events are shown in governed order; spacing is by event, not elapsed time. Forecast and realised points are
-            formal checkpoint observations — dotted connectors show sequence only.
+            formal checkpoint observations — dotted connectors show sequence only; the forecast connector breaks where
+            the version measured against changes.
           </p>
           {evolution.formalPositions.length === 0 && (
             <p className="mb-3 text-sm text-slate-600" data-testid="evolution-no-positions">
