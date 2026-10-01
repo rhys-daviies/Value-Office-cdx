@@ -19,8 +19,13 @@ import type {
 //
 // Money is a decimal string (or null when not established). Dates are ISO strings.
 
-/** Bump when a model's shape changes, so issued snapshots stay interpretable. */
-export const REPORT_MODEL_VERSION = 1;
+/**
+ * Bump when a model's shape changes, so issued snapshots stay interpretable.
+ * 1 — Phase 4A models. 2 — Phase 4D.7: the Assurance model also snapshots `evolution` and `outcomes`
+ * (report visuals). Issued v1 snapshots are never rewritten; they render through the v1 layout.
+ */
+export const REPORT_MODEL_VERSION = 2;
+export type ReportModelVersion = 1 | typeof REPORT_MODEL_VERSION;
 
 export const REPORT_TITLES: Record<ReportType, string> = {
   information_request: "Information Request",
@@ -30,7 +35,8 @@ export const REPORT_TITLES: Record<ReportType, string> = {
 };
 
 export type ReportHeader = {
-  modelVersion: typeof REPORT_MODEL_VERSION;
+  /** New models carry REPORT_MODEL_VERSION; issued snapshots keep the version they were built with. */
+  modelVersion: ReportModelVersion;
   type: ReportType;
   title: string;
   /** e.g. "Assurance Review 1" */
@@ -259,6 +265,69 @@ export type AssuranceReport = {
   } | null;
   valueChanges: AssuranceValueChange[];
   nextActions: AssuranceNextAction[];
+  /** Model v2+: governed Value Case history up to and including this review (absent on v1 snapshots). */
+  evolution?: AssuranceEvolution;
+  /** Model v2+: this review's decision economics; null when it has no options with a recommendation or decision. */
+  outcomes?: AssuranceOutcomes | null;
+};
+
+/**
+ * Value Case Evolution as snapshotted in an issued report (Phase 4D.7). Copied from the application's
+ * governed read model — Original Business Case, Authorised versions, finalised reviews only — in event
+ * order. No working values, drafts or proposed Value Changes.
+ */
+export type AssuranceEvolution = {
+  originalBusinessCase: { title: string; value: string | null } | null;
+  events: AssuranceEvolutionEvent[];
+};
+
+export type AssuranceEvolutionEvent =
+  | { kind: "original"; key: string; title: string; value: string | null }
+  | {
+      kind: "authorisation";
+      key: string;
+      versionNumber: number;
+      authorisedValue: string;
+      authorisedOn: string | null;
+      vcoName: string | null;
+      valueChangeCode: string | null;
+    }
+  | {
+      kind: "review";
+      key: string;
+      sequence: number;
+      reviewDate: string;
+      againstVersionNumber: number;
+      currentForecast: string | null;
+      realisedValue: string | null;
+      valueGap: string | null;
+      /** Authorised Value in force at this point in the event order. */
+      inForceValue: string | null;
+      /** This report's own review. */
+      isThisReview: boolean;
+    };
+
+/**
+ * Alternative Value Outcomes as snapshotted in an issued report (Phase 4D.7): a point-in-time comparison
+ * of this review's stored, quantified options — not a trajectory. Ordered recommendation, stored order,
+ * client choice; a scenario holding both roles appears once.
+ */
+export type AssuranceOutcomes = {
+  againstVersionNumber: number;
+  /** Reference: Authorised Value of the version this review measured against. */
+  authorisedValue: string;
+  /** Reference: this review's formal Current Forecast. */
+  currentFormalForecast: string | null;
+  outcomes: {
+    label: string;
+    kind: ScenarioKind;
+    totalValue: string;
+    narrative: string | null;
+    recommended: boolean;
+    selected: boolean;
+  }[];
+  /** Selected − recommended; null unless both exist. */
+  differenceFromRecommendation: string | null;
 };
 
 // ---------------------------------------------------------------------------

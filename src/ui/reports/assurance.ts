@@ -14,6 +14,12 @@ import {
   text,
   type ReportIssueMeta,
 } from "./common";
+import {
+  renderEvolutionSection,
+  renderOptionsOnlySection,
+  renderOutcomesSection,
+  VISUAL_CSS,
+} from "./assurance-visuals";
 import { html, type SafeHtml } from "./html";
 
 const KIND_LABELS = {
@@ -66,11 +72,79 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
   const hasUnattributed = p.unattributedRealised !== null;
   const maxScenario = m.scenarios.reduce((acc, s) => Decimal.max(acc, new Decimal(s.totalValue)), new Decimal(0));
 
+  // Model v2 (Phase 4D.7) adds the Value Case Evolution and Alternative Value Outcomes sections from the
+  // snapshot. A v1 snapshot renders exactly as it was issued: same sections, numbering and wording.
+  const v2 = m.header.modelVersion >= 2 && m.evolution !== undefined;
+  let sectionNumber = 0;
+  const sec = (title: string) => html`<h2>${++sectionNumber}. ${title}</h2>`;
+  // Sections are functions called inline, so headings are numbered in document order.
+  const evolutionSection = () => (v2 && m.evolution ? renderEvolutionSection(m, sec) : null);
+  const optionsSection = () => {
+    if (!v2) return legacyOptions();
+    if (m.outcomes) return renderOutcomesSection(m, m.outcomes, sec);
+    if (m.scenarios.length) return renderOptionsOnlySection(m, sec);
+    return null; // no stored options: the section is omitted
+  };
+  // The Phase 4A options section, verbatim, for v1 snapshots.
+  const legacyOptions = () =>
+    html`<section>
+      ${sec("Alternative trajectories")}
+      ${
+        m.scenarios.length === 0
+          ? html`<p class="rpt-muted"><em>No options are recorded for this review.</em></p>`
+          : html`<p class="rpt-small rpt-muted">
+                Option values are Cardaxia's assessed totals for each trajectory, entered from the analysis described.
+                The Value Office records and compares them; it does not calculate them.
+              </p>
+              <div class="bars" data-testid="as-chart">
+                ${m.scenarios.map(
+                  (s) =>
+                    html`<div
+                      class="bar ${s.kind === "current" ? "current" : ""} ${s.isRecommendation ? "recommended" : ""} ${s.isClientSelection ? "selected" : ""}"
+                    >
+                      <span>${s.label}</span>
+                      <span class="track"
+                        ><span class="fill" style="display:block;width:${barWidth(s.totalValue, maxScenario)}%"></span
+                      ></span>
+                      <span class="num">${$.short(s.totalValue)}</span>
+                    </div>`,
+                )}
+              </div>
+              <table data-testid="as-options">
+                <thead>
+                  <tr>
+                    <th>Option</th>
+                    <th>Type</th>
+                    <th class="num">Total value</th>
+                    <th class="num">vs current</th>
+                    <th class="num">vs recommendation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${m.scenarios.map(
+                    (s) =>
+                      html`<tr>
+                        <td>
+                          ${s.label}${s.isClientSelection ? html` <span class="tag info">Client selected</span>` : null}
+                          ${s.narrative ? html`<div class="rpt-small rpt-muted rpt-text">${s.narrative}</div>` : null}
+                        </td>
+                        <td>${KIND_LABELS[s.kind]}</td>
+                        <td class="num">${$.short(s.totalValue)}</td>
+                        <td class="num">${$.shortChange(s.vsCurrent)}</td>
+                        <td class="num">${$.shortChange(s.vsRecommended)}</td>
+                      </tr>`,
+                  )}
+                </tbody>
+              </table>`
+      }
+    </section>`;
+  // Not reformatted: keeps the v1 layout byte-identical; new sections are spliced in without whitespace.
+  // prettier-ignore
   return html`
-    ${reportHeader(m.header, meta, { asAtLabel: "Review date", status: "Finalised Assurance Review" })}
+    ${reportHeader(m.header, meta, { asAtLabel: "Review date", status: "Finalised Assurance Review" })}${v2 ? VISUAL_CSS : null}
 
     <section>
-      <h2>1. Executive value position</h2>
+      ${sec("Executive value position")}
       <div class="rpt-headline" data-testid="as-headline">
         ${figure("Authorised Value", $.short(p.authorisedTotal), {
           testId: "as-authorised",
@@ -160,10 +234,10 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
         }
         Value Gap and Value Leakage are separate measures and are not added together.
       </div>
-    </section>
+    </section>${evolutionSection()}
 
     <section>
-      <h2>2. Review context</h2>
+      ${sec("Review context")}
       <dl class="rpt-kv" data-testid="as-context">
         <dt>Review</dt>
         <dd>Assurance Review ${r.sequence}</dd>
@@ -187,7 +261,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
     </section>
 
     <section>
-      <h2>3. What changed</h2>
+      ${sec("What changed")}
       <h3>What changed</h3>
       ${text(r.whatChanged)}
       <h3>Why it matters</h3>
@@ -220,7 +294,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
     </section>
 
     <section>
-      <h2>4. Value Driver position</h2>
+      ${sec("Value Driver position")}
       <p class="rpt-small rpt-muted">Movement is measured against ${comparedWith}.</p>
       <table data-testid="as-drivers">
         <thead>
@@ -306,7 +380,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
     </section>
 
     <section>
-      <h2>5. Value Leakage</h2>
+      ${sec("Value Leakage")}
       <p class="rpt-small rpt-muted">
         Value Leakage is value that has been, or is at risk of being, lost. Total = Recoverable + Unrecoverable. It is
         reported separately from Value Gap and is not reconciled to it.
@@ -395,60 +469,10 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
       }
     </section>
 
-    <section>
-      <h2>6. Alternative trajectories</h2>
-      ${
-        m.scenarios.length === 0
-          ? html`<p class="rpt-muted"><em>No options are recorded for this review.</em></p>`
-          : html`<p class="rpt-small rpt-muted">
-                Option values are Cardaxia's assessed totals for each trajectory, entered from the analysis described.
-                The Value Office records and compares them; it does not calculate them.
-              </p>
-              <div class="bars" data-testid="as-chart">
-                ${m.scenarios.map(
-                  (s) =>
-                    html`<div
-                      class="bar ${s.kind === "current" ? "current" : ""} ${s.isRecommendation ? "recommended" : ""} ${s.isClientSelection ? "selected" : ""}"
-                    >
-                      <span>${s.label}</span>
-                      <span class="track"
-                        ><span class="fill" style="display:block;width:${barWidth(s.totalValue, maxScenario)}%"></span
-                      ></span>
-                      <span class="num">${$.short(s.totalValue)}</span>
-                    </div>`,
-                )}
-              </div>
-              <table data-testid="as-options">
-                <thead>
-                  <tr>
-                    <th>Option</th>
-                    <th>Type</th>
-                    <th class="num">Total value</th>
-                    <th class="num">vs current</th>
-                    <th class="num">vs recommendation</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${m.scenarios.map(
-                    (s) =>
-                      html`<tr>
-                        <td>
-                          ${s.label}${s.isClientSelection ? html` <span class="tag info">Client selected</span>` : null}
-                          ${s.narrative ? html`<div class="rpt-small rpt-muted rpt-text">${s.narrative}</div>` : null}
-                        </td>
-                        <td>${KIND_LABELS[s.kind]}</td>
-                        <td class="num">${$.short(s.totalValue)}</td>
-                        <td class="num">${$.shortChange(s.vsCurrent)}</td>
-                        <td class="num">${$.shortChange(s.vsRecommended)}</td>
-                      </tr>`,
-                  )}
-                </tbody>
-              </table>`
-      }
-    </section>
+    ${optionsSection()}
 
     <section>
-      <h2>7. Cardaxia recommendation</h2>
+      ${sec("Cardaxia recommendation")}
       ${
         m.recommendation
           ? html`<div class="rpt-panel" data-testid="as-recommendation">
@@ -463,7 +487,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
     </section>
 
     <section>
-      <h2>8. Client decision</h2>
+      ${sec("Client decision")}
       ${
         m.decision
           ? html`<div class="rpt-panel" data-testid="as-decision">
@@ -499,7 +523,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
     </section>
 
     <section>
-      <h2>9. Value Change</h2>
+      ${sec("Value Change")}
       ${
         m.valueChanges.length === 0
           ? html`<p class="rpt-muted"><em>No Value Change has been proposed from this review.</em></p>`
@@ -554,7 +578,7 @@ export function renderAssurance(m: AssuranceReport, meta: ReportIssueMeta): Safe
     </section>
 
     <section>
-      <h2>10. Next actions</h2>
+      ${sec("Next actions")}
       ${
         m.nextActions.length
           ? html`<ul class="rpt-list" data-testid="as-next-actions">

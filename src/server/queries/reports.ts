@@ -7,7 +7,9 @@ import {
   issuability,
   REPORT_MODEL_VERSION,
   REPORT_TITLES,
+  type AssuranceEvolution,
   type AssuranceNextAction,
+  type AssuranceOutcomes,
   type AssuranceReport,
   type AssuranceValueChange,
   type InformationRequestReport,
@@ -21,6 +23,8 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, type ReportType }
 import { db, schema } from "@/server/db/client";
 
 import { getAssuranceWorkspace } from "./assurance";
+import { getValueCaseEvolution } from "./evolution";
+import { getAlternativeValueOutcomes, hasDecisionContext } from "./outcomes";
 import { getInformationRequestWorkspace } from "./information-request";
 import { getProjectHeader, type ProjectHeader } from "./projects";
 import { getReviewResponse, getValueChangeDetail, listValueChanges } from "./response";
@@ -223,6 +227,70 @@ export async function buildRequalificationReport(
 // ---------------------------------------------------------------------------
 // Value Assurance
 
+/**
+ * Report snapshot of Value Case Evolution (Phase 4D.7): the application's governed history, copied as is
+ * and cut after this review, so the report shows the history as at the review it describes.
+ */
+async function assuranceEvolution(projectId: string, sequence: number): Promise<AssuranceEvolution> {
+  const e = await getValueCaseEvolution(projectId);
+  const cut = e.events.findIndex((x) => x.kind === "review" && x.position.sequence === sequence);
+  const events = cut === -1 ? e.events : e.events.slice(0, cut + 1);
+  return {
+    originalBusinessCase: e.originalBusinessCase
+      ? { title: e.originalBusinessCase.title, value: e.originalBusinessCase.value }
+      : null,
+    events: events.map((x) => {
+      if (x.kind === "original")
+        return { kind: "original", key: x.key, title: x.original.title, value: x.original.value };
+      if (x.kind === "authorisation") {
+        const a = x.authorisation;
+        return {
+          kind: "authorisation",
+          key: x.key,
+          versionNumber: a.versionNumber,
+          authorisedValue: a.authorisedValue,
+          authorisedOn: a.date,
+          vcoName: a.vcoName,
+          valueChangeCode: a.valueChangeCode,
+        };
+      }
+      const p = x.position;
+      return {
+        kind: "review",
+        key: x.key,
+        sequence: p.sequence,
+        reviewDate: p.date,
+        againstVersionNumber: p.againstVersionNumber,
+        currentForecast: p.currentForecast,
+        realisedValue: p.realisedValue,
+        valueGap: p.valueGap,
+        inForceValue: x.inForceValue,
+        isThisReview: p.sequence === sequence,
+      };
+    }),
+  };
+}
+
+/** Report snapshot of Alternative Value Outcomes (Phase 4D.7): copied from the application read model. */
+async function assuranceOutcomes(projectId: string, reviewId: string): Promise<AssuranceOutcomes | null> {
+  const o = await getAlternativeValueOutcomes(projectId, reviewId);
+  if (!o || !hasDecisionContext(o)) return null;
+  return {
+    againstVersionNumber: o.review.againstVersionNumber,
+    authorisedValue: o.authorisedValue,
+    currentFormalForecast: o.currentFormalForecast,
+    outcomes: o.outcomes.map((x) => ({
+      label: x.label,
+      kind: x.kind,
+      totalValue: x.totalValue,
+      narrative: x.narrative,
+      recommended: x.recommended,
+      selected: x.selected,
+    })),
+    differenceFromRecommendation: o.differenceFromRecommendation,
+  };
+}
+
 export async function buildAssuranceReport(
   projectId: string,
   reviewId: string,
@@ -393,6 +461,8 @@ export async function buildAssuranceReport(
           : null,
       valueChanges: changes,
       nextActions,
+      evolution: await assuranceEvolution(projectId, review.sequence),
+      outcomes: await assuranceOutcomes(projectId, review.id),
     },
     issuable: issuability("assurance", review.status),
   };

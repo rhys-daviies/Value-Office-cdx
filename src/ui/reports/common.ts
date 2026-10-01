@@ -12,8 +12,12 @@ import { EVIDENCE_STATUS_LABELS, QUALIFICATION_LABELS } from "@/ui/labels";
 
 import { html, type SafeHtml } from "./html";
 
-/** Bump when the rendered layout changes; recorded on every issue. */
-export const RENDERER_VERSION = "report-html-1";
+/**
+ * Bump when the rendered layout changes; recorded on every issue.
+ * report-html-1 — Phase 4A. report-html-2 — Phase 4D.7: Assurance model v2 adds the Value Case Evolution
+ * and Alternative Value Outcomes sections (server-side SVG). v1 snapshots still render the v1 layout.
+ */
+export const RENDERER_VERSION = "report-html-2";
 
 /** Preview (draft, not issued) or an issued report's issue details. */
 export type ReportIssueMeta =

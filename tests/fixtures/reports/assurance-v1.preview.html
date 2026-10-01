@@ -1,0 +1,555 @@
+<style>
+      
+.vo-report {
+  --ink: #0f172a; --muted: #475569; --faint: #94a3b8; --rule: #cbd5e1; --panel: #f8fafc;
+  --accent: #0f766e; --warn: #b45309; --warn-bg: #fffbeb; --bad: #b91c1c; --bad-bg: #fef2f2;
+  --info: #6d28d9; --info-bg: #f5f3ff;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--ink); font-size: 10.5pt; line-height: 1.45; background: #fff;
+  max-width: 190mm; margin: 0 auto;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.vo-report * { box-sizing: border-box; }
+.vo-report .rpt-banner { border: 1.5px dashed var(--warn); background: var(--warn-bg); color: var(--warn);
+  font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 9pt; padding: 6px 10px; margin-bottom: 14px; }
+.vo-report .rpt-head { border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 18px; }
+.vo-report .rpt-brand { display: flex; justify-content: space-between; font-size: 8.5pt; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); }
+.vo-report .rpt-brand b { color: var(--accent); }
+.vo-report h1 { font-size: 21pt; line-height: 1.15; margin: 10px 0 2px; font-weight: 700; }
+.vo-report .rpt-subject { font-size: 12pt; color: var(--muted); margin: 0 0 10px; }
+.vo-report .rpt-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 18px; margin: 0; font-size: 9pt; }
+.vo-report .rpt-meta div { min-width: 0; }
+.vo-report .rpt-meta dt { color: var(--muted); font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; }
+.vo-report .rpt-meta dd { margin: 0; font-weight: 600; }
+.vo-report section { margin: 0 0 18px; }
+.vo-report h2 { font-size: 12.5pt; margin: 0 0 8px; padding-bottom: 3px; border-bottom: 1px solid var(--rule);
+  break-after: avoid; page-break-after: avoid; }
+.vo-report h3 { font-size: 10.5pt; margin: 12px 0 4px; break-after: avoid; }
+.vo-report p { margin: 0 0 8px; }
+.vo-report .rpt-text { white-space: pre-line; }
+.vo-report .rpt-muted { color: var(--muted); }
+.vo-report .rpt-small { font-size: 8.5pt; }
+.vo-report .rpt-headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(30mm, 1fr)); gap: 8px;
+  margin: 0 0 10px; break-inside: avoid; }
+.vo-report .rpt-figure { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; background: var(--panel); }
+.vo-report .rpt-figure .k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.vo-report .rpt-figure .v { font-size: 16pt; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.vo-report .rpt-figure .n { font-size: 8pt; color: var(--muted); margin-top: 2px; }
+.vo-report .rpt-figure.is-gap { border-color: #fdba74; }
+.vo-report .rpt-figure.is-leak { border-color: #fca5a5; }
+.vo-report .rpt-figure.is-info { border-color: #c4b5fd; background: var(--info-bg); }
+.vo-report .rpt-figure.is-warn { border-color: #fcd34d; background: var(--warn-bg); }
+.vo-report .rpt-figure.is-warn .v { color: var(--warn); }
+.vo-report table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 0 0 8px; }
+.vo-report th { text-align: left; font-weight: 600; color: var(--muted); font-size: 7.5pt; text-transform: uppercase;
+  letter-spacing: .04em; border-bottom: 1.5px solid var(--ink); padding: 4px 6px; vertical-align: bottom; }
+.vo-report td { border-bottom: 1px solid var(--rule); padding: 5px 6px; vertical-align: top; }
+.vo-report tr { break-inside: avoid; page-break-inside: avoid; }
+.vo-report thead { display: table-header-group; }
+.vo-report .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vo-report tfoot td { font-weight: 700; border-top: 1.5px solid var(--ink); border-bottom: none; }
+.vo-report .tag { display: inline-block; font-size: 7.5pt; font-weight: 600; padding: 1px 6px; border-radius: 9px;
+  border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+.vo-report .tag.good { color: #047857; border-color: #6ee7b7; }
+.vo-report .tag.part { color: var(--warn); border-color: #fcd34d; }
+.vo-report .tag.none { color: var(--bad); border-color: #fca5a5; }
+.vo-report .tag.info { color: var(--info); border-color: #c4b5fd; }
+.vo-report .unq { color: var(--warn); font-style: italic; font-weight: 600; }
+.vo-report .callout { border-left: 3px solid var(--rule); background: var(--panel); padding: 7px 10px; margin: 0 0 10px;
+  break-inside: avoid; }
+.vo-report .callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+.vo-report .callout.bad { border-color: var(--bad); background: var(--bad-bg); }
+.vo-report .callout.info { border-color: var(--info); background: var(--info-bg); }
+.vo-report .callout strong { display: block; }
+.vo-report .stamp { display: inline-block; border: 2px solid var(--bad); color: var(--bad); font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; margin: 0 6px 6px 0; font-size: 9.5pt; }
+.vo-report .stamp.neutral { border-color: var(--muted); color: var(--muted); }
+.vo-report .stamp.good { border-color: #047857; color: #047857; }
+.vo-report .rpt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; break-inside: avoid; }
+.vo-report .rpt-panel { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; }
+.vo-report .rpt-panel h3 { margin-top: 0; }
+.vo-report .rpt-kv { display: grid; grid-template-columns: 38% 1fr; gap: 3px 10px; font-size: 9pt; margin: 0; }
+.vo-report .rpt-kv dt { color: var(--muted); }
+.vo-report .rpt-kv dd { margin: 0; }
+.vo-report .bars { margin: 4px 0 10px; break-inside: avoid; }
+.vo-report .bar { display: grid; grid-template-columns: 48mm 1fr 22mm; align-items: center; gap: 8px; margin: 3px 0; font-size: 9pt; }
+.vo-report .bar .track { background: #eef2f7; height: 12px; border-radius: 2px; }
+.vo-report .bar .fill { background: #64748b; height: 12px; border-radius: 2px; }
+.vo-report .bar.current .fill { background: #0369a1; }
+.vo-report .bar.recommended .fill { background: var(--accent); }
+.vo-report .bar.selected .fill { background: #7c3aed; }
+.vo-report .rpt-list { margin: 0 0 8px; padding-left: 18px; }
+.vo-report .rpt-list li { margin: 2px 0; }
+.vo-report .rpt-end { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 8pt; color: var(--muted); }
+@media print { .vo-report { max-width: none; } }
+
+    </style>
+    <article class="vo-report" data-report-type="assurance">
+    
+    <div class="rpt-banner" data-testid="report-draft-banner">
+            Draft preview — not issued. Figures reflect the Value Record now and may change before issue.
+          </div>
+    <header class="rpt-head">
+      <div class="rpt-brand">
+        <span><b>Cardaxia</b> · Value Office</span>
+        <span data-testid="report-issue-line"
+          >Draft preview</span
+        >
+      </div>
+      <h1>Value Assurance Report</h1>
+      <p class="rpt-subject">Assurance Review 1</p>
+      <dl class="rpt-meta">
+        <div>
+          <dt>Client</dt>
+          <dd>[FIXTURE PLACEHOLDER] Horizon client</dd>
+        </div>
+        <div>
+          <dt>Project</dt>
+          <dd>Project Horizon</dd>
+        </div>
+        <div>
+          <dt>Report date</dt>
+          <dd>Not issued</dd>
+        </div>
+        <div>
+          <dt>Review date</dt>
+          <dd>30 Jun 2026</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd data-testid="report-status">Finalised Assurance Review</dd>
+        </div>
+        <div>
+          <dt>Value Basis</dt>
+          <dd>[FIXTURE PLACEHOLDER] Value Basis not yet specified for Project Horizon · USD</dd>
+        </div>
+      </dl>
+    </header>
+  
+
+    <section>
+      <h2>1. Executive value position</h2>
+      <div class="rpt-headline" data-testid="as-headline">
+        <div class="rpt-figure" data-testid="as-authorised">
+    <div class="k">Authorised Value</div>
+    <div class="v">$15.5m</div>
+    <div class="n">Value Case V1</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-forecast">
+    <div class="k">Current Forecast</div>
+    <div class="v">$14.7m</div>
+    <div class="n">All financial drivers forecast</div>
+  </div>
+        <div class="rpt-figure is-gap" data-testid="as-gap">
+    <div class="k">Value Gap</div>
+    <div class="v">$0.8m</div>
+    <div class="n">Authorised Value − Current Forecast</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-movement">
+    <div class="k">Movement</div>
+    <div class="v">-$0.8m</div>
+    <div class="n">Since Authorised Value</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-realised">
+    <div class="k">Realised Value</div>
+    <div class="v">$2.8m</div>
+    <div class="n">All unattributed — see below</div>
+  </div>
+      </div>
+      <div class="rpt-headline" data-testid="as-realised-breakdown">
+                <div class="rpt-figure" data-testid="as-realised-attributed">
+    <div class="k">Attributed Realised</div>
+    <div class="v">—</div>
+    <div class="n">No realised value attributed to drivers</div>
+  </div>
+                <div class="rpt-figure is-info" data-testid="as-realised-unattributed">
+    <div class="k">Unattributed Realised</div>
+    <div class="v">$2.8m</div>
+    <div class="n">Not allocated to any Value Driver</div>
+  </div>
+                <div class="rpt-figure" data-testid="as-realised-total">
+    <div class="k">Total Realised</div>
+    <div class="v">$2.8m</div>
+    
+  </div>
+              </div>
+              <div class="callout info" data-testid="as-unattributed-note">
+                <strong>Unattributed Realised Value</strong>
+                $2,800,000 of realised value is known at project level but has not been
+                responsibly attributed to individual Value Drivers, so it is not included in any driver's figures.
+                <div class="rpt-text">[FIXTURE PLACEHOLDER] $2.8m realised is known only at project level; no reliable per-driver attribution is available.</div>
+              </div>
+      
+      <div class="callout" data-testid="as-leakage-headline">
+        <strong>Value Leakage — reported separately from Value Gap</strong>
+        1 open item(s).
+              <span class="unq">Not yet quantified.</span>
+        Value Gap and Value Leakage are separate measures and are not added together.
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Review context</h2>
+      <dl class="rpt-kv" data-testid="as-context">
+        <dt>Review</dt>
+        <dd>Assurance Review 1</dd>
+        <dt>Review date</dt>
+        <dd>30 Jun 2026</dd>
+        <dt>Trigger</dt>
+        <dd>
+          Ad hoc
+        </dd>
+        <dt>Measured against</dt>
+        <dd>Authorised Value Case V1 · Re-Qualified Value Case</dd>
+        <dt>Previous position</dt>
+        <dd>
+          None — first review; movement is measured against the Authorised Value
+        </dd>
+        <dt>Finalised</dt>
+        <dd>1 Oct 2026 by Consultant 27917024</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>3. What changed</h2>
+      <h3>What changed</h3>
+      <p class="rpt-text">[FIXTURE PLACEHOLDER] What changed since Authorised V1 is not yet specified.</p>
+      <h3>Why it matters</h3>
+      <p class="rpt-text">[FIXTURE PLACEHOLDER] Economic significance not yet specified.</p>
+      <h3>Summary</h3>
+              <p class="rpt-text">[FIXTURE PLACEHOLDER] Realised Value of $2.8m is known only as a project-level aggregate and is recorded as unattributed realised value. Per-driver realised values are not specified, so none are recorded.</p>
+      <h3>Evidence considered</h3>
+      <p class="rpt-muted"><em>No evidence linked to this review.</em></p>
+    </section>
+
+    <section>
+      <h2>4. Value Driver position</h2>
+      <p class="rpt-small rpt-muted">Movement is measured against the Authorised Value (V1).</p>
+      <table data-testid="as-drivers">
+        <thead>
+          <tr>
+            <th>Value Driver</th>
+            <th class="num">Authorised</th>
+            <th class="num">Previous</th>
+            <th class="num">Current Forecast</th>
+            <th class="num">Movement</th>
+            <th class="num">Realised</th>
+            <th class="num">Value Gap</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+                  <td><strong>VD-01</strong> Service Productivity</td>
+                  <td class="num">$4,800,000</td>
+                  <td class="num">$4,800,000</td>
+                  <td class="num">
+                    $4,400,000
+                  </td>
+                  <td class="num">-$400,000</td>
+                  <td class="num">
+                    <span class="rpt-muted">—</span>
+                  </td>
+                  <td class="num">$400,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-02</strong> Customer Retention</td>
+                  <td class="num">$3,600,000</td>
+                  <td class="num">$3,600,000</td>
+                  <td class="num">
+                    $3,200,000
+                  </td>
+                  <td class="num">-$400,000</td>
+                  <td class="num">
+                    <span class="rpt-muted">—</span>
+                  </td>
+                  <td class="num">$400,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-03</strong> Technology Run Cost</td>
+                  <td class="num">$2,400,000</td>
+                  <td class="num">$2,400,000</td>
+                  <td class="num">
+                    $2,200,000
+                  </td>
+                  <td class="num">-$200,000</td>
+                  <td class="num">
+                    <span class="rpt-muted">—</span>
+                  </td>
+                  <td class="num">$200,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-04</strong> Contact Avoidance</td>
+                  <td class="num">$2,100,000</td>
+                  <td class="num">$2,100,000</td>
+                  <td class="num">
+                    $2,000,000
+                  </td>
+                  <td class="num">-$100,000</td>
+                  <td class="num">
+                    <span class="rpt-muted">—</span>
+                  </td>
+                  <td class="num">$100,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-05</strong> Quality / Rework</td>
+                  <td class="num">$2,200,000</td>
+                  <td class="num">$2,200,000</td>
+                  <td class="num">
+                    $2,500,000
+                  </td>
+                  <td class="num">+$300,000</td>
+                  <td class="num">
+                    <span class="rpt-muted">—</span>
+                  </td>
+                  <td class="num">-$300,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-06</strong> New Automation</td>
+                  <td class="num">$400,000</td>
+                  <td class="num">$400,000</td>
+                  <td class="num">
+                    $400,000
+                  </td>
+                  <td class="num">$0</td>
+                  <td class="num">
+                    <span class="rpt-muted">—</span>
+                  </td>
+                  <td class="num">$0</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr>
+          <tr data-testid="as-unattributed-row">
+                  <td colspan="5"><em>Unattributed realised value (not allocated to any Value Driver)</em></td>
+                  <td class="num">$2,800,000</td>
+                  <td colspan="2"></td>
+                </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total (financial drivers)</td>
+            <td class="num">$15,500,000</td>
+            <td class="num">$15,500,000</td>
+            <td class="num">$14,700,000</td>
+            <td class="num">-$800,000</td>
+            <td class="num">$2,800,000</td>
+            <td class="num">$800,000</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      <h3>Forecast rationale</h3>
+              <dl class="rpt-kv">
+                <dt>VD-01 Service Productivity</dt>
+                        <dd class="rpt-text">[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.</dd><dt>VD-02 Customer Retention</dt>
+                        <dd class="rpt-text">[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.</dd><dt>VD-03 Technology Run Cost</dt>
+                        <dd class="rpt-text">[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.</dd><dt>VD-04 Contact Avoidance</dt>
+                        <dd class="rpt-text">[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.</dd><dt>VD-05 Quality / Rework</dt>
+                        <dd class="rpt-text">[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.</dd><dt>VD-06 New Automation</dt>
+                        <dd class="rpt-text">[FIXTURE PLACEHOLDER] Forecast rationale not yet specified.</dd>
+              </dl>
+    </section>
+
+    <section>
+      <h2>5. Value Leakage</h2>
+      <p class="rpt-small rpt-muted">
+        Value Leakage is value that has been, or is at risk of being, lost. Total = Recoverable + Unrecoverable. It is
+        reported separately from Value Gap and is not reconciled to it.
+      </p>
+      <table data-testid="as-leakage">
+                <thead>
+                  <tr>
+                    <th>Issue</th>
+                    <th>Affected drivers</th>
+                    <th>Risk / Leakage Owner</th>
+                    <th class="num">Total VL</th>
+                    <th class="num">Recoverable</th>
+                    <th class="num">Unrecoverable</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-testid="as-leakage-row">
+                        <td><strong>VL-001</strong> Vendor sequencing</td>
+                        <td>
+                          <span class="rpt-muted">Not specified</span>
+                        </td>
+                        <td><span class="unq">Not assigned</span></td>
+                        <td colspan="3" style="text-align:center">
+                                <span class="unq" data-testid="as-leakage-unquantified">Not yet quantified</span>
+                              </td>
+                        <td>Open</td>
+                      </tr>
+                </tbody>
+              </table>
+              <h3>VL-001 Vendor sequencing</h3>
+                    <p class="rpt-text">[FIXTURE PLACEHOLDER] Vendor sequencing issue identified in Assurance Review 1. Amounts have not been reliably established: the earlier prototype figures do not reconcile under the clarified Value Leakage definition (Total = Recoverable + Unrecoverable), so no amount is recorded pending PMO confirmation. Affected drivers and AVO not specified.</p>
+                    <dl class="rpt-kv">
+                      <dt>Identified</dt>
+                      <dd>
+                        Assurance Review 1
+                      </dd>
+                      
+                      <dt>Consultant assessment</dt>
+                      <dd class="rpt-text">[FIXTURE PLACEHOLDER] Not assessed under the clarified Value Leakage definition.</dd>
+                      <dt>Amount</dt>
+                              <dd>
+                                <span class="unq">Not yet quantified</span> — no amount has been responsibly established
+                                in this review.
+                              </dd>
+                    </dl>
+    </section>
+
+    <section>
+      <h2>6. Alternative trajectories</h2>
+      <p class="rpt-small rpt-muted">
+                Option values are Cardaxia's assessed totals for each trajectory, entered from the analysis described.
+                The Value Office records and compares them; it does not calculate them.
+              </p>
+              <div class="bars" data-testid="as-chart">
+                <div
+                      class="bar current  "
+                    >
+                      <span>Current trajectory</span>
+                      <span class="track"
+                        ><span class="fill" style="display:block;width:96.1%"></span
+                      ></span>
+                      <span class="num">$14.7m</span>
+                    </div><div
+                      class="bar  recommended "
+                    >
+                      <span>Cardaxia recommendation</span>
+                      <span class="track"
+                        ><span class="fill" style="display:block;width:100.0%"></span
+                      ></span>
+                      <span class="num">$15.3m</span>
+                    </div><div
+                      class="bar   selected"
+                    >
+                      <span>[FIXTURE PLACEHOLDER] Client-selected option</span>
+                      <span class="track"
+                        ><span class="fill" style="display:block;width:97.4%"></span
+                      ></span>
+                      <span class="num">$14.9m</span>
+                    </div>
+              </div>
+              <table data-testid="as-options">
+                <thead>
+                  <tr>
+                    <th>Option</th>
+                    <th>Type</th>
+                    <th class="num">Total value</th>
+                    <th class="num">vs current</th>
+                    <th class="num">vs recommendation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                        <td>
+                          Current trajectory
+                          
+                        </td>
+                        <td>Current trajectory</td>
+                        <td class="num">$14.7m</td>
+                        <td class="num">$0</td>
+                        <td class="num">-$0.6m</td>
+                      </tr><tr>
+                        <td>
+                          Cardaxia recommendation
+                          <div class="rpt-small rpt-muted rpt-text">[FIXTURE PLACEHOLDER] Actions and timing not specified.</div>
+                        </td>
+                        <td>Cardaxia recommendation</td>
+                        <td class="num">$15.3m</td>
+                        <td class="num">+$0.6m</td>
+                        <td class="num">$0</td>
+                      </tr><tr>
+                        <td>
+                          [FIXTURE PLACEHOLDER] Client-selected option <span class="tag info">Client selected</span>
+                          <div class="rpt-small rpt-muted rpt-text">[FIXTURE PLACEHOLDER] Option definition (e.g. timing) not specified.</div>
+                        </td>
+                        <td>Alternative</td>
+                        <td class="num">$14.9m</td>
+                        <td class="num">+$0.2m</td>
+                        <td class="num">-$0.4m</td>
+                      </tr>
+                </tbody>
+              </table>
+    </section>
+
+    <section>
+      <h2>7. Cardaxia recommendation</h2>
+      <div class="rpt-panel" data-testid="as-recommendation">
+              <p>
+                <strong>Cardaxia recommendation</strong> · $15.3m
+                <span class="rpt-muted rpt-small">(issued 1 Oct 2026)</span>
+              </p>
+              <p class="rpt-text">[FIXTURE PLACEHOLDER] Cardaxia recommendation narrative not specified.</p>
+            </div>
+    </section>
+
+    <section>
+      <h2>8. Client decision</h2>
+      <div class="rpt-panel" data-testid="as-decision">
+                <dl class="rpt-kv">
+                  <dt>Selected option</dt>
+                  <dd><strong>[FIXTURE PLACEHOLDER] Client-selected option</strong> · $14.9m</dd>
+                  <dt>Decision maker</dt>
+                  <dd>[FIXTURE PLACEHOLDER] Client decision maker</dd>
+                  <dt>Decision date</dt>
+                  <dd>30 Jun 2026</dd>
+                  <dt>Rationale</dt>
+                  <dd class="rpt-text">[FIXTURE PLACEHOLDER] Decision rationale not specified.</dd>
+                  <dt>Economic consequence</dt>
+                  <dd class="rpt-text">Not recorded.</dd>
+                  <dt>Difference vs Cardaxia recommendation</dt>
+                  <dd data-testid="as-client-difference">
+                    <strong>-$0.4m</strong> (client-elected)
+                  </dd>
+                  
+                </dl>
+              </div>
+              <p class="rpt-small rpt-muted">
+                The Cardaxia recommendation is preserved as issued. The client decision is recorded separately and does
+                not alter it.
+              </p>
+    </section>
+
+    <section>
+      <h2>9. Value Change</h2>
+      <div class="rpt-panel" data-testid="as-value-change">
+                  <p>
+                    <span class="stamp neutral"
+                      >Proposed</span
+                    >
+                    <span class="stamp">Not reconciled</span>
+                  </p>
+                  <dl class="rpt-kv">
+                    <dt>Value Change</dt>
+                    <dd>VC-002 · V1 → V2</dd>
+                    <dt>Stated change</dt>
+                    <dd>-$0.6m</dd>
+                    <dt>Current authorised value</dt>
+                    <dd>$15.5m</dd>
+                    <dt>Proposed authorised value</dt>
+                            <dd>$14.9m</dd>
+                    <dt>Reason</dt>
+                            <dd class="rpt-text">[FIXTURE PLACEHOLDER] Reflects the client-selected option (−$0.6m against Authorised V1).</dd>
+                  </dl>
+                  <p class="rpt-small">
+                          Not reconciled at Value Driver level — not ready for VCO authorisation. The Authorised Value is unchanged until the VCO authorises a reconciled change.
+                        </p>
+                </div>
+    </section>
+
+    <section>
+      <h2>10. Next actions</h2>
+      <ul class="rpt-list" data-testid="as-next-actions">
+                <li>VL-001 Vendor sequencing: Risk / Leakage Owner not yet assigned.</li><li>VC-002: proposed, not reconciled at Value Driver level — not ready for VCO authorisation.</li>
+              </ul>
+              <p class="rpt-small rpt-muted">Only actions recorded in the Value Record are listed.</p>
+    </section>
+    <p class="rpt-end">
+    Prepared by Cardaxia from the governed Value Record.
+    Draft preview — not an issued report.
+  </p>
+  </article>

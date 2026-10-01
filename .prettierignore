@@ -4,3 +4,5 @@ package-lock.json
 node_modules
 playwright-report
 test-results
+# Golden report fixtures are byte-exact renderer output (Phase 4D.7 compatibility) — never reformat.
+tests/fixtures/

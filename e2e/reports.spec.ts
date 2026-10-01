@@ -53,8 +53,8 @@ test("Horizon Value Assurance Report preview: position, unattributed realised, l
   await expect(vl).not.toContainText("$0");
   await expect(page.getByTestId("report-preview")).not.toContainText("0.70");
 
-  // Options, recommendation and decision stay separate.
-  const options = page.getByTestId("as-options");
+  // Options, recommendation and decision stay separate (model v2: the Alternative Value Outcomes table).
+  const options = page.getByTestId("as-outcomes-table");
   await expect(options).toContainText("$14.7m");
   await expect(options).toContainText("$15.3m");
   await expect(options).toContainText("$14.9m");
@@ -101,6 +101,10 @@ test("issue the Horizon Value Assurance Report: confirmation, immutable issue re
   await expect(view.getByTestId("report-issue-line")).toContainText("Issue 1");
   await expect(view.getByTestId("report-draft-banner")).toHaveCount(0);
   await expect(view.getByTestId("as-forecast")).toContainText("$14.7m");
+  // Phase 4D.7: the issued (model v2) report carries both visuals from its snapshot.
+  await expect(view.getByTestId("as-evolution-svg")).toBeVisible();
+  await expect(view.getByTestId("as-outcomes-svg")).toBeVisible();
+  await expect(view.getByTestId("as-outcomes-difference")).toContainText("-$0.4m");
 
   const pdfHref = await page.getByRole("link", { name: "Download PDF" }).getAttribute("href");
   const pdf = await page.request.get(pdfHref!);

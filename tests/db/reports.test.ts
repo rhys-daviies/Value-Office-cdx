@@ -198,8 +198,9 @@ describe("report read models use the authoritative Value Record", () => {
     expect(m.scenarios.find((s) => s.isClientSelection)!.totalValue).toBe("14900000.00");
 
     const text = textOf(renderReportArticle(m, preview));
-    const rec = text.slice(text.indexOf("7. Cardaxia recommendation"), text.indexOf("8. Client decision"));
-    const dec = text.slice(text.indexOf("8. Client decision"), text.indexOf("9. Value Change"));
+    // Model v2 numbering (Phase 4D.7: Value Case Evolution is section 2).
+    const rec = text.slice(text.indexOf("8. Cardaxia recommendation"), text.indexOf("9. Client decision"));
+    const dec = text.slice(text.indexOf("9. Client decision"), text.indexOf("10. Value Change"));
     expect(rec).toContain("$15.3m");
     expect(rec).not.toContain("$14.9m");
     expect(dec).toContain("$14.9m");
@@ -215,7 +216,7 @@ describe("report read models use the authoritative Value Record", () => {
 
     const markup = renderReportArticle(m, preview);
     const text = textOf(markup);
-    const leakage = text.slice(text.indexOf("5. Value Leakage"), text.indexOf("6. Alternative trajectories"));
+    const leakage = text.slice(text.indexOf("6. Value Leakage"), text.indexOf("7. Alternative Value Outcomes"));
     expect(leakage).toContain("Not yet quantified");
     expect(leakage).not.toMatch(/\$0(\b|\.)/);
     for (const figure of Object.values(HORIZON.response.prototypeLeakage)) expect(text).not.toContain(figure);
@@ -554,9 +555,14 @@ describe("issuing reports", () => {
 describe("no floating-point money in the report layer", () => {
   it("report modules never convert amounts to JavaScript numbers", () => {
     const root = path.resolve(import.meta.dirname, "../../src");
+    // Recursive: includes the Phase 4D.7 server-side SVG chart modules (ui/reports/charts).
+    const tree = (dir: string): string[] =>
+      readdirSync(path.join(root, dir), { recursive: true, encoding: "utf8" })
+        .filter((f) => f.endsWith(".ts"))
+        .map((f) => path.join(root, dir, f));
     const files = [
-      ...readdirSync(path.join(root, "ui/reports")).map((f) => path.join(root, "ui/reports", f)),
-      ...readdirSync(path.join(root, "server/reports")).map((f) => path.join(root, "server/reports", f)),
+      ...tree("ui/reports"),
+      ...tree("server/reports"),
       path.join(root, "server/queries/reports.ts"),
       path.join(root, "domain/reports.ts"),
     ];
