@@ -4,6 +4,7 @@ import { versionAuthority } from "@/domain/value-case";
 import { recordInheritedBusinessCaseAction, updateVersionDetailsAction } from "@/server/actions/value-case";
 import { listEvidenceOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
+import { getVersionTrajectoryAuthoring } from "@/server/queries/trajectory";
 import { getVersionDetail, nextCode } from "@/server/queries/value-case";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import {
@@ -17,6 +18,7 @@ import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields"
 import { Empty, KeyValues, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { formatDate, formatDateTime, formatMetric, formatMoneyShort, formatPeriod, moneyInputValue } from "@/ui/format";
 import { requireProject } from "@/ui/require";
+import { VersionTrajectorySection } from "@/ui/trajectory/milestones";
 import { AddDriverForm, DriverEditor, DriverReadOnly, DriverValue } from "@/ui/value-case/drivers";
 
 export const metadata = { title: "Value Case version" };
@@ -38,6 +40,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
       ? summary.financialTotal
       : null;
   const base = `/projects/${projectId}`;
+  const trajectory = isV0 ? null : await getVersionTrajectoryAuthoring(projectId, version.id);
 
   const ctx = editableV0
     ? {
@@ -192,6 +195,24 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
               <SubmitButton variant="secondary">Save details</SubmitButton>
             </div>
           </ActionForm>
+        </Section>
+      )}
+
+      {trajectory && (
+        <Section
+          title="Value Basis and planned value"
+          description={
+            version.status === "draft"
+              ? "Edit this draft's basis and milestones where the version is edited (Re-Qualification or its Value Change)."
+              : "As recorded on this version."
+          }
+        >
+          <VersionTrajectorySection
+            projectId={projectId}
+            currency={currency}
+            authoring={{ ...trajectory, editable: false }}
+            project={project}
+          />
         </Section>
       )}
 

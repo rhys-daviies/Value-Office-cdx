@@ -1,11 +1,13 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { toDbMoney } from "@/domain/money";
 import type { ValueBasisKind, VersionStatus } from "@/domain/statuses";
 import {
   realisedComparable,
+  terminalReconciliation,
   trajectoryMeasure,
   trajectoryStatus,
+  type TerminalReconciliation,
   type TrajectoryMeasure,
   type TrajectoryStatus,
 } from "@/domain/trajectory";
@@ -225,5 +227,201 @@ export async function getScenarioTrajectories(
       selected: o.selected,
       points: points.get(o.id) ?? [],
     })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Authoring read models (Phase 4D.9D): what the consultant edits, with display-only reconciliation status.
+
+export type VersionTrajectoryAuthoring = {
+  version: {
+    id: string;
+    versionNumber: number;
+    status: VersionStatus;
+    valueBasisKind: ValueBasisKind | null;
+    valuePeriodStart: string | null;
+    valuePeriodEnd: string | null;
+  };
+  /** The version's total (its governed terminal). */
+  total: string;
+  status: TrajectoryStatus;
+  measure: TrajectoryMeasure | null;
+  points: TrajectoryPoint[];
+  reconciliation: TerminalReconciliation | null;
+  editable: boolean;
+  /** Kind fixed by an earlier classified governed version; a later version cannot change it. */
+  inheritedKind: ValueBasisKind | null;
+  /** The version a Value Change started from (re-phasing context), with its plan exactly as authorised. */
+  previous: {
+    versionNumber: number;
+    status: VersionStatus;
+    valueBasisKind: ValueBasisKind | null;
+    valuePeriodStart: string | null;
+    valuePeriodEnd: string | null;
+    points: TrajectoryPoint[];
+  } | null;
+};
+
+export async function getVersionTrajectoryAuthoring(
+  projectId: string,
+  versionId: string,
+): Promise<VersionTrajectoryAuthoring | null> {
+  const [v] = await db()
+    .select()
+    .from(schema.valueCaseVersion)
+    .where(and(eq(schema.valueCaseVersion.id, versionId), eq(schema.valueCaseVersion.projectId, projectId)));
+  if (!v || v.kind !== "value_case") return null;
+  const [{ total }, points, [change], [classified]] = await Promise.all([
+    getVersionTotal(v.id),
+    pointsBy("valueCaseVersionId", [v.id]).then((m) => m.get(v.id) ?? []),
+    db()
+      .select({ fromVersionId: schema.valueChange.fromVersionId })
+      .from(schema.valueChange)
+      .where(eq(schema.valueChange.toVersionId, v.id)),
+    db()
+      .select({ kind: schema.valueCaseVersion.valueBasisKind })
+      .from(schema.valueCaseVersion)
+      .where(
+        and(
+          eq(schema.valueCaseVersion.valueCaseId, v.valueCaseId),
+          ne(schema.valueCaseVersion.id, v.id),
+          inArray(schema.valueCaseVersion.status, ["authorised", "superseded"]),
+          isNotNull(schema.valueCaseVersion.valueBasisKind),
+        ),
+      )
+      .orderBy(desc(schema.valueCaseVersion.versionNumber))
+      .limit(1),
+  ]);
+  let previous: VersionTrajectoryAuthoring["previous"] = null;
+  if (change) {
+    const [from] = await db()
+      .select()
+      .from(schema.valueCaseVersion)
+      .where(eq(schema.valueCaseVersion.id, change.fromVersionId));
+    previous = {
+      versionNumber: from!.versionNumber,
+      status: from!.status,
+      valueBasisKind: from!.valueBasisKind,
+      valuePeriodStart: from!.valuePeriodStart,
+      valuePeriodEnd: from!.valuePeriodEnd,
+      points: (await pointsBy("valueCaseVersionId", [from!.id])).get(from!.id) ?? [],
+    };
+  }
+  const measure = trajectoryMeasure(v.valueBasisKind);
+  const totalStr = toDbMoney(total);
+  return {
+    version: {
+      id: v.id,
+      versionNumber: v.versionNumber,
+      status: v.status,
+      valueBasisKind: v.valueBasisKind,
+      valuePeriodStart: v.valuePeriodStart,
+      valuePeriodEnd: v.valuePeriodEnd,
+    },
+    total: totalStr,
+    status: trajectoryStatus(v, points.length),
+    measure,
+    points,
+    reconciliation: measure ? terminalReconciliation(points, v.valuePeriodEnd, totalStr) : null,
+    editable: v.status === "draft",
+    inheritedKind: classified?.kind ?? null,
+    previous,
+  };
+}
+
+export type ReviewTrajectoryAuthoring = {
+  reviewDate: string;
+  finalised: boolean;
+  governing: {
+    versionNumber: number;
+    valueBasisKind: ValueBasisKind | null;
+    valuePeriodStart: string | null;
+    valuePeriodEnd: string | null;
+  };
+  status: TrajectoryStatus;
+  measure: TrajectoryMeasure | null;
+  forecast: {
+    /** The review's formal forecast (governed terminal); null while incomplete. */
+    total: string | null;
+    points: TrajectoryPoint[];
+    reconciliation: TerminalReconciliation | null;
+    editable: boolean;
+  };
+  recommendationIssued: boolean;
+  options: {
+    scenarioId: string;
+    label: string;
+    totalValue: string;
+    points: TrajectoryPoint[];
+    reconciliation: TerminalReconciliation | null;
+    editable: boolean;
+  }[];
+};
+
+/** Forecast and option-path authoring for one review. `forecastTotal` is the review's formal forecast (or null). */
+export async function getReviewTrajectoryAuthoring(
+  projectId: string,
+  reviewId: string,
+  forecastTotal: string | null,
+): Promise<ReviewTrajectoryAuthoring | null> {
+  const [r] = await db()
+    .select()
+    .from(schema.assuranceReview)
+    .where(and(eq(schema.assuranceReview.id, reviewId), eq(schema.assuranceReview.projectId, projectId)));
+  if (!r) return null;
+  const [[v], options, [rec]] = await Promise.all([
+    db().select().from(schema.valueCaseVersion).where(eq(schema.valueCaseVersion.id, r.againstVersionId)),
+    db()
+      .select()
+      .from(schema.scenario)
+      .where(eq(schema.scenario.assuranceReviewId, r.id))
+      .orderBy(asc(schema.scenario.sortOrder), asc(schema.scenario.createdAt)),
+    db()
+      .select({ issuedAt: schema.recommendation.issuedAt })
+      .from(schema.recommendation)
+      .where(eq(schema.recommendation.assuranceReviewId, r.id)),
+  ]);
+  const [forecastPoints, optionPoints] = await Promise.all([
+    pointsBy("assuranceReviewId", [r.id]),
+    pointsBy(
+      "scenarioId",
+      options.map((o) => o.id),
+    ),
+  ]);
+  const measure = trajectoryMeasure(v!.valueBasisKind);
+  const finalised = r.status === "finalised";
+  const issued = Boolean(rec?.issuedAt);
+  const fp = forecastPoints.get(r.id) ?? [];
+  // Status of the governing version's setup (phasing here means this review's forecast milestones).
+  const status = trajectoryStatus(v!, fp.length);
+  return {
+    reviewDate: r.reviewDate,
+    finalised,
+    governing: {
+      versionNumber: v!.versionNumber,
+      valueBasisKind: v!.valueBasisKind,
+      valuePeriodStart: v!.valuePeriodStart,
+      valuePeriodEnd: v!.valuePeriodEnd,
+    },
+    status,
+    measure,
+    forecast: {
+      total: forecastTotal,
+      points: fp,
+      reconciliation: measure ? terminalReconciliation(fp, v!.valuePeriodEnd, forecastTotal) : null,
+      editable: !finalised,
+    },
+    recommendationIssued: issued,
+    options: options.map((o) => {
+      const points = optionPoints.get(o.id) ?? [];
+      return {
+        scenarioId: o.id,
+        label: o.label,
+        totalValue: o.totalValue,
+        points,
+        reconciliation: measure ? terminalReconciliation(points, v!.valuePeriodEnd, o.totalValue) : null,
+        editable: !finalised && !issued,
+      };
+    }),
   };
 }

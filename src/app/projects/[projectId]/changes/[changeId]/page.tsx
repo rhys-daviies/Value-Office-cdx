@@ -16,6 +16,7 @@ import { nextEvidenceCode } from "@/server/queries/evidence";
 import { listEvidenceOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getValueChangeDetail } from "@/server/queries/response";
+import { getVersionTrajectoryAuthoring } from "@/server/queries/trajectory";
 import { nextCode } from "@/server/queries/value-case";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { PlainBadge, VersionBadge } from "@/ui/components/badges";
@@ -24,6 +25,7 @@ import { KeyValues, Notice, Section, Table, TextLink } from "@/ui/components/lay
 import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate, formatDateTime, formatMoneyChange, formatMoneyShort, moneyInputValue } from "@/ui/format";
 import { isUuid, requireProject } from "@/ui/require";
+import { VersionTrajectorySection } from "@/ui/trajectory/milestones";
 import { WorkingEstimate } from "@/ui/drivers/display";
 import { AddDriverForm, DriverEditor } from "@/ui/value-case/drivers";
 
@@ -45,11 +47,12 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
   if (!isUuid(changeId)) notFound();
   const d = await getValueChangeDetail(projectId, changeId);
   if (!d) notFound();
-  const [stakeholders, evidence, actor, register] = await Promise.all([
+  const [stakeholders, evidence, actor, register, trajectory] = await Promise.all([
     listStakeholders(projectId),
     listEvidenceOptions(projectId),
     getCurrentActor().catch(() => null),
     getDriverRegister(projectId),
+    getVersionTrajectoryAuthoring(projectId, d.toVersion.id),
   ]);
   // Phase 4D.3: identities with a working record that are not yet in the proposed version.
   const inProposed = new Set(d.toDrivers.map((drv) => drv.valueDriverId));
@@ -353,6 +356,21 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
           </div>
         )}
       </Section>
+
+      {trajectory && (
+        <Section
+          id="trajectory"
+          title={`V${d.toVersion.versionNumber} Value Basis and planned value`}
+          description={`The proposed commitment's basis, Value Period and value milestones. V${d.fromVersion.versionNumber} stays exactly as authorised.`}
+        >
+          <VersionTrajectorySection
+            projectId={projectId}
+            currency={currency}
+            authoring={trajectory}
+            project={project}
+          />
+        </Section>
+      )}
 
       {change.status === "draft" && (
         <Section title="Propose to the Value Case Owner" tone="muted">

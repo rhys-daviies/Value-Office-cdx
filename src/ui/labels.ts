@@ -232,3 +232,28 @@ export const SCENARIO_KIND_LABELS = {
   alternative: "Alternative",
   no_action: "No action",
 } as const;
+
+/** Phase 4D.9: Value Basis kinds (canonical enum → consultant label and one-line trajectory note). */
+export const VALUE_BASIS_LABELS = {
+  cumulative_benefit: "Cumulative Benefit",
+  annual_run_rate: "Annual Run Rate",
+  net_present_value: "Net Present Value (NPV)",
+  other: "Other",
+} as const;
+
+export const VALUE_BASIS_TRAJECTORY_NOTES = {
+  cumulative_benefit: "Tracks cumulative value across the Value Period.",
+  annual_run_rate: "Tracks the annualised value run-rate expected at each milestone.",
+  net_present_value: "Time-phased trajectory is not available for NPV.",
+  other: "Time-phased trajectory is not available for this Value Basis.",
+} as const;
+
+/** Read-model trajectory statuses, as shown to consultants. */
+export const TRAJECTORY_STATUS_LABELS = {
+  no_authorised_version: "No Authorised Value Case yet",
+  basis_not_classified: "Value Basis not classified",
+  basis_not_supported: "Trajectory not available for this Value Basis",
+  period_not_set: "Value Period not set",
+  phasing_not_entered: "Phasing not entered",
+  ready: "Phasing entered",
+} as const;

@@ -7,6 +7,7 @@ import { documentMatterEvidence, requestMatterEvidence } from "@/server/commands
 import { assessMatterWorking, createMatter, setMatterRemediation, setMatterStage } from "@/server/commands/matters";
 import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { createProject } from "@/server/commands/project";
+import { setForecastPoint, setPlanPoint, setScenarioPoint, setVersionBasis } from "@/server/commands/trajectory";
 import type { Actor } from "@/server/commands/run";
 import { addStakeholder, setValueCaseOwner } from "@/server/commands/stakeholders";
 import {
@@ -440,4 +441,142 @@ export async function seedCompactDecision(actor: Actor, opts: { code: string; na
     workingEstimate: "200000.00",
   });
   return { project, review };
+}
+
+/**
+ * Phase 4D.9D: "Trajectory Compact" — the authoring demonstration (synthetic). Authorised V1 $30.0m on a Cumulative
+ * Benefit basis over 1 Jan 2026 – 31 Dec 2028 with plan milestones $0 / $6m / $18m / $30m; a DRAFT review (30 Sep
+ * 2026) with formal forecast $26m, forecast milestones $16m (Dec 2027) and $26m (Dec 2028), and three options with
+ * explicit consultant-entered paths: Act now $29m (recommended, not yet issued), Delay 3 months $27m, No action $23m.
+ * Every value here is a stated fixture value; nothing is derived.
+ */
+export async function seedCompactTrajectory(actor: Actor, opts: { code: string; name: string }) {
+  const { project } = await createProject(actor, {
+    newClientName: "Synthetic Test Client",
+    code: opts.code,
+    name: opts.name,
+    currency: "USD",
+    valueBasisDescription: "Synthetic: cumulative benefit over FY26–FY28",
+    valuePeriodStart: "2026-01-01",
+    valuePeriodEnd: "2028-12-31",
+  });
+  const { person: vco } = await addStakeholder(actor, {
+    projectId: project.id,
+    name: "Test VCO",
+    roleDescription: "VCO",
+  });
+  await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
+  const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
+  const drivers = [
+    ["VD-01", "Procurement Savings", "15000000.00"],
+    ["VD-02", "Revenue Uplift", "10000000.00"],
+    ["VD-03", "Working Capital", "5000000.00"],
+  ] as const;
+  const ids: string[] = [];
+  for (const [i, [code, name, value]] of drivers.entries()) {
+    const { driver } = await addValueDriver(actor, {
+      versionId: v1.id,
+      code,
+      name,
+      financialValue: value,
+      sortOrder: i + 1,
+    });
+    ids.push(driver.id);
+  }
+  await setVersionBasis(actor, {
+    versionId: v1.id,
+    valueBasisKind: "cumulative_benefit",
+    valuePeriodStart: "2026-01-01",
+    valuePeriodEnd: "2028-12-31",
+  });
+  for (const [asOf, value] of [
+    ["2026-01-01", "0.00"],
+    ["2026-12-31", "6000000.00"],
+    ["2027-12-31", "18000000.00"],
+    ["2028-12-31", "30000000.00"],
+  ] as const) {
+    await setPlanPoint(actor, { versionId: v1.id, asOf, value });
+  }
+  await proposeVersion(actor, { versionId: v1.id });
+  const evidence = await recordEvidence(actor, {
+    projectId: project.id,
+    code: "E-001",
+    title: "Synthetic authorisation",
+  });
+  await authoriseInitialVersion(actor, {
+    versionId: v1.id,
+    authorisedByPersonId: vco.id,
+    authorisedOn: "2026-01-15",
+    authorisationEvidenceId: evidence.id,
+  });
+  const review = await createReview(actor, { projectId: project.id, trigger: "ad_hoc", reviewDate: "2026-09-30" });
+  await upsertValuePositions(actor, {
+    reviewId: review.id,
+    positions: [
+      { valueDriverId: ids[0]!, currentForecast: "13000000.00", realisedValue: "2500000.00" },
+      { valueDriverId: ids[1]!, currentForecast: "9000000.00", realisedValue: "1000000.00" },
+      { valueDriverId: ids[2]!, currentForecast: "4000000.00", realisedValue: "500000.00" },
+    ],
+  });
+  await setForecastPoint(actor, { reviewId: review.id, asOf: "2027-12-31", value: "16000000.00" });
+  await setForecastPoint(actor, { reviewId: review.id, asOf: "2028-12-31", value: "26000000.00" });
+  const option = async (
+    label: string,
+    kind: "recommended" | "alternative" | "no_action",
+    total: string,
+    n: number,
+    mid: string,
+  ) => {
+    const s = await upsertScenario(actor, { reviewId: review.id, label, kind, totalValue: total, sortOrder: n });
+    await setScenarioPoint(actor, { scenarioId: s.id, asOf: "2027-12-31", value: mid });
+    await setScenarioPoint(actor, { scenarioId: s.id, asOf: "2028-12-31", value: total });
+    return s;
+  };
+  const act = await option("Act now", "recommended", "29000000.00", 1, "18000000.00");
+  await option("Delay 3 months", "alternative", "27000000.00", 2, "16500000.00");
+  await option("No action", "no_action", "23000000.00", 3, "15000000.00");
+  await saveRecommendation(actor, {
+    reviewId: review.id,
+    scenarioId: act.id,
+    narrative: "Act now to protect the plan",
+  });
+  return { project, vco, v1, review };
+}
+
+/**
+ * Phase 4D.9D: "Trajectory Draft" — a DRAFT V1 ($30.0m, unclassified, no milestones) whose project setup records a
+ * Value Period, for authoring a basis and plan from scratch (synthetic).
+ */
+export async function seedCompactTrajectoryDraft(actor: Actor, opts: { code: string; name: string }) {
+  const { project } = await createProject(actor, {
+    newClientName: "Synthetic Test Client",
+    code: opts.code,
+    name: opts.name,
+    currency: "USD",
+    valueBasisDescription: "Synthetic: cumulative benefit over FY26–FY28",
+    valuePeriodStart: "2026-01-01",
+    valuePeriodEnd: "2028-12-31",
+  });
+  const { person: vco } = await addStakeholder(actor, {
+    projectId: project.id,
+    name: "Test VCO",
+    roleDescription: "VCO",
+  });
+  await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
+  const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
+  await addValueDriver(actor, {
+    versionId: v1.id,
+    code: "VD-01",
+    name: "Procurement Savings",
+    financialValue: "20000000.00",
+    sortOrder: 1,
+  });
+  await addValueDriver(actor, {
+    versionId: v1.id,
+    code: "VD-02",
+    name: "Revenue Uplift",
+    financialValue: "10000000.00",
+    sortOrder: 2,
+  });
+  return { project, vco, v1 };
 }

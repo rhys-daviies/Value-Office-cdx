@@ -11,6 +11,7 @@ import { getCurrentActor } from "@/server/auth/actor";
 import { nextEvidenceCode } from "@/server/queries/evidence";
 import { listEvidenceOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
+import { getVersionTrajectoryAuthoring } from "@/server/queries/trajectory";
 import { getRequalificationWorkspace, type ComparisonRow } from "@/server/queries/value-case";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, NonFinancialBadge, PlainBadge, QualificationBadge, VersionBadge } from "@/ui/components/badges";
@@ -18,6 +19,7 @@ import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@
 import { Empty, Missing, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
+import { VersionTrajectorySection } from "@/ui/trajectory/milestones";
 import { requireProject } from "@/ui/require";
 import { AddDriverForm, DriverEditor, DriverReadOnly, DriverValue } from "@/ui/value-case/drivers";
 
@@ -36,6 +38,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
   ]);
   const currency = project.currency;
   const v1 = ws.requalifiedVersion;
+  const trajectory = v1 ? await getVersionTrajectoryAuthoring(projectId, v1.id) : null;
   const s = ws.requalifiedSummary;
   const vco = stakeholders.find((p) => p.personId === valueCase.vcoPersonId) ?? null;
   const base = `/projects/${projectId}`;
@@ -230,6 +233,22 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
               />
             )}
           </div>
+        </Section>
+      )}
+
+      {/* ---- Value Basis and planned value (Phase 4D.9D) ------------------------- */}
+      {v1 && trajectory && (
+        <Section
+          id="trajectory"
+          title={`V${v1.versionNumber} Value Basis and planned value`}
+          description="The economic basis, Value Period and dated value milestones of this commitment. Optional; nothing is generated."
+        >
+          <VersionTrajectorySection
+            projectId={projectId}
+            currency={currency}
+            authoring={trajectory}
+            project={project}
+          />
         </Section>
       )}
 

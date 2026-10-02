@@ -6,13 +6,15 @@ import {
   seedCompactDecision,
   seedCompactEvolution,
   seedCompactOperating,
+  seedCompactTrajectory,
+  seedCompactTrajectoryDraft,
 } from "@/fixtures/compact";
 import { ensureUser } from "@/server/commands/users";
 import { closeDb, db, schema } from "@/server/db/client";
 
 import { loadLocalEnv } from "./load-env";
 
-// Seeds the synthetic "Assurance Compact", "Response Compact", "Matters Compact", "Evidence Compact", "Drivers Compact", "Office Compact", "Evolution Compact" and "Decision Compact" projects (Authorised V1; Drivers Compact adds a decided review, Office Compact live Assurance work, Evolution Compact V1→V2 governed history, Decision Compact a decided review with four options). Idempotent by code.
+// Seeds the synthetic "Assurance Compact", "Response Compact", "Matters Compact", "Evidence Compact", "Drivers Compact", "Office Compact", "Evolution Compact", "Decision Compact", "Trajectory Compact" and "Trajectory Draft" projects (Authorised V1; Drivers Compact adds a decided review, Office Compact live Assurance work, Evolution Compact V1→V2 governed history, Decision Compact a decided review with four options). Idempotent by code.
 loadLocalEnv();
 
 const email = process.env.VO_DEV_USER_EMAIL ?? "consultant@cardaxia.ai";
@@ -28,12 +30,22 @@ try {
     ["OFFICE", "Office Compact"],
     ["EVOLVE", "Evolution Compact"],
     ["DECIDE", "Decision Compact"],
+    ["TRAJ", "Trajectory Compact"],
+    ["TRAJD", "Trajectory Draft"],
   ] as const) {
     const [existing] = await db().select().from(schema.project).where(eq(schema.project.code, code));
     if (existing) {
       console.log(`${name} already seeded; nothing to do.`);
     } else {
-      if (code === "DECIDE") {
+      if (code === "TRAJ") {
+        await seedCompactTrajectory(actor, { code, name });
+        console.log(
+          `Seeded ${name}: Authorised V1 $30m with plan milestones; draft review with forecast and option paths`,
+        );
+      } else if (code === "TRAJD") {
+        await seedCompactTrajectoryDraft(actor, { code, name });
+        console.log(`Seeded ${name}: draft V1 $30m, unclassified, project Value Period set`);
+      } else if (code === "DECIDE") {
         await seedCompactDecision(actor, { code, name });
         console.log(`Seeded ${name}: Review #1 finalised with four options, recommendation ≠ client selection`);
       } else if (code === "EVOLVE") {

@@ -56,6 +56,7 @@ export async function ReviewResponse({
   evidence,
   currentForecastTotal,
   outcomes,
+  optionPaths,
 }: {
   projectId: string;
   currency: string;
@@ -67,6 +68,8 @@ export async function ReviewResponse({
   currentForecastTotal: string | null;
   /** Phase 4D.6: the Alternative Value Outcomes visual (finalised reviews), placed after the decision. */
   outcomes?: React.ReactNode;
+  /** Phase 4D.9D: each option's dated value milestones, placed with the options. */
+  optionPaths?: React.ReactNode;
 }) {
   const draft = review.status === "draft";
   const { leakage, leakageBasis, leakageSummary, scenarios, recommendation, decision } = response;
@@ -410,6 +413,7 @@ export async function ReviewResponse({
             </Expander>
           </div>
         )}
+        {optionPaths}
       </Section>
 
       {/* ---- Recommendation ----------------------------------------------------------- */}
