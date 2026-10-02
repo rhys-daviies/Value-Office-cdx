@@ -40,7 +40,9 @@ try {
     } else {
       if (code === "TRAJX") {
         await seedCompactTrajectory(actor, { code, name, formal: true });
-        console.log(`Seeded ${name}: Trajectory Compact with finalised reviews (31 Mar and 30 Sep 2026)`);
+        console.log(
+          `Seeded ${name}: finalised reviews 31 Mar and 30 Sep 2026; three option paths; client selects Delay`,
+        );
       } else if (code === "TRAJ") {
         await seedCompactTrajectory(actor, { code, name });
         console.log(

@@ -54,8 +54,10 @@ test("Value Trajectory is the primary Overview visual: plan, realised, formal ch
   for (const width of [1366, 1024]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(chart).toBeVisible();
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect(overflow).toBeLessThanOrEqual(0);
+    // ResponsiveContainer re-measures asynchronously after a resize: wait for the settled layout.
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth))
+      .toBeLessThanOrEqual(0);
   }
 });
 

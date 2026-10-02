@@ -50,6 +50,26 @@ export function realisedComparable(inForceKind: ValueBasisKind | null, againstKi
   return inForceKind === "cumulative_benefit" && againstKind === inForceKind;
 }
 
+/**
+ * Whether a finalised review establishes a complete PROJECT-LEVEL realised position that a trajectory may plot
+ * (PMO decision, Phase 4D.9F). Realised value is project-level: attribution to drivers is not required, so either
+ * - every financial driver has a realised value (plus any unattributed realised value); or
+ * - no driver-level realised value is recorded and the review formally records the whole position as unattributed
+ *   realised value (a project-level aggregate, which always carries its rationale).
+ * A position recorded for only some drivers stays incomplete — even with an unattributed amount alongside, the review
+ * does not say whether the unassessed drivers are covered by it — and is never plotted as a partial total.
+ */
+export function realisedPositionComplete(t: {
+  financialDriverCount: number;
+  realisedAssessed: number;
+  unattributedRealised: string | null;
+  realisedTotal: string | null;
+}): boolean {
+  if (t.realisedTotal === null) return false;
+  if (t.financialDriverCount > 0 && t.realisedAssessed === t.financialDriverCount) return true;
+  return t.realisedAssessed === 0 && t.unattributedRealised !== null;
+}
+
 // ---------------------------------------------------------------------------
 // Authoring support (Phase 4D.9D). Display-only status: the database gates (drizzle/0020) remain the authority.
 

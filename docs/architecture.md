@@ -377,6 +377,21 @@ setup information and keep their existing lock.
 **Out of MVP:** forecast ranges, a realised run-rate measure, Original Business Case (V0) phasing, per-driver
 phasing, AI-generated points, Working Outlook.
 
+**Realised completeness (4D.9F PMO decision).** A trajectory plots a finalised review's realised value only when the
+review establishes a complete project-level position (`realisedPositionComplete`): every financial driver has a realised
+value, or none does and the whole position is recorded as unattributed realised value. A position recorded for only
+some drivers is not plotted (noted), even with an unattributed amount alongside. Today and the formal checkpoint are
+combined only on the same calendar date; otherwise their labels are placed apart.
+
+**Alternative Value Trajectories (4D.9F)** — `getAlternativeValueTrajectories` → `src/ui/trajectory/alternatives*`, on
+the finalised review after the client decision. One review: shared history (cumulative only: zero origin and earlier
+finalised reviews' complete realised positions), the branch anchor (that review's own complete realised position —
+composition only, never stored), then each option's stored milestones; terminal labels are the stored option totals.
+Roles come from the issued recommendation and the recorded decision; options keep the 4D.6 semantic order and are never
+ranked. An option without milestones is a single end marker at its stored total ("Phasing not entered"). Run-rate has no
+history or anchor. When no option has milestones, or the basis is unclassified, NPV, Other or has no Value Period, the
+4D.6 endpoint-only Alternative Value Outcomes remain the visual. Overview's Latest Value Decision is unchanged.
+
 ## Client reports (Phase 4A)
 
 ```

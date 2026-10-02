@@ -12,9 +12,8 @@ import { getAssuranceWorkspace, listReviewEvidenceOptions, type AssuranceWorkspa
 import { listOpenMatterEvidence } from "@/server/queries/evidence";
 import { listDriverOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
-import { getAlternativeValueOutcomes } from "@/server/queries/outcomes";
 import { getReviewResponse } from "@/server/queries/response";
-import { getReviewTrajectoryAuthoring } from "@/server/queries/trajectory";
+import { getAlternativeValueTrajectories, getReviewTrajectoryAuthoring } from "@/server/queries/trajectory";
 import { ReviewResponse } from "@/ui/assurance/response";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, NonFinancialBadge, PlainBadge, QualificationBadge } from "@/ui/components/badges";
@@ -40,8 +39,8 @@ import {
 } from "@/ui/assurance/display";
 import { formatDate, formatDateTime, formatMoneyShort, moneyInputValue } from "@/ui/format";
 import { TRIGGER_LABELS } from "@/ui/labels";
-import { AlternativeValueOutcomes } from "@/ui/outcomes/outcomes";
 import { isUuid, requireProject } from "@/ui/require";
+import { ReviewOptionsVisual } from "@/ui/trajectory/alternatives";
 import { ForecastTrajectorySection, OptionPathsSection } from "@/ui/trajectory/milestones";
 
 export const metadata = { title: "Assurance Review" };
@@ -70,11 +69,12 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   const notAssessed = totals.forecastBlockers.filter((b) => b.notAssessed);
   const response = await getReviewResponse(projectId, review.id);
   const trajectory = await getReviewTrajectoryAuthoring(projectId, review.id, ws.totals.forecastTotal);
-  const [stakeholders, driverOptions, outcomes] = await Promise.all([
+  const [stakeholders, driverOptions, alternatives] = await Promise.all([
     listStakeholders(projectId),
     listDriverOptions(projectId),
-    getAlternativeValueOutcomes(projectId, review.id),
+    getAlternativeValueTrajectories(projectId, review.id),
   ]);
+  const outcomes = alternatives?.outcomes ?? null;
 
   return (
     <>
@@ -378,7 +378,7 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
         currentForecastTotal={totals.forecastTotal}
         outcomes={
           outcomes && outcomes.review.finalised && outcomes.outcomes.length > 0 ? (
-            <AlternativeValueOutcomes data={outcomes} />
+            <ReviewOptionsVisual data={alternatives!} />
           ) : undefined
         }
         optionPaths={

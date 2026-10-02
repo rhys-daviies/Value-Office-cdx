@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { seedCompactTrajectory, seedCompactTrajectoryDraft } from "@/fixtures/compact";
-import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
+import { createReview, finaliseReview, updateReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
 import type { Actor } from "@/server/commands/run";
 import { removePlanPoint, setForecastPoint, setPlanPoint, setVersionBasis } from "@/server/commands/trajectory";
@@ -12,7 +12,7 @@ import { authoriseInitialVersion, proposeVersion } from "@/server/commands/value
 import { authoriseValueChange, createValueChange, proposeValueChange } from "@/server/commands/value-change";
 import { db, schema } from "@/server/db/client";
 import { getValueTrajectoryChart } from "@/server/queries/trajectory";
-import { buildTrajectoryPresentation, epoch, timeTicks } from "@/ui/trajectory/model";
+import { buildTrajectoryPresentation, epoch, placeMarkerLabels, timeTicks } from "@/ui/trajectory/model";
 import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 
 import { newActor, proposedV1, uid } from "../support/fixtures";
@@ -133,12 +133,79 @@ describe("primary Value Trajectory read model", () => {
 
     // 8. Today and the formal checkpoint are distinct markers; the age of the position is stated.
     const p = buildTrajectoryPresentation(c, "USD")!;
-    expect(p.today).toEqual({ t: epoch(TODAY), label: "Today" });
-    expect(p.checkpoint).toEqual({ t: epoch("2026-09-30"), label: "Formal position 30 Sept 2026" });
+    expect(p.today).toMatchObject({ t: epoch(TODAY), label: "Today" });
+    expect(p.checkpoint).toMatchObject({ t: epoch("2026-09-30"), label: "Formal position 30 Sept 2026" });
     expect(render(c)).toContain("Formal position as at 30 Sept 2026 (Review #2); today is 15 Mar 2027.");
     const same = buildTrajectoryPresentation({ ...c, today: { asOf: "2026-09-30", inPeriod: true } }, "USD")!;
     expect(same.checkpoint).toBeNull();
     expect(same.today!.label).toBe("Today · formal position");
+  });
+
+  it("4D.9F marker decision: combined only on the same calendar date; days apart stay distinct, labels kept apart", async () => {
+    const x = await executive();
+    const c = await getValueTrajectoryChart(x.project.id, { today: "2026-10-02" }); // two days after the review
+    const p = buildTrajectoryPresentation(c, "USD")!;
+    expect(p.checkpoint).toMatchObject({ t: epoch("2026-09-30"), label: "Formal position 30 Sept 2026" });
+    expect(p.today).toMatchObject({ t: epoch("2026-10-02"), label: "Today" });
+    // Presentation only: the earlier label sits left of its line, the later one right — they cannot collide.
+    expect([p.checkpoint!.align, p.today!.align]).toEqual(["end", "start"]);
+    const one = buildTrajectoryPresentation({ ...c, today: { asOf: "2026-10-01", inPeriod: true } }, "USD")!;
+    expect(one.checkpoint).not.toBeNull(); // one day apart is still two markers
+    // Near the left edge both labels go right of their lines, so they are staggered onto separate rows.
+    const early = placeMarkerLabels(
+      [epoch("2026-01-01"), epoch("2028-12-31")],
+      [
+        { t: epoch("2026-02-01"), label: "Formal position 1 Feb 2026" },
+        { t: epoch("2026-02-03"), label: "Today" },
+      ],
+    );
+    expect(early.map((m) => [m.align, m.row])).toEqual([
+      ["start", 0],
+      ["start", 1],
+    ]);
+  });
+
+  it("4D.9F realised correction: a complete project-level unattributed position is plotted; partial stays excluded", async () => {
+    const a = await authorised("cumulative_benefit", { plan: true });
+    const id = await driverIds(a.project.id);
+    // Review #1: no driver-level realised, $2.8m formally recorded as unattributed (project-level aggregate).
+    const r1 = await createReview(a.actor, { projectId: a.project.id, trigger: "ad_hoc", reviewDate: "2026-06-30" });
+    await upsertValuePositions(a.actor, {
+      reviewId: r1.id,
+      positions: [
+        { valueDriverId: id("VD-01"), currentForecast: "19000000.00" },
+        { valueDriverId: id("VD-02"), currentForecast: "9000000.00" },
+      ],
+    });
+    await updateReview(a.actor, {
+      reviewId: r1.id,
+      unattributedRealisedValue: "2800000.00",
+      unattributedRealisedRationale: "Known only at project level",
+    });
+    await finaliseReview(a.actor, { reviewId: r1.id });
+    // Review #2: realised recorded for only one of two drivers, plus unattributed — genuinely incomplete.
+    const r2 = await createReview(a.actor, { projectId: a.project.id, trigger: "ad_hoc", reviewDate: "2026-12-31" });
+    await upsertValuePositions(a.actor, {
+      reviewId: r2.id,
+      positions: [
+        { valueDriverId: id("VD-01"), currentForecast: "19000000.00", realisedValue: "3000000.00" },
+        { valueDriverId: id("VD-02"), currentForecast: "9000000.00" },
+      ],
+    });
+    await updateReview(a.actor, {
+      reviewId: r2.id,
+      unattributedRealisedValue: "500000.00",
+      unattributedRealisedRationale: "Known only at project level",
+    });
+    await finaliseReview(a.actor, { reviewId: r2.id });
+
+    const c = await getValueTrajectoryChart(a.project.id, { today: TODAY });
+    expect(c.realised!.checkpoints).toEqual([{ sequence: 1, asOf: "2026-06-30", value: "2800000.00" }]);
+    expect(c.realised!.excluded).toEqual([{ sequence: 2, reason: "incomplete" }]);
+    expect(render(c)).toContain("Realised not plotted where incomplete (Review #2: realised assessed for only some");
+    // Stored values are unchanged by the read.
+    const [stored] = await db().select().from(schema.assuranceReview).where(eq(schema.assuranceReview.id, r1.id));
+    expect(stored!.unattributedRealisedValue).toBe("2800000.00");
   });
 
   it("20. rows exist only at explicit dates; tooltips name only stored observations; the anchor is not a forecast", async () => {

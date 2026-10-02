@@ -97,7 +97,7 @@ function axisTicks(points: OutcomePoint[], currency: string): [string, string][]
   return ticks;
 }
 
-function DecisionSummary({ d }: { d: Data }) {
+export function DecisionSummary({ d }: { d: Data }) {
   const m = (v: string | null) => formatMoneyShort(v, d.currency);
   const rec = d.outcomes.find((o) => o.recommended);
   const sel = d.outcomes.find((o) => o.selected);
@@ -241,8 +241,11 @@ export function AlternativeValueOutcomes({
   data,
   variant = "full",
   reviewHref,
+  note,
 }: {
   data: Data;
+  /** Phase 4D.9F: why no time-based Alternative Value Trajectories are shown for this review (when relevant). */
+  note?: string;
   /** full: review page (table open). compact: Overview "Latest Value Decision" (table collapsed). */
   variant?: "full" | "compact";
   reviewHref?: string;
@@ -272,6 +275,11 @@ export function AlternativeValueOutcomes({
         <GovernedTag>Point in time</GovernedTag>
       </div>
       <DecisionSummary d={data} />
+      {note && (
+        <p className="mb-2 text-xs text-slate-600" data-testid="outcomes-trajectory-note">
+          {note}
+        </p>
+      )}
       {data.outcomes.length === 0 ? (
         <p className="text-sm text-slate-600" data-testid="outcomes-empty">
           No options were recorded for this review.

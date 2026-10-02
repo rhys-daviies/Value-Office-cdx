@@ -21,9 +21,31 @@ export type TrajectoryPresentation = {
   domain: [number, number];
   xTicks: [number, string][];
   yTicks: [number, string][];
-  today: { t: number; label: string } | null;
-  checkpoint: { t: number; label: string } | null;
+  today: MarkerLabel | null;
+  checkpoint: MarkerLabel | null;
 };
+
+/**
+ * A vertical marker and where its label sits: `align` end = text to the left of the line, start = to the right;
+ * `row` 0 or 1 = label line above the plot. Placement only — Today and the formal checkpoint stay separate markers
+ * unless they are literally the same date.
+ */
+export type MarkerLabel = { t: number; label: string; align: "start" | "end"; row: 0 | 1 };
+
+/** Keeps two marker labels apart: opposite sides of their lines, else staggered rows; and inside the plot edges. */
+export function placeMarkerLabels(domain: [number, number], markers: { t: number; label: string }[]): MarkerLabel[] {
+  const span = domain[1] - domain[0] || 1;
+  const sorted = [...markers].sort((a, b) => a.t - b.t);
+  const placed = sorted.map((m, i): MarkerLabel => {
+    const f = (m.t - domain[0]) / span;
+    let align: "start" | "end" = sorted.length === 1 ? "start" : i === 0 ? "end" : "start";
+    if (align === "end" && f < 0.18) align = "start";
+    if (align === "start" && f > 0.82) align = "end";
+    return { ...m, align, row: 0 };
+  });
+  if (placed.length === 2 && placed[0]!.align === placed[1]!.align) placed[1]!.row = 1;
+  return markers.map((m) => placed.find((p) => p.t === m.t && p.label === m.label)!);
+}
 
 /** Month-boundary ticks across the period: monthly ≤ 12 months, quarterly ≤ 24, half-yearly ≤ 60, else yearly. */
 export function timeTicks(start: string, end: string): [number, string][] {
@@ -129,19 +151,29 @@ export function buildTrajectoryPresentation(c: ValueTrajectoryChart, currency: s
     row(c.forecast.points.at(-1)!.asOf).endLabel.forecast = m(c.forecast.points.at(-1)!.value);
   }
 
+  // Combined only when literally the same calendar date; otherwise two markers, labels kept apart by placement.
   const sameDay = c.latestFormal && c.today.asOf === c.latestFormal.reviewDate;
+  const domain: [number, number] = [epoch(c.period.start), epoch(c.period.end)];
+  const today = c.today.inPeriod
+    ? { t: epoch(c.today.asOf), label: sameDay ? "Today · formal position" : "Today" }
+    : null;
+  const checkpoint =
+    c.latestFormal &&
+    !sameDay &&
+    c.latestFormal.reviewDate >= c.period.start &&
+    c.latestFormal.reviewDate <= c.period.end
+      ? { t: epoch(c.latestFormal.reviewDate), label: `Formal position ${formatDate(c.latestFormal.reviewDate)}` }
+      : null;
+  const placed = placeMarkerLabels(
+    domain,
+    [checkpoint, today].filter((m) => m !== null),
+  );
   return {
     rows: [...rows.values()].sort((a, b) => a.t - b.t),
-    domain: [epoch(c.period.start), epoch(c.period.end)],
+    domain,
     xTicks: timeTicks(c.period.start, c.period.end),
     yTicks: valueTicks(plotted, currency),
-    today: c.today.inPeriod ? { t: epoch(c.today.asOf), label: sameDay ? "Today · formal position" : "Today" } : null,
-    checkpoint:
-      c.latestFormal &&
-      !sameDay &&
-      c.latestFormal.reviewDate >= c.period.start &&
-      c.latestFormal.reviewDate <= c.period.end
-        ? { t: epoch(c.latestFormal.reviewDate), label: `Formal position ${formatDate(c.latestFormal.reviewDate)}` }
-        : null,
+    today: today ? placed.find((m) => m.label === today.label)! : null,
+    checkpoint: checkpoint ? placed.find((m) => m.label === checkpoint.label)! : null,
   };
 }

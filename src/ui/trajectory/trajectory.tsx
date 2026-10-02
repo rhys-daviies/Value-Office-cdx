@@ -36,7 +36,7 @@ function noteText(n: TrajectoryChartNote, c: ValueTrajectoryChart): string {
       return `Realised not plotted where incomplete (${c
         .realised!.excluded.filter((e) => e.reason === "incomplete")
         .map((e) => `Review #${e.sequence}`)
-        .join(", ")}: not every financial driver assessed).`;
+        .join(", ")}: realised assessed for only some financial drivers).`;
   }
 }
 

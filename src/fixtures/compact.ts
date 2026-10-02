@@ -455,7 +455,8 @@ export async function seedCompactTrajectory(
   opts: {
     code: string;
     name: string;
-    /** 4D.9E: also a finalised Review #1 and the 30 Sep review finalised. */ formal?: boolean;
+    /** 4D.9E: also a finalised Review #1 and the 30 Sep review finalised; 4D.9F: client selects "Delay 3 months". */
+    formal?: boolean;
   },
 ) {
   const { project } = await createProject(actor, {
@@ -553,7 +554,7 @@ export async function seedCompactTrajectory(
     return s;
   };
   const act = await option("Act now", "recommended", "29000000.00", 1, "18000000.00");
-  await option("Delay 3 months", "alternative", "27000000.00", 2, "16500000.00");
+  const delay = await option("Delay 3 months", "alternative", "27000000.00", 2, "16500000.00");
   await option("No action", "no_action", "23000000.00", 3, "15000000.00");
   await saveRecommendation(actor, {
     reviewId: review.id,
@@ -563,6 +564,14 @@ export async function seedCompactTrajectory(
   if (opts.formal) {
     await issueRecommendation(actor, { reviewId: review.id });
     await finaliseReview(actor, { reviewId: review.id });
+    // 4D.9F: the client selects a different option from Cardaxia's recommendation (synthetic).
+    await recordDecision(actor, {
+      reviewId: review.id,
+      selectedScenarioId: delay.id,
+      decidedByPersonId: vco.id,
+      decidedOn: "2026-10-15",
+      rationale: "Synthetic: delay to align with the budget cycle",
+    });
   }
   return { project, vco, v1, review };
 }

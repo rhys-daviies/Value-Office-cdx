@@ -34,7 +34,29 @@ export type TrajectoryRow = {
   endLabel: { plan?: string; forecast?: string; realised?: string };
 };
 
-type Marker = { t: number; label: string };
+type Marker = { t: number; label: string; align: "start" | "end"; row: 0 | 1 };
+
+/** Marker label above the plot, beside its line (placement chosen on the server so labels never collide). */
+export function markerLabel(m: Marker, fill: string, weight = 400) {
+  function MarkerLabel({ viewBox }: { viewBox?: { x?: number; y?: number } }) {
+    const x = viewBox?.x ?? 0;
+    const y = viewBox?.y ?? 0;
+    return (
+      <text
+        x={m.align === "start" ? x + 5 : x - 5}
+        y={y - (m.row === 0 ? 18 : 5)}
+        textAnchor={m.align}
+        fontSize={11}
+        fill={fill}
+        fontWeight={weight}
+        data-marker={m.label}
+      >
+        {m.label}
+      </text>
+    );
+  }
+  return MarkerLabel;
+}
 
 function TipContent({ active, payload }: TooltipContentProps<ValueType, NameType>) {
   const row = payload?.[0]?.payload as TrajectoryRow | undefined;
@@ -112,7 +134,7 @@ export function ValueTrajectoryChart({
   return (
     <div className="h-[340px] w-full" role="img" aria-label={ariaLabel} data-testid="trajectory-chart">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows} margin={{ top: 28, right: 24, bottom: 4, left: 8 }}>
+        <ComposedChart data={rows} margin={{ top: 34, right: 24, bottom: 4, left: 8 }}>
           <CartesianGrid stroke="#e2e8f0" vertical={false} />
           <XAxis
             dataKey="t"
@@ -146,16 +168,11 @@ export function ValueTrajectoryChart({
               x={checkpoint.t}
               stroke="#334155"
               strokeDasharray="4 3"
-              label={{ value: checkpoint.label, position: "insideTopLeft", fontSize: 11, fill: "#334155" }}
+              label={markerLabel(checkpoint, "#334155")}
             />
           )}
           {today && (
-            <ReferenceLine
-              x={today.t}
-              stroke="#b45309"
-              strokeWidth={1.5}
-              label={{ value: today.label, position: "top", fontSize: 11, fill: "#b45309", fontWeight: 600 }}
-            />
+            <ReferenceLine x={today.t} stroke="#b45309" strokeWidth={1.5} label={markerLabel(today, "#b45309", 600)} />
           )}
           {has("plan") && (
             <Line

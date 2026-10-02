@@ -1,9 +1,11 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { toDbMoney } from "@/domain/money";
+import { optionDifference, type Outcome } from "@/domain/outcomes";
 import type { ValueBasisKind, VersionStatus } from "@/domain/statuses";
 import {
   realisedComparable,
+  realisedPositionComplete,
   terminalReconciliation,
   trajectoryMeasure,
   trajectoryStatus,
@@ -14,7 +16,7 @@ import {
 import { db, schema } from "@/server/db/client";
 
 import { getAssuranceReviewList } from "./assurance";
-import { getAlternativeValueOutcomes } from "./outcomes";
+import { getAlternativeValueOutcomes, type AlternativeValueOutcomes } from "./outcomes";
 import { getVersionTotal, listVersions } from "./value-case";
 
 // Governed Value Trajectory read model (Phase 4D.9C). Structured data for the 4D.9D/E UI; no chart here.
@@ -41,7 +43,7 @@ export type RealisedCheckpoint = {
   againstVersionNumber: number;
   /** Cumulative realised (attributed + unattributed) at the review; null when none recorded. */
   value: string | null;
-  /** Every financial driver had a realised value recorded at the review. */
+  /** The review establishes a complete project-level realised position (`realisedPositionComplete`). */
   complete: boolean;
 };
 
@@ -146,7 +148,7 @@ export async function getValueTrajectory(projectId: string, opts: { today?: stri
             date: r.review.reviewDate,
             againstVersionNumber: r.againstVersionNumber,
             value: r.totals.realisedTotal,
-            complete: r.totals.financialDriverCount > 0 && r.totals.realisedAssessed === r.totals.financialDriverCount,
+            complete: realisedPositionComplete(r.totals),
           }))
       : [];
 
@@ -550,4 +552,153 @@ export async function getValueTrajectoryChart(
     today: { asOf: t.today, inPeriod: within(t.today) },
     notes,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Alternative Value Trajectories (Phase 4D.9F). The option paths assessed at ONE Assurance Review: shared governed
+// history up to the review, then each stored option's explicit milestones to the Value Period end. Composition only:
+// every value is a stored governed amount. The single presentation addition is the branch anchor — the review's own
+// complete realised position — which is never stored as a scenario point.
+
+export type AlternativeTrajectoryStatus =
+  "basis_not_classified" | "basis_not_supported" | "period_not_set" | "no_options" | "no_option_paths" | "ready";
+
+export type AlternativeTrajectoryNote =
+  | "no_valid_anchor"
+  | "realised_run_rate_not_recorded"
+  | "realised_partial_excluded"
+  | "options_without_phasing"
+  | "path_not_reconciled";
+
+export type AlternativeTrajectoryOption = {
+  scenarioId: string;
+  label: string;
+  kind: Outcome["kind"];
+  narrative: string | null;
+  /** Stored option total: the option's value at the Value Period end (its governed terminal). */
+  totalValue: string;
+  recommended: boolean;
+  selected: boolean;
+  /** Explicit stored milestones (after the review date); empty = phasing not entered. */
+  points: TrajectoryPoint[];
+  reconciliation: TerminalReconciliation;
+  /** Stored total − the issued recommendation's stored total (exact decimal); null for the recommendation itself. */
+  differenceFromRecommendation: string | null;
+};
+
+export type AlternativeValueTrajectories = {
+  status: AlternativeTrajectoryStatus;
+  /** A time-based chart can be drawn (at least one option has explicit milestones). */
+  available: boolean;
+  measure: TrajectoryMeasure | null;
+  valueBasisKind: ValueBasisKind | null;
+  /** Governing Value Period: that of the version the review measured against. */
+  period: { start: string; end: string } | null;
+  /** Cumulative only, with a valid anchor: zero origin and earlier finalised reviews' complete realised positions. */
+  history: {
+    origin: { asOf: string; value: "0.00" };
+    checkpoints: { sequence: number; asOf: string; value: string }[];
+  } | null;
+  /** Cumulative only: this finalised review's own complete realised position, at its review date. */
+  anchor: { sequence: number; asOf: string; value: string } | null;
+  /** In the 4D.6 semantic order (recommendation, other options, client-selected); never ranked by value. */
+  options: AlternativeTrajectoryOption[];
+  notes: AlternativeTrajectoryNote[];
+  /** The point-in-time decision economics of the same review (summary, references, endpoint fallback). */
+  outcomes: AlternativeValueOutcomes;
+};
+
+export async function getAlternativeValueTrajectories(
+  projectId: string,
+  reviewId: string,
+): Promise<AlternativeValueTrajectories | null> {
+  const outcomes = await getAlternativeValueOutcomes(projectId, reviewId);
+  if (!outcomes) return null;
+  const [[review], versions, reviews] = await Promise.all([
+    db()
+      .select({ againstVersionId: schema.assuranceReview.againstVersionId })
+      .from(schema.assuranceReview)
+      .where(eq(schema.assuranceReview.id, reviewId)),
+    listVersions(projectId),
+    getAssuranceReviewList(projectId),
+  ]);
+  const governing = versions.find((v) => v.id === review!.againstVersionId)!;
+  const kind = governing.valueBasisKind;
+  const measure = trajectoryMeasure(kind);
+  const period =
+    governing.valuePeriodStart && governing.valuePeriodEnd
+      ? { start: governing.valuePeriodStart, end: governing.valuePeriodEnd }
+      : null;
+  const within = (d: string) => period !== null && d >= period.start && d <= period.end;
+
+  const pathPoints = await pointsBy(
+    "scenarioId",
+    outcomes.outcomes.map((o) => o.id),
+  );
+  const rec = outcomes.outcomes.find((o) => o.recommended) ?? null;
+  const options: AlternativeTrajectoryOption[] = outcomes.outcomes.map((o) => {
+    const points = measure && period ? (pathPoints.get(o.id) ?? []) : [];
+    return {
+      scenarioId: o.id,
+      label: o.label,
+      kind: o.kind,
+      narrative: o.narrative,
+      totalValue: o.totalValue,
+      recommended: o.recommended,
+      selected: o.selected,
+      points,
+      reconciliation: terminalReconciliation(points, period?.end ?? null, o.totalValue),
+      differenceFromRecommendation: rec && !o.recommended ? optionDifference(o.totalValue, rec.totalValue) : null,
+    };
+  });
+
+  const status: AlternativeTrajectoryStatus =
+    kind === null
+      ? "basis_not_classified"
+      : measure === null
+        ? "basis_not_supported"
+        : period === null
+          ? "period_not_set"
+          : options.length === 0
+            ? "no_options"
+            : options.every((o) => o.points.length === 0)
+              ? "no_option_paths"
+              : "ready";
+  const available = status === "ready";
+  const notes: AlternativeTrajectoryNote[] = [];
+  let history: AlternativeValueTrajectories["history"] = null;
+  let anchor: AlternativeValueTrajectories["anchor"] = null;
+
+  if (available && measure === "cumulative") {
+    const kindOf = new Map(versions.map((v) => [v.versionNumber, v.valueBasisKind]));
+    const self = reviews.find((r) => r.review.id === reviewId)!;
+    if (self.review.status === "finalised" && realisedPositionComplete(self.totals) && within(self.review.reviewDate)) {
+      anchor = { sequence: self.review.sequence, asOf: self.review.reviewDate, value: self.totals.realisedTotal! };
+    } else notes.push("no_valid_anchor");
+    if (anchor) {
+      // Shared history: earlier finalised reviews only (never later ones), on the same basis kind, complete, in period.
+      const earlier = reviews.filter(
+        (r) =>
+          r.review.status === "finalised" &&
+          r.review.sequence < anchor!.sequence &&
+          realisedComparable(kind, kindOf.get(r.againstVersionNumber) ?? null) &&
+          r.totals.realisedTotal !== null &&
+          within(r.review.reviewDate),
+      );
+      if (earlier.some((r) => !realisedPositionComplete(r.totals))) notes.push("realised_partial_excluded");
+      history = {
+        origin: { asOf: period!.start, value: "0.00" },
+        checkpoints: earlier
+          .filter((r) => realisedPositionComplete(r.totals))
+          .map((r) => ({ sequence: r.review.sequence, asOf: r.review.reviewDate, value: r.totals.realisedTotal! })),
+      };
+    }
+  }
+  if (available && measure === "run_rate") notes.push("realised_run_rate_not_recorded");
+  if (available && options.some((o) => o.points.length === 0)) notes.push("options_without_phasing");
+  if (available && options.some((o) => o.points.length > 0 && o.reconciliation.state !== "reconciled")) {
+    notes.push("path_not_reconciled");
+  }
+
+  return { status, available, measure, valueBasisKind: kind, period, history, anchor, options, notes, outcomes };
 }
