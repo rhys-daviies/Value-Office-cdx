@@ -95,8 +95,9 @@ async function pointsBy(
   return out;
 }
 
-export async function getValueTrajectory(projectId: string): Promise<ValueTrajectory> {
-  const today = new Date().toISOString().slice(0, 10);
+export async function getValueTrajectory(projectId: string, opts: { today?: string } = {}): Promise<ValueTrajectory> {
+  // Today defaults to the UTC date (as elsewhere in the app); tests inject it for determinism.
+  const today = opts.today ?? new Date().toISOString().slice(0, 10);
   const versions = await listVersions(projectId);
   const governed = versions
     .filter((v) => v.kind === "value_case" && (v.status === "authorised" || v.status === "superseded"))
@@ -423,5 +424,130 @@ export async function getReviewTrajectoryAuthoring(
         editable: !finalised && !issued,
       };
     }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Primary Value Trajectory chart model (Phase 4D.9E). Composition only — which governed records are drawn and why
+// others are not. Every value is a stored governed amount; the single presentation addition is the forecast's
+// visual anchor, which reuses the latest review's own realised checkpoint (never stored as a trajectory point).
+
+/** Why part of the chart is absent, shown as a concise note. */
+export type TrajectoryChartNote =
+  | "plan_phasing_not_entered"
+  | "no_formal_position"
+  | "forecast_phasing_not_entered"
+  | "forecast_not_comparable"
+  | "formal_measured_against_earlier_version"
+  | "realised_run_rate_not_recorded"
+  | "realised_partial_excluded";
+
+export type ValueTrajectoryChart = {
+  /** Unavailable when the version in force cannot carry a trajectory (no basis, unsupported basis, no period). */
+  available: boolean;
+  status: TrajectoryStatus;
+  measure: TrajectoryMeasure | null;
+  valueBasisKind: ValueBasisKind | null;
+  period: { start: string; end: string } | null;
+  version: { versionNumber: number; total: string } | null;
+  /** Explicit plan points of the CURRENT authorised version only (earlier plans stay in history). */
+  plan: TrajectoryPoint[];
+  /** Cumulative bases only: zero origin at period start and complete governed checkpoints within the period. */
+  realised: {
+    origin: { asOf: string; value: "0.00" } | null;
+    checkpoints: { sequence: number; asOf: string; value: string }[];
+    /** Finalised reviews whose realised value is not plotted (incomplete, not recorded, or outside the period). */
+    excluded: { sequence: number; reason: "incomplete" | "not_recorded" | "outside_period" }[];
+  } | null;
+  /** The latest finalised Assurance Review: the formal checkpoint (not Today). */
+  latestFormal: {
+    sequence: number;
+    reviewDate: string;
+    againstVersionNumber: number;
+    forecastTotal: string | null;
+  } | null;
+  /** The latest review's forecast milestones, anchored visually on its realised checkpoint where valid. */
+  forecast: {
+    reviewDate: string;
+    anchor: { asOf: string; value: string } | null;
+    points: TrajectoryPoint[];
+  } | null;
+  today: { asOf: string; inPeriod: boolean };
+  notes: TrajectoryChartNote[];
+};
+
+export async function getValueTrajectoryChart(
+  projectId: string,
+  opts: { today?: string } = {},
+): Promise<ValueTrajectoryChart> {
+  const t = await getValueTrajectory(projectId, opts);
+  const inForce = t.inForce;
+  const period =
+    inForce?.valuePeriodStart && inForce.valuePeriodEnd
+      ? { start: inForce.valuePeriodStart, end: inForce.valuePeriodEnd }
+      : null;
+  const available = t.measure !== null && period !== null;
+  const within = (d: string) => period !== null && d >= period.start && d <= period.end;
+  const plan = available ? (t.plans.find((p) => p.status === "authorised")?.points ?? []) : [];
+  const notes: TrajectoryChartNote[] = [];
+  if (available && plan.length === 0) notes.push("plan_phasing_not_entered");
+
+  let realised: ValueTrajectoryChart["realised"] = null;
+  if (available && t.measure === "cumulative") {
+    const checkpoints: { sequence: number; asOf: string; value: string }[] = [];
+    const excluded: { sequence: number; reason: "incomplete" | "not_recorded" | "outside_period" }[] = [];
+    for (const r of t.realised) {
+      if (r.value === null) excluded.push({ sequence: r.sequence, reason: "not_recorded" });
+      else if (!r.complete) excluded.push({ sequence: r.sequence, reason: "incomplete" });
+      else if (!within(r.date)) excluded.push({ sequence: r.sequence, reason: "outside_period" });
+      else checkpoints.push({ sequence: r.sequence, asOf: r.date, value: r.value });
+    }
+    if (excluded.some((e) => e.reason === "incomplete")) notes.push("realised_partial_excluded");
+    realised = { origin: { asOf: period!.start, value: "0.00" }, checkpoints, excluded };
+  }
+  if (available && t.measure === "run_rate") notes.push("realised_run_rate_not_recorded");
+
+  const last = t.latestFormal;
+  const latestFormal = last
+    ? {
+        sequence: last.sequence,
+        reviewDate: last.reviewDate,
+        againstVersionNumber: last.againstVersionNumber,
+        forecastTotal: last.forecastTotal,
+      }
+    : null;
+  let forecast: ValueTrajectoryChart["forecast"] = null;
+  if (available) {
+    if (!last) notes.push("no_formal_position");
+    else if (!last.comparable) notes.push("forecast_not_comparable");
+    else {
+      if (inForce && last.againstVersionNumber !== inForce.versionNumber) {
+        notes.push("formal_measured_against_earlier_version");
+      }
+      if (last.points.length === 0) notes.push("forecast_phasing_not_entered");
+      else {
+        const own = realised?.checkpoints.find((c) => c.sequence === last.sequence) ?? null;
+        forecast = {
+          reviewDate: last.reviewDate,
+          anchor: own ? { asOf: own.asOf, value: own.value } : null,
+          points: last.points,
+        };
+      }
+    }
+  }
+
+  return {
+    available,
+    status: t.status,
+    measure: t.measure,
+    valueBasisKind: inForce?.valueBasisKind ?? null,
+    period,
+    version: inForce ? { versionNumber: inForce.versionNumber, total: inForce.total } : null,
+    plan,
+    realised,
+    latestFormal,
+    forecast,
+    today: { asOf: t.today, inPeriod: within(t.today) },
+    notes,
   };
 }

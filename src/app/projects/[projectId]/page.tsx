@@ -1,5 +1,6 @@
 import { getProjectOverview } from "@/server/queries/projects";
 import { getValueCaseEvolution } from "@/server/queries/evolution";
+import { getValueTrajectoryChart } from "@/server/queries/trajectory";
 import { getLatestValueDecision } from "@/server/queries/outcomes";
 import { getOverviewValueOfficeState } from "@/server/queries/workspace";
 import { AttentionBadges } from "@/ui/assurance/matters";
@@ -17,6 +18,7 @@ import { Empty, KeyValues, Missing, Notice, Section, TextLink } from "@/ui/compo
 import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
 import { IR_STATUS_LABELS, KEY_DATE_LABELS } from "@/ui/labels";
 import { ValueCaseEvolution } from "@/ui/evolution/evolution";
+import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 import { AlternativeValueOutcomes } from "@/ui/outcomes/outcomes";
 import { requireProject } from "@/ui/require";
 import { moneyChange, versionAuthority } from "@/domain/value-case";
@@ -25,11 +27,12 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STA
 export default async function ProjectOverviewPage({ params }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
   await requireProject(projectId);
-  const [o, state, evolution, latestDecision] = await Promise.all([
+  const [o, state, evolution, latestDecision, trajectory] = await Promise.all([
     getProjectOverview(projectId).then((x) => x!),
     getOverviewValueOfficeState(projectId),
     getValueCaseEvolution(projectId),
     getLatestValueDecision(projectId),
+    getValueTrajectoryChart(projectId),
   ]);
   const { position, cadence, response } = state;
   const attentionMatters = state.workspace.matters.filter((m) => m.needsAttention);
@@ -68,6 +71,8 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
             />
             <WorkingPicture workspace={state.workspace} currency={currency} href={`${base}/assurance#continuous`} />
           </div>
+
+          <ValueTrajectory chart={trajectory} currency={currency} id="trajectory" />
 
           <ValueCaseEvolution evolution={evolution} id="evolution" />
 

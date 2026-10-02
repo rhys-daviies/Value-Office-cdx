@@ -450,7 +450,14 @@ export async function seedCompactDecision(actor: Actor, opts: { code: string; na
  * explicit consultant-entered paths: Act now $29m (recommended, not yet issued), Delay 3 months $27m, No action $23m.
  * Every value here is a stated fixture value; nothing is derived.
  */
-export async function seedCompactTrajectory(actor: Actor, opts: { code: string; name: string }) {
+export async function seedCompactTrajectory(
+  actor: Actor,
+  opts: {
+    code: string;
+    name: string;
+    /** 4D.9E: also a finalised Review #1 and the 30 Sep review finalised. */ formal?: boolean;
+  },
+) {
   const { project } = await createProject(actor, {
     newClientName: "Synthetic Test Client",
     code: opts.code,
@@ -509,6 +516,19 @@ export async function seedCompactTrajectory(actor: Actor, opts: { code: string; 
     authorisedOn: "2026-01-15",
     authorisationEvidenceId: evidence.id,
   });
+  if (opts.formal) {
+    // Synthetic earlier checkpoint: complete realised $1.0m at 31 Mar 2026 (forecast $28.0m, no forecast phasing).
+    const first = await createReview(actor, { projectId: project.id, trigger: "kickoff", reviewDate: "2026-03-31" });
+    await upsertValuePositions(actor, {
+      reviewId: first.id,
+      positions: [
+        { valueDriverId: ids[0]!, currentForecast: "14000000.00", realisedValue: "600000.00" },
+        { valueDriverId: ids[1]!, currentForecast: "9500000.00", realisedValue: "300000.00" },
+        { valueDriverId: ids[2]!, currentForecast: "4500000.00", realisedValue: "100000.00" },
+      ],
+    });
+    await finaliseReview(actor, { reviewId: first.id });
+  }
   const review = await createReview(actor, { projectId: project.id, trigger: "ad_hoc", reviewDate: "2026-09-30" });
   await upsertValuePositions(actor, {
     reviewId: review.id,
@@ -540,6 +560,10 @@ export async function seedCompactTrajectory(actor: Actor, opts: { code: string; 
     scenarioId: act.id,
     narrative: "Act now to protect the plan",
   });
+  if (opts.formal) {
+    await issueRecommendation(actor, { reviewId: review.id });
+    await finaliseReview(actor, { reviewId: review.id });
+  }
   return { project, vco, v1, review };
 }
 

@@ -14,7 +14,7 @@ import { closeDb, db, schema } from "@/server/db/client";
 
 import { loadLocalEnv } from "./load-env";
 
-// Seeds the synthetic "Assurance Compact", "Response Compact", "Matters Compact", "Evidence Compact", "Drivers Compact", "Office Compact", "Evolution Compact", "Decision Compact", "Trajectory Compact" and "Trajectory Draft" projects (Authorised V1; Drivers Compact adds a decided review, Office Compact live Assurance work, Evolution Compact V1→V2 governed history, Decision Compact a decided review with four options). Idempotent by code.
+// Seeds the synthetic "Assurance Compact", "Response Compact", "Matters Compact", "Evidence Compact", "Drivers Compact", "Office Compact", "Evolution Compact", "Decision Compact", "Trajectory Compact", "Trajectory Draft" and "Trajectory Executive" projects (Authorised V1; Drivers Compact adds a decided review, Office Compact live Assurance work, Evolution Compact V1→V2 governed history, Decision Compact a decided review with four options). Idempotent by code.
 loadLocalEnv();
 
 const email = process.env.VO_DEV_USER_EMAIL ?? "consultant@cardaxia.ai";
@@ -32,12 +32,16 @@ try {
     ["DECIDE", "Decision Compact"],
     ["TRAJ", "Trajectory Compact"],
     ["TRAJD", "Trajectory Draft"],
+    ["TRAJX", "Trajectory Executive"],
   ] as const) {
     const [existing] = await db().select().from(schema.project).where(eq(schema.project.code, code));
     if (existing) {
       console.log(`${name} already seeded; nothing to do.`);
     } else {
-      if (code === "TRAJ") {
+      if (code === "TRAJX") {
+        await seedCompactTrajectory(actor, { code, name, formal: true });
+        console.log(`Seeded ${name}: Trajectory Compact with finalised reviews (31 Mar and 30 Sep 2026)`);
+      } else if (code === "TRAJ") {
         await seedCompactTrajectory(actor, { code, name });
         console.log(
           `Seeded ${name}: Authorised V1 $30m with plan milestones; draft review with forecast and option paths`,

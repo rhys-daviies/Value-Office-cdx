@@ -3,6 +3,7 @@ import Link from "next/link";
 import { moneyChange, versionAuthority } from "@/domain/value-case";
 import { createInheritedBusinessCaseAction } from "@/server/actions/value-case";
 import { getValueCaseEvolution } from "@/server/queries/evolution";
+import { getValueTrajectoryChart } from "@/server/queries/trajectory";
 import { getValueCaseTimeline, type TimelineEntry } from "@/server/queries/value-case";
 import { getGovernedCommitment } from "@/server/queries/workspace";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
@@ -20,6 +21,7 @@ import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields"
 import { ButtonLink, Notice, Section, Table, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
 import { ValueCaseEvolution } from "@/ui/evolution/evolution";
+import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 import { requireProject } from "@/ui/require";
 
 export const metadata = { title: "Value Case" };
@@ -27,10 +29,11 @@ export const metadata = { title: "Value Case" };
 export default async function ValueCasePage({ params }: PageProps<"/projects/[projectId]/value-case">) {
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
-  const [timeline, commitment, evolution] = await Promise.all([
+  const [timeline, commitment, evolution, trajectory] = await Promise.all([
     getValueCaseTimeline(projectId),
     getGovernedCommitment(projectId),
     getValueCaseEvolution(projectId),
+    getValueTrajectoryChart(projectId),
   ]);
   const inherited = timeline.find((t) => t.version.kind === "inherited_business_case");
   const valueCases = timeline.filter((t) => t.version.kind === "value_case");
@@ -124,6 +127,7 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
         </section>
       )}
 
+      {commitment && <ValueTrajectory chart={trajectory} currency={project.currency} id="trajectory" />}
       {commitment && <ValueCaseEvolution evolution={evolution} id="evolution" tableOpen />}
 
       <h2 className="mb-2 text-base font-semibold text-slate-900">Version history</h2>
