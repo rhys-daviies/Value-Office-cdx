@@ -186,7 +186,7 @@ export function AlternativeTrajectoriesChart({
                 fontWeight={600}
                 data-testid="alternatives-review-marker"
               >
-                {review.label} · options assessed
+                {review.label}
               </text>
             )}
           />
@@ -220,10 +220,7 @@ export function AlternativeTrajectoriesChart({
           ))}
         </ComposedChart>
       </ResponsiveContainer>
-      <ul
-        className="pointer-events-none absolute top-0 right-0 text-[11px] leading-[13px]"
-        style={{ width: MARGIN.right - 12 }}
-      >
+      <ul className="absolute top-0 right-0 text-[11px] leading-[13px]" style={{ width: MARGIN.right - 12 }}>
         {stackLabels(labels, yMax).map((l) => (
           <li
             key={l.key}
@@ -236,6 +233,7 @@ export function AlternativeTrajectoriesChart({
               <span
                 key={line}
                 className={`block truncate ${i === 0 ? "font-semibold" : "text-slate-500"}`}
+                title={line}
                 style={i === 0 ? { color: l.color } : undefined}
               >
                 {line}

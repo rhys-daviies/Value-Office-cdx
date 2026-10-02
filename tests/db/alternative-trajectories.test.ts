@@ -185,13 +185,18 @@ describe("Alternative Value Trajectories read model", () => {
       notes: [],
     });
     // Semantic order (recommendation, others, client-selected); stored totals; exact differences.
-    expect(
-      a.options.map((o) => [o.label, o.totalValue, o.recommended, o.selected, o.differenceFromRecommendation]),
-    ).toEqual([
-      ["Act now", "29000000.00", true, false, null],
-      ["No action", "23000000.00", false, false, "-6000000.00"],
-      ["Delay 3 months", "27000000.00", false, true, "-2000000.00"],
+    expect(a.options.map((o) => [o.label, o.totalValue, o.recommended, o.selected])).toEqual([
+      ["Act now", "29000000.00", true, false],
+      ["No action", "23000000.00", false, false],
+      ["Delay 3 months", "27000000.00", false, true],
     ]);
+    // 4D.9G: the decision comparison is Client Selected vs Cardaxia Recommendation only.
+    expect(a.governed).toBe(true);
+    expect(a.decisionComparison).toEqual({
+      recommended: { label: "Act now", totalValue: "29000000.00" },
+      selected: { label: "Delay 3 months", totalValue: "27000000.00" },
+      difference: "-2000000.00",
+    });
     expect(a.options.map((o) => o.points.map((p) => p.asOf))).toEqual(Array(3).fill(["2027-12-31", "2028-12-31"]));
     expect(a.options.every((o) => o.reconciliation.state === "reconciled")).toBe(true);
     // The anchor is composition only: no scenario point exists at the review date.
@@ -233,13 +238,13 @@ describe("Alternative Value Trajectories read model", () => {
       ["No action", false, false],
       ["Delay 3 months", false, false],
     ]);
-    expect(p.review.label).toBe("Review #2 · 30 Sept 2026");
+    expect(p.review.label).toBe("Review #2 · 30 Sept 2026 · options assessed");
 
     const html = text(a);
     expect(html).toContain("Alternative Value Trajectories");
     expect(html).toContain("All options share the history to the review and differ only after it.");
     expect(html).toContain("Realised (shared history)");
-    expect(html).toContain("Difference from Cardaxia recommendation");
+    expect(html).not.toContain("Difference from Cardaxia recommendation"); // no per-option difference metric
     expect(html).not.toMatch(/best|optimal|cost of delay/i);
     expect(html).not.toContain("Alternative Value Outcomes"); // no second, redundant endpoint chart
   });
@@ -252,17 +257,19 @@ describe("Alternative Value Trajectories read model", () => {
     ]);
     const p = buildAlternativePresentation(a, "USD")!;
     expect(p.labels[0]!.lines).toEqual(["$29.0m Act now", "Cardaxia recommendation · Client selected"]);
+    expect(a.decisionComparison!.difference).toBe("0.00");
     expect(text(a)).toContain("Client selected Cardaxia's recommendation");
   });
 
   it("no recommendation and no client decision: options only, no roles invented", async () => {
     const { a } = await reviewWithOptions("cumulative_benefit", { options: [ACT, NONE] });
-    expect(a.options.every((o) => !o.recommended && !o.selected && o.differenceFromRecommendation === null)).toBe(true);
+    expect(a.options.every((o) => !o.recommended && !o.selected)).toBe(true);
+    expect(a.decisionComparison).toBeNull();
     expect(a.outcomes.recommendation).toBeNull();
     expect(a.outcomes.decision).toBeNull();
     const html = text(a);
     expect(html).toContain("No recommendation issued");
-    expect(html).toContain("No decision recorded");
+    expect(html).toContain("No client decision recorded yet.");
     expect(buildAlternativePresentation(a, "USD")!.labels.every((l) => l.lines.length === 1)).toBe(true);
   });
 

@@ -392,6 +392,17 @@ ranked. An option without milestones is a single end marker at its stored total 
 history or anchor. When no option has milestones, or the basis is unclassified, NPV, Other or has no Value Period, the
 4D.6 endpoint-only Alternative Value Outcomes remain the visual. Overview's Latest Value Decision is unchanged.
 
+**Review story and draft preview (4D.9G).** `getReviewStory` (`src/ui/assurance/story.tsx`, top of the review page)
+composes what changed → value affected → Cardaxia response → management decision → governance through explicit links
+only: matters via `leakage_assessment` (a finalised review's snapshot; a legacy finalised review's matters raised or
+assessed in it; a draft's open matters and its own assessments), drivers via the snapshot driver ids, forecast movement
+from the review's Value Position, formal evidence (trigger + review links — matter evidence links stay working links),
+and Value Changes by `value_change.assurance_review_id` or `decision_id`. Value Leakage is shown per matter with exact
+amounts and is never presented as the Value Gap. The governed Alternative Value Trajectories compare Client Selected
+with Cardaxia Recommendation only once a decision exists. A draft review shows a non-governed preview (working styling,
+"Draft · Not governed", a saved recommendation as "Draft recommendation (not issued)", no branch anchor, governed
+history only). The primary trajectory marks the authorised Value Change that created the version in force.
+
 ## Client reports (Phase 4A)
 
 ```

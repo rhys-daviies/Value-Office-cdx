@@ -92,6 +92,11 @@ function Legend({ c }: { c: ValueTrajectoryChart }) {
       )}
       {item(<line x1="14" y1="0" x2="14" y2="12" stroke="#334155" strokeDasharray="3 2" />, "Formal position")}
       {item(<line x1="14" y1="0" x2="14" y2="12" stroke="#b45309" strokeWidth="1.5" />, "Today")}
+      {c.versionChange?.inPeriod &&
+        item(
+          <line x1="14" y1="0" x2="14" y2="12" stroke="#2563eb" strokeDasharray="1 3" strokeWidth="1.5" />,
+          "Authorised Value Change",
+        )}
     </ul>
   );
 }
@@ -189,6 +194,7 @@ export function ValueTrajectory({
         yTicks={p.yTicks}
         today={p.today}
         checkpoint={p.checkpoint}
+        versionChange={p.versionChange}
         ariaLabel={summary}
       />
       {allNotes.length > 0 && (

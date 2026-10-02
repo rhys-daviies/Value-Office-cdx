@@ -118,6 +118,7 @@ export function ValueTrajectoryChart({
   yTicks,
   today,
   checkpoint,
+  versionChange = null,
   ariaLabel,
 }: {
   rows: TrajectoryRow[];
@@ -126,6 +127,7 @@ export function ValueTrajectoryChart({
   yTicks: [number, string][];
   today: Marker | null;
   checkpoint: Marker | null;
+  versionChange?: Marker | null;
   ariaLabel: string;
 }) {
   const xLabel = new Map(xTicks);
@@ -169,6 +171,14 @@ export function ValueTrajectoryChart({
               stroke="#334155"
               strokeDasharray="4 3"
               label={markerLabel(checkpoint, "#334155")}
+            />
+          )}
+          {versionChange && (
+            <ReferenceLine
+              x={versionChange.t}
+              stroke="#2563eb"
+              strokeDasharray="1 3"
+              label={markerLabel(versionChange, "#1d4ed8")}
             />
           )}
           {today && (

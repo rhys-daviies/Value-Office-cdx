@@ -1,11 +1,18 @@
 import { and, eq } from "drizzle-orm";
 
-import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
+import {
+  createReview,
+  finaliseReview,
+  linkReviewEvidence,
+  updateReview,
+  upsertValuePositions,
+} from "@/server/commands/assurance";
 import { createEmergingDriver } from "@/server/commands/drivers";
 import { recordEvidence } from "@/server/commands/evidence";
 import { documentMatterEvidence, requestMatterEvidence } from "@/server/commands/matter-evidence";
 import { assessMatterWorking, createMatter, setMatterRemediation, setMatterStage } from "@/server/commands/matters";
 import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { assessLeakage } from "@/server/commands/leakage";
 import { createProject } from "@/server/commands/project";
 import { setForecastPoint, setPlanPoint, setScenarioPoint, setVersionBasis } from "@/server/commands/trajectory";
 import type { Actor } from "@/server/commands/run";
@@ -562,6 +569,41 @@ export async function seedCompactTrajectory(
     narrative: "Act now to protect the plan",
   });
   if (opts.formal) {
+    // 4D.9G synthetic Assurance story: a Continuous Assurance matter on VD-01, evidenced and formally assessed here.
+    const { person: lead } = await addStakeholder(actor, {
+      projectId: project.id,
+      name: "Test Delivery Lead",
+      roleDescription: "Risk / Leakage Owner",
+    });
+    const matter = await createMatter(actor, {
+      projectId: project.id,
+      code: "VL-001",
+      title: "Vendor sequencing risk",
+      identifiedOn: "2026-08-14",
+      responseOwnerPersonId: lead.id,
+      driverIds: [ids[0]!],
+    });
+    await setMatterStage(actor, { matterId: matter.id, stage: "escalated" });
+    const plan = await recordEvidence(actor, {
+      projectId: project.id,
+      code: "E-002",
+      title: "Revised mobilisation plan",
+      isMaterialChange: true,
+    });
+    await updateReview(actor, {
+      reviewId: review.id,
+      trigger: "material_evidence_change",
+      triggerEvidenceId: plan.id,
+      whatChanged: "Synthetic: the vendor's revised mobilisation plan moves procurement onboarding by two quarters.",
+    });
+    await linkReviewEvidence(actor, { reviewId: review.id, evidenceId: plan.id });
+    await assessLeakage(actor, {
+      leakageId: matter.id,
+      reviewId: review.id,
+      totalAmount: "700000.00",
+      unrecoverableAmount: "250000.00",
+      unrecoverableRationale: "Synthetic: one quarter of savings is lost under the revised plan (E-002)",
+    });
     await issueRecommendation(actor, { reviewId: review.id });
     await finaliseReview(actor, { reviewId: review.id });
     // 4D.9F: the client selects a different option from Cardaxia's recommendation (synthetic).

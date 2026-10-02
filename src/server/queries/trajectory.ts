@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { toDbMoney } from "@/domain/money";
-import { optionDifference, type Outcome } from "@/domain/outcomes";
+import type { Outcome } from "@/domain/outcomes";
 import type { ValueBasisKind, VersionStatus } from "@/domain/statuses";
 import {
   realisedComparable,
@@ -475,6 +475,11 @@ export type ValueTrajectoryChart = {
     points: TrajectoryPoint[];
   } | null;
   today: { asOf: string; inPeriod: boolean };
+  /**
+   * Phase 4D.9G event: the authorised Value Change that created the version in force (its plan is the line drawn),
+   * at its authorisation date. Null for V1, or when no authorised Value Change created the version.
+   */
+  versionChange: { code: string; versionNumber: number; authorisedOn: string; inPeriod: boolean } | null;
   notes: TrajectoryChartNote[];
 };
 
@@ -538,6 +543,25 @@ export async function getValueTrajectoryChart(
     }
   }
 
+  const [vc] =
+    available && inForce
+      ? await db()
+          .select({ code: schema.valueChange.code, authorisedOn: schema.valueChange.authorisedOn })
+          .from(schema.valueChange)
+          .where(
+            and(eq(schema.valueChange.toVersionId, inForce.versionId), eq(schema.valueChange.status, "authorised")),
+          )
+      : [];
+  const versionChange =
+    vc?.authorisedOn && inForce
+      ? {
+          code: vc.code,
+          versionNumber: inForce.versionNumber,
+          authorisedOn: vc.authorisedOn,
+          inPeriod: within(vc.authorisedOn),
+        }
+      : null;
+
   return {
     available,
     status: t.status,
@@ -550,6 +574,7 @@ export async function getValueTrajectoryChart(
     latestFormal,
     forecast,
     today: { asOf: t.today, inPeriod: within(t.today) },
+    versionChange,
     notes,
   };
 }
@@ -565,6 +590,7 @@ export type AlternativeTrajectoryStatus =
 
 export type AlternativeTrajectoryNote =
   | "no_valid_anchor"
+  | "draft_no_anchor"
   | "realised_run_rate_not_recorded"
   | "realised_partial_excluded"
   | "options_without_phasing"
@@ -582,19 +608,24 @@ export type AlternativeTrajectoryOption = {
   /** Explicit stored milestones (after the review date); empty = phasing not entered. */
   points: TrajectoryPoint[];
   reconciliation: TerminalReconciliation;
-  /** Stored total − the issued recommendation's stored total (exact decimal); null for the recommendation itself. */
-  differenceFromRecommendation: string | null;
+  /** Saved as Cardaxia's recommendation but NOT issued (draft preview only; never a governed role). */
+  pendingRecommendation: boolean;
 };
 
 export type AlternativeValueTrajectories = {
   status: AlternativeTrajectoryStatus;
+  /** The review is finalised: a governed record. A draft review is a non-governed preview only. */
+  governed: boolean;
   /** A time-based chart can be drawn (at least one option has explicit milestones). */
   available: boolean;
   measure: TrajectoryMeasure | null;
   valueBasisKind: ValueBasisKind | null;
   /** Governing Value Period: that of the version the review measured against. */
   period: { start: string; end: string } | null;
-  /** Cumulative only, with a valid anchor: zero origin and earlier finalised reviews' complete realised positions. */
+  /**
+   * Cumulative only: zero origin and earlier finalised reviews' complete realised positions. Shown with a valid anchor
+   * (finalised review) or, on a draft preview, as governed history only (the draft's own realised is never an anchor).
+   */
   history: {
     origin: { asOf: string; value: "0.00" };
     checkpoints: { sequence: number; asOf: string; value: string }[];
@@ -604,6 +635,15 @@ export type AlternativeValueTrajectories = {
   /** In the 4D.6 semantic order (recommendation, other options, client-selected); never ranked by value. */
   options: AlternativeTrajectoryOption[];
   notes: AlternativeTrajectoryNote[];
+  /**
+   * Client Selected vs Cardaxia Recommendation (stored totals; selected − recommended, exact decimal). Only when a client
+   * decision exists against an issued recommendation; never for every option.
+   */
+  decisionComparison: {
+    recommended: { label: string; totalValue: string };
+    selected: { label: string; totalValue: string };
+    difference: string;
+  } | null;
   /** The point-in-time decision economics of the same review (summary, references, endpoint fallback). */
   outcomes: AlternativeValueOutcomes;
 };
@@ -614,14 +654,19 @@ export async function getAlternativeValueTrajectories(
 ): Promise<AlternativeValueTrajectories | null> {
   const outcomes = await getAlternativeValueOutcomes(projectId, reviewId);
   if (!outcomes) return null;
-  const [[review], versions, reviews] = await Promise.all([
+  const [[review], versions, reviews, [savedRec]] = await Promise.all([
     db()
       .select({ againstVersionId: schema.assuranceReview.againstVersionId })
       .from(schema.assuranceReview)
       .where(eq(schema.assuranceReview.id, reviewId)),
     listVersions(projectId),
     getAssuranceReviewList(projectId),
+    db()
+      .select({ scenarioId: schema.recommendation.scenarioId, issuedAt: schema.recommendation.issuedAt })
+      .from(schema.recommendation)
+      .where(eq(schema.recommendation.assuranceReviewId, reviewId)),
   ]);
+  const pendingId = savedRec && !savedRec.issuedAt ? savedRec.scenarioId : null;
   const governing = versions.find((v) => v.id === review!.againstVersionId)!;
   const kind = governing.valueBasisKind;
   const measure = trajectoryMeasure(kind);
@@ -635,7 +680,6 @@ export async function getAlternativeValueTrajectories(
     "scenarioId",
     outcomes.outcomes.map((o) => o.id),
   );
-  const rec = outcomes.outcomes.find((o) => o.recommended) ?? null;
   const options: AlternativeTrajectoryOption[] = outcomes.outcomes.map((o) => {
     const points = measure && period ? (pathPoints.get(o.id) ?? []) : [];
     return {
@@ -648,7 +692,7 @@ export async function getAlternativeValueTrajectories(
       selected: o.selected,
       points,
       reconciliation: terminalReconciliation(points, period?.end ?? null, o.totalValue),
-      differenceFromRecommendation: rec && !o.recommended ? optionDifference(o.totalValue, rec.totalValue) : null,
+      pendingRecommendation: o.id === pendingId,
     };
   });
 
@@ -669,18 +713,19 @@ export async function getAlternativeValueTrajectories(
   let history: AlternativeValueTrajectories["history"] = null;
   let anchor: AlternativeValueTrajectories["anchor"] = null;
 
+  const self = reviews.find((r) => r.review.id === reviewId)!;
+  const governed = self.review.status === "finalised";
   if (available && measure === "cumulative") {
     const kindOf = new Map(versions.map((v) => [v.versionNumber, v.valueBasisKind]));
-    const self = reviews.find((r) => r.review.id === reviewId)!;
-    if (self.review.status === "finalised" && realisedPositionComplete(self.totals) && within(self.review.reviewDate)) {
+    if (governed && realisedPositionComplete(self.totals) && within(self.review.reviewDate)) {
       anchor = { sequence: self.review.sequence, asOf: self.review.reviewDate, value: self.totals.realisedTotal! };
-    } else notes.push("no_valid_anchor");
-    if (anchor) {
+    } else notes.push(governed ? "no_valid_anchor" : "draft_no_anchor");
+    if (anchor || !governed) {
       // Shared history: earlier finalised reviews only (never later ones), on the same basis kind, complete, in period.
       const earlier = reviews.filter(
         (r) =>
           r.review.status === "finalised" &&
-          r.review.sequence < anchor!.sequence &&
+          r.review.sequence < self.review.sequence &&
           realisedComparable(kind, kindOf.get(r.againstVersionNumber) ?? null) &&
           r.totals.realisedTotal !== null &&
           within(r.review.reviewDate),
@@ -692,6 +737,8 @@ export async function getAlternativeValueTrajectories(
           .filter((r) => realisedPositionComplete(r.totals))
           .map((r) => ({ sequence: r.review.sequence, asOf: r.review.reviewDate, value: r.totals.realisedTotal! })),
       };
+      // A draft preview without any earlier governed checkpoint has no history to show (a lone origin is not history).
+      if (!anchor && history.checkpoints.length === 0) history = null;
     }
   }
   if (available && measure === "run_rate") notes.push("realised_run_rate_not_recorded");
@@ -700,5 +747,29 @@ export async function getAlternativeValueTrajectories(
     notes.push("path_not_reconciled");
   }
 
-  return { status, available, measure, valueBasisKind: kind, period, history, anchor, options, notes, outcomes };
+  const rec = outcomes.outcomes.find((o) => o.recommended);
+  const sel = outcomes.outcomes.find((o) => o.selected);
+  const decisionComparison =
+    rec && sel && outcomes.differenceFromRecommendation !== null
+      ? {
+          recommended: { label: rec.label, totalValue: rec.totalValue },
+          selected: { label: sel.label, totalValue: sel.totalValue },
+          difference: outcomes.differenceFromRecommendation,
+        }
+      : null;
+
+  return {
+    status,
+    governed,
+    available,
+    measure,
+    valueBasisKind: kind,
+    period,
+    history,
+    anchor,
+    options,
+    notes,
+    decisionComparison,
+    outcomes,
+  };
 }

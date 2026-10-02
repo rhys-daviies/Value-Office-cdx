@@ -13,8 +13,10 @@ import { listOpenMatterEvidence } from "@/server/queries/evidence";
 import { listDriverOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getReviewResponse } from "@/server/queries/response";
+import { getReviewStory } from "@/server/queries/review-story";
 import { getAlternativeValueTrajectories, getReviewTrajectoryAuthoring } from "@/server/queries/trajectory";
 import { ReviewResponse } from "@/ui/assurance/response";
+import { ReviewStory } from "@/ui/assurance/story";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, NonFinancialBadge, PlainBadge, QualificationBadge } from "@/ui/components/badges";
 import {
@@ -40,7 +42,7 @@ import {
 import { formatDate, formatDateTime, formatMoneyShort, moneyInputValue } from "@/ui/format";
 import { TRIGGER_LABELS } from "@/ui/labels";
 import { isUuid, requireProject } from "@/ui/require";
-import { ReviewOptionsVisual } from "@/ui/trajectory/alternatives";
+import { DraftTrajectoryPreview, ReviewOptionsVisual } from "@/ui/trajectory/alternatives";
 import { ForecastTrajectorySection, OptionPathsSection } from "@/ui/trajectory/milestones";
 
 export const metadata = { title: "Assurance Review" };
@@ -69,10 +71,11 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   const notAssessed = totals.forecastBlockers.filter((b) => b.notAssessed);
   const response = await getReviewResponse(projectId, review.id);
   const trajectory = await getReviewTrajectoryAuthoring(projectId, review.id, ws.totals.forecastTotal);
-  const [stakeholders, driverOptions, alternatives] = await Promise.all([
+  const [stakeholders, driverOptions, alternatives, story] = await Promise.all([
     listStakeholders(projectId),
     listDriverOptions(projectId),
     getAlternativeValueTrajectories(projectId, review.id),
+    getReviewStory(projectId, review.id),
   ]);
   const outcomes = alternatives?.outcomes ?? null;
 
@@ -99,6 +102,8 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             : `Finalised ${formatDateTime(review.finalisedAt)} by ${ws.finalisedBy?.name ?? "—"} — read-only. Corrections require a new review.`}
         </p>
       </div>
+
+      {story && <ReviewStory story={story} currency={currency} base={base} />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Review">
@@ -382,7 +387,12 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
           ) : undefined
         }
         optionPaths={
-          trajectory && <OptionPathsSection projectId={projectId} currency={currency} authoring={trajectory} />
+          trajectory && (
+            <>
+              <OptionPathsSection projectId={projectId} currency={currency} authoring={trajectory} />
+              {draft && alternatives && <DraftTrajectoryPreview data={alternatives} />}
+            </>
+          )
         }
       />
 

@@ -23,6 +23,8 @@ export type TrajectoryPresentation = {
   yTicks: [number, string][];
   today: MarkerLabel | null;
   checkpoint: MarkerLabel | null;
+  /** Authorised Value Change that created the version in force (Phase 4D.9G). */
+  versionChange: MarkerLabel | null;
 };
 
 /**
@@ -32,19 +34,39 @@ export type TrajectoryPresentation = {
  */
 export type MarkerLabel = { t: number; label: string; align: "start" | "end"; row: 0 | 1 };
 
-/** Keeps two marker labels apart: opposite sides of their lines, else staggered rows; and inside the plot edges. */
+/**
+ * Places marker labels so they never collide (presentation only; markers are never merged). Greedy, in date order:
+ * each label tries left of its line, then right, on the top row, then the second row, staying inside the plot.
+ * Label width is estimated from its length against a typical plot width.
+ */
 export function placeMarkerLabels(domain: [number, number], markers: { t: number; label: string }[]): MarkerLabel[] {
   const span = domain[1] - domain[0] || 1;
-  const sorted = [...markers].sort((a, b) => a.t - b.t);
-  const placed = sorted.map((m, i): MarkerLabel => {
+  const width = (label: string) => (label.length * 6 + 10) / 800;
+  const taken: { row: 0 | 1; from: number; to: number }[] = [];
+  const placed = new Map<{ t: number; label: string }, MarkerLabel>();
+  type Slot = { align: "start" | "end"; row: 0 | 1 };
+  const slots: Slot[] = [
+    { align: "end", row: 0 },
+    { align: "start", row: 0 },
+    { align: "end", row: 1 },
+    { align: "start", row: 1 },
+  ];
+  for (const m of [...markers].sort((a, b) => a.t - b.t)) {
     const f = (m.t - domain[0]) / span;
-    let align: "start" | "end" = sorted.length === 1 ? "start" : i === 0 ? "end" : "start";
-    if (align === "end" && f < 0.18) align = "start";
-    if (align === "start" && f > 0.82) align = "end";
-    return { ...m, align, row: 0 };
-  });
-  if (placed.length === 2 && placed[0]!.align === placed[1]!.align) placed[1]!.row = 1;
-  return markers.map((m) => placed.find((p) => p.t === m.t && p.label === m.label)!);
+    const w = width(m.label);
+    const extent = (o: Slot): [number, number] => (o.align === "end" ? [f - w, f] : [f, f + w]);
+    const fits = (o: Slot) => {
+      const [from, to] = extent(o);
+      return from >= 0 && to <= 1 && !taken.some((x) => x.row === o.row && from < x.to && to > x.from);
+    };
+    // A lone marker reads naturally to the right of its line.
+    const order = markers.length === 1 ? [slots[1]!, slots[0]!, slots[3]!, slots[2]!] : slots;
+    const choice: Slot = order.find(fits) ?? { align: f > 0.5 ? "end" : "start", row: 1 };
+    const [from, to] = extent(choice);
+    taken.push({ row: choice.row, from, to });
+    placed.set(m, { ...m, ...choice });
+  }
+  return markers.map((m) => placed.get(m)!);
 }
 
 /** Month-boundary ticks across the period: monthly ≤ 12 months, quarterly ≤ 24, half-yearly ≤ 60, else yearly. */
@@ -164,9 +186,15 @@ export function buildTrajectoryPresentation(c: ValueTrajectoryChart, currency: s
     c.latestFormal.reviewDate <= c.period.end
       ? { t: epoch(c.latestFormal.reviewDate), label: `Formal position ${formatDate(c.latestFormal.reviewDate)}` }
       : null;
+  const change = c.versionChange?.inPeriod
+    ? {
+        t: epoch(c.versionChange.authorisedOn),
+        label: `V${c.versionChange.versionNumber} authorised (${c.versionChange.code})`,
+      }
+    : null;
   const placed = placeMarkerLabels(
     domain,
-    [checkpoint, today].filter((m) => m !== null),
+    [checkpoint, today, change].filter((m) => m !== null),
   );
   return {
     rows: [...rows.values()].sort((a, b) => a.t - b.t),
@@ -175,5 +203,6 @@ export function buildTrajectoryPresentation(c: ValueTrajectoryChart, currency: s
     yTicks: valueTicks(plotted, currency),
     today: today ? placed.find((m) => m.label === today.label)! : null,
     checkpoint: checkpoint ? placed.find((m) => m.label === checkpoint.label)! : null,
+    versionChange: change ? placed.find((m) => m.label === change.label)! : null,
   };
 }

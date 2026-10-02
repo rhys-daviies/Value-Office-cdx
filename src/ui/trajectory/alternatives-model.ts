@@ -58,8 +58,17 @@ export type AlternativePresentation = {
   labels: TerminalLabel[];
 };
 
-export const optionRoles = (o: { recommended: boolean; selected: boolean }) =>
-  [o.recommended && RECOMMENDATION_LABEL, o.selected && SELECTED_LABEL].filter(Boolean).join(" · ");
+/** Saved as Cardaxia's recommendation but not issued: shown only on a draft preview, never as a governed role. */
+export const PENDING_RECOMMENDATION_LABEL = "Draft recommendation (not issued)";
+
+export const optionRoles = (o: { recommended: boolean; selected: boolean; pendingRecommendation?: boolean }) =>
+  [
+    o.recommended && RECOMMENDATION_LABEL,
+    o.pendingRecommendation && PENDING_RECOMMENDATION_LABEL,
+    o.selected && SELECTED_LABEL,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 export function buildAlternativePresentation(
   a: AlternativeValueTrajectories,
@@ -167,7 +176,9 @@ export function buildAlternativePresentation(
     yTicks: valueTicks(plotted, currency),
     review: {
       t: epoch(reviewDate),
-      label: `Review #${a.outcomes.review.sequence} · ${formatDate(reviewDate)}`,
+      label: a.governed
+        ? `Review #${a.outcomes.review.sequence} · ${formatDate(reviewDate)} · options assessed`
+        : `Draft Review #${a.outcomes.review.sequence} · ${formatDate(reviewDate)} · not finalised`,
     },
     labels,
   };

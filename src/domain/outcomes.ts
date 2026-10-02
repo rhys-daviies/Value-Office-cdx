@@ -47,8 +47,3 @@ export function differenceFromRecommendation(outcomes: readonly Outcome[]): stri
   const sel = outcomes.find((o) => o.selected);
   return rec && sel ? clientElectedDifference(sel.totalValue, rec.totalValue) : null;
 }
-
-/** One stored option total − the recommended option's stored total (Phase 4D.9F), decimal-safe and signed. */
-export function optionDifference(optionTotal: string, recommendedTotal: string): string {
-  return clientElectedDifference(optionTotal, recommendedTotal);
-}
