@@ -591,6 +591,7 @@ export type AlternativeTrajectoryStatus =
 export type AlternativeTrajectoryNote =
   | "no_valid_anchor"
   | "draft_no_anchor"
+  | "draft_forecast_phasing_not_entered"
   | "realised_run_rate_not_recorded"
   | "realised_partial_excluded"
   | "options_without_phasing"
@@ -634,6 +635,11 @@ export type AlternativeValueTrajectories = {
   anchor: { sequence: number; asOf: string; value: string } | null;
   /** In the 4D.6 semantic order (recommendation, other options, client-selected); never ranked by value. */
   options: AlternativeTrajectoryOption[];
+  /**
+   * Draft preview only (Phase 4D.9H): this draft review's explicitly entered forecast milestones — the working baseline
+   * the options are assessed against. Never a governed Formal Forecast; null on a finalised review or without points.
+   */
+  draftForecast: { points: TrajectoryPoint[] } | null;
   notes: AlternativeTrajectoryNote[];
   /**
    * Client Selected vs Cardaxia Recommendation (stored totals; selected − recommended, exact decimal). Only when a client
@@ -742,6 +748,12 @@ export async function getAlternativeValueTrajectories(
     }
   }
   if (available && measure === "run_rate") notes.push("realised_run_rate_not_recorded");
+  let draftForecast: AlternativeValueTrajectories["draftForecast"] = null;
+  if (available && !governed) {
+    const fp = (await pointsBy("assuranceReviewId", [reviewId])).get(reviewId) ?? [];
+    if (fp.length) draftForecast = { points: fp };
+    else notes.push("draft_forecast_phasing_not_entered");
+  }
   if (available && options.some((o) => o.points.length === 0)) notes.push("options_without_phasing");
   if (available && options.some((o) => o.points.length > 0 && o.reconciliation.state !== "reconciled")) {
     notes.push("path_not_reconciled");
@@ -768,6 +780,7 @@ export async function getAlternativeValueTrajectories(
     history,
     anchor,
     options,
+    draftForecast,
     notes,
     decisionComparison,
     outcomes,

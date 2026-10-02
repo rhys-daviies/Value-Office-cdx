@@ -13,7 +13,13 @@ import {
 } from "recharts";
 import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
-import type { AlternativeRow, AlternativeSeries, OptionMarker, TerminalLabel } from "./alternatives-model";
+import {
+  DRAFT_FORECAST_STYLE,
+  type AlternativeRow,
+  type AlternativeSeries,
+  type OptionMarker,
+  type TerminalLabel,
+} from "./alternatives-model";
 
 // Alternative Value Trajectories chart (Phase 4D.9F). Client-only drawing of a model the server has composed and
 // formatted. Rows exist ONLY at explicit governed dates, so a tooltip can only appear at a stored observation. Option
@@ -78,6 +84,15 @@ function optionDot(s: AlternativeSeries) {
     );
   }
   return Dot;
+}
+
+function DraftForecastDot({ cx, cy, payload, value }: DotProps) {
+  if (cx === undefined || cy === undefined || !payload || value === null || value === undefined) return <g />;
+  return (
+    <g data-series="draftForecast" data-t={payload.t}>
+      <circle cx={cx} cy={cy} r={4} fill="#fff" stroke={DRAFT_FORECAST_STYLE.color} strokeWidth={2} />
+    </g>
+  );
 }
 
 function HistoryDot({ cx, cy, payload, value }: DotProps) {
@@ -199,6 +214,19 @@ export function AlternativeTrajectoriesChart({
               strokeWidth={2}
               connectNulls
               dot={HistoryDot}
+              activeDot={false}
+              isAnimationActive={false}
+            />
+          )}
+          {rows.some((r) => r.draftForecast !== null) && (
+            <Line
+              dataKey="draftForecast"
+              name={DRAFT_FORECAST_STYLE.label}
+              stroke={DRAFT_FORECAST_STYLE.color}
+              strokeWidth={2}
+              strokeDasharray={DRAFT_FORECAST_STYLE.dash}
+              connectNulls
+              dot={DraftForecastDot}
               activeDot={false}
               isAnimationActive={false}
             />

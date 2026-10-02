@@ -111,5 +111,11 @@ test("Draft review: working context and a Draft · Not governed trajectory previ
     "Draft Review #1 · 30 Sept 2026 · not finalised",
   );
   await expect(page.getByTestId("alternative-value-trajectories")).toHaveCount(0); // no governed visual on a draft
+  // 4D.9H: the draft forecast baseline, and proposal wording until the recommendation is issued.
+  await expect(preview.getByTestId("alternatives-legend")).toContainText("Draft Formal Forecast (not governed)");
+  await expect(preview.getByTestId("alternatives-chart").locator('g[data-series="draftForecast"]')).toHaveCount(2);
+  await expect(preview.getByTestId("alternatives-role").first()).toContainText("Proposed recommendation");
+  await expect(page.getByTestId("scenario-row").first()).toContainText("Proposed recommendation");
+  await expect(page.getByTestId("scenario-row").first()).not.toContainText("Recommended");
   await expect(preview.getByText("Cardaxia recommendation", { exact: false })).toHaveCount(0);
 });

@@ -285,7 +285,7 @@ export function ValueCaseEvolution({
             Value Case Evolution
           </h2>
           <p className="mt-0.5 text-sm text-slate-600">
-            How the authorised commitment, formal forecast and realised value have moved over time.
+            History of the governed value commitment — how it got here, not progress against the plan.
           </p>
         </div>
         <GovernedTag>Governed history</GovernedTag>

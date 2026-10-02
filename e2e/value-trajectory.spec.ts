@@ -12,13 +12,16 @@ test("Value Trajectory is the primary Overview visual: plan, realised, formal ch
   const t = page.getByTestId("value-trajectory");
   await expect(t).toHaveAttribute("data-status", "ready");
 
-  // Primary: above the Value Case Evolution.
+  // Primary: the dominant chart; Evolution is no longer an equal chart here (4D.9H), only a compact summary below.
   const order = await page.evaluate(() => {
     const a = document.querySelector('[data-testid="value-trajectory"]')!;
-    const b = document.getElementById("evolution")!;
+    const b = document.querySelector('[data-testid="value-case-summary"]')!;
     return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING;
   });
   expect(order).toBeTruthy();
+  await expect(page.getByTestId("value-case-evolution")).toHaveCount(0);
+  await expect(page.getByTestId("value-case-summary").getByTestId("summary-current")).toHaveText("$30.0m");
+  await expect(page.getByTestId("value-case-summary").getByTestId("summary-changes")).toHaveText("0");
 
   await expect(t).toContainText("Value Period 1 Jan 2026 – 31 Dec 2028 · Cumulative Value");
   const facts = t.getByTestId("trajectory-facts");
@@ -68,5 +71,5 @@ test("Value Trajectory unavailable states are explicit and existing Overviews st
   await expect(page.getByTestId("value-trajectory")).toHaveAttribute("data-status", "basis_not_classified");
   await expect(page.getByTestId("trajectory-unavailable")).toHaveText("Value Basis not classified.");
   await expect(page.getByTestId("value-trajectory").getByTestId("trajectory-chart")).toHaveCount(0);
-  await expect(page.getByTestId("evolution-chart")).toBeVisible();
+  await expect(page.getByTestId("value-case-summary")).toBeVisible();
 });

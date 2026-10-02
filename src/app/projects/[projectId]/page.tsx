@@ -1,5 +1,6 @@
 import { getProjectOverview } from "@/server/queries/projects";
 import { getValueCaseEvolution } from "@/server/queries/evolution";
+import { getValueCaseSummary } from "@/server/queries/value-case-summary";
 import { getValueTrajectoryChart } from "@/server/queries/trajectory";
 import { getLatestValueDecision } from "@/server/queries/outcomes";
 import { getOverviewValueOfficeState } from "@/server/queries/workspace";
@@ -17,7 +18,7 @@ import {
 import { Empty, KeyValues, Missing, Notice, Section, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
 import { IR_STATUS_LABELS, KEY_DATE_LABELS } from "@/ui/labels";
-import { ValueCaseEvolution } from "@/ui/evolution/evolution";
+import { ValueCaseSummary } from "@/ui/value-case/summary";
 import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 import { AlternativeValueOutcomes } from "@/ui/outcomes/outcomes";
 import { requireProject } from "@/ui/require";
@@ -34,6 +35,8 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
     getLatestValueDecision(projectId),
     getValueTrajectoryChart(projectId),
   ]);
+  // 4D.9H: the full Value Case Evolution lives on the Value Case page; Overview carries a compact governance summary.
+  const valueCase = await getValueCaseSummary(projectId, evolution);
   const { position, cadence, response } = state;
   const attentionMatters = state.workspace.matters.filter((m) => m.needsAttention);
   const { project, clientName, valueBasisLocked } = o.header;
@@ -55,7 +58,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
         </Notice>
       )}
 
-      {!position.authorised && <ValueCaseEvolution evolution={evolution} id="evolution" />}
+      {!position.authorised && <ValueCaseSummary summary={valueCase} base={base} />}
 
       {position.authorised && (
         <>
@@ -74,7 +77,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
 
           <ValueTrajectory chart={trajectory} currency={currency} id="trajectory" />
 
-          <ValueCaseEvolution evolution={evolution} id="evolution" />
+          <ValueCaseSummary summary={valueCase} base={base} />
 
           {latestDecision && (
             <AlternativeValueOutcomes
@@ -256,7 +259,11 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
           />
         </Section>
 
-        <Section title="Value Case" actions={<TextLink href={`${base}/value-case`}>Open Value Case</TextLink>}>
+        {/* 4D.9H: retitled — this is the V0 → V1 re-qualification baseline; the governed commitment is summarised above. */}
+        <Section
+          title="Re-Qualification baseline (V0 → V1)"
+          actions={<TextLink href={`${base}/value-case`}>Open Value Case</TextLink>}
+        >
           <div className="space-y-3 text-sm" data-testid="overview-value-case">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>

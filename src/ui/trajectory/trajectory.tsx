@@ -116,6 +116,7 @@ export function ValueTrajectory({
     <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
       <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
         Value Trajectory <GovernedTag>Governed</GovernedTag>
+        <span className="text-sm font-normal text-slate-500">Progress against the current authorised plan.</span>
       </h2>
       {c.period && (
         <p className="text-xs text-slate-500">

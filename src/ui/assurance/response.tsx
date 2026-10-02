@@ -17,7 +17,7 @@ import { PlainBadge } from "../components/badges";
 import { DateField, FormGrid, Hidden, MoneyField, SelectField, TextArea, TextField } from "../components/fields";
 import { Empty, Expander, KeyValues, Notice, Section, Table, TextLink } from "../components/layout";
 import { formatDate, formatDateTime, formatMoneyChange, formatMoneyShort, moneyInputValue } from "../format";
-import { ASSURANCE_STAGE_LABELS, SCENARIO_KIND_LABELS } from "../labels";
+import { ASSURANCE_STAGE_LABELS, scenarioKindLabel } from "../labels";
 
 type Option = { value: string; label: string };
 type Driver = { driverId: string; code: string; name: string };
@@ -348,7 +348,7 @@ export async function ReviewResponse({
                         </>
                       )}
                     </td>
-                    <td>{SCENARIO_KIND_LABELS[sc.kind]}</td>
+                    <td>{scenarioKindLabel(sc.kind, Boolean(recommendation?.issuedAt))}</td>
                     <td className="text-right font-semibold whitespace-nowrap" data-testid="scenario-total">
                       {money(sc.totalValue, currency)}
                     </td>
@@ -402,7 +402,7 @@ export async function ReviewResponse({
                       label="Kind"
                       required
                       defaultValue="alternative"
-                      options={SCENARIO_KINDS.map((k) => ({ value: k, label: SCENARIO_KIND_LABELS[k] }))}
+                      options={SCENARIO_KINDS.map((k) => ({ value: k, label: scenarioKindLabel(k, false) }))}
                     />
                     <MoneyField name="totalValue" label="Projected total value" required currency={currency} />
                   </FormGrid>

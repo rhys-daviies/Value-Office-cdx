@@ -75,7 +75,7 @@ test("position → leakage → options → recommendation → decision → Value
   const addOpt = page.getByTestId("add-scenario-form");
   for (const [label, kind, total] of [
     ["Current trajectory", "Current trajectory", "1.3m"],
-    ["Act now", "Recommended", "1.5m"],
+    ["Act now", "Proposed recommendation", "1.5m"], // the "recommended" kind, worded as a proposal until issued (4D.9H)
     ["Delay one quarter", "Alternative", "1.4m"],
   ] as const) {
     await addOpt.getByLabel("Option").fill(label);

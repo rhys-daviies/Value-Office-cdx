@@ -233,6 +233,14 @@ export const SCENARIO_KIND_LABELS = {
   no_action: "No action",
 } as const;
 
+/**
+ * The stored option kind as shown (Phase 4D.9H). Until Cardaxia's recommendation is issued, the "recommended" kind is
+ * a working proposal and reads "Proposed recommendation"; the stored kind is unchanged.
+ */
+export function scenarioKindLabel(kind: keyof typeof SCENARIO_KIND_LABELS, recommendationIssued: boolean): string {
+  return kind === "recommended" && !recommendationIssued ? "Proposed recommendation" : SCENARIO_KIND_LABELS[kind];
+}
+
 /** Phase 4D.9: Value Basis kinds (canonical enum → consultant label and one-line trajectory note). */
 export const VALUE_BASIS_LABELS = {
   cumulative_benefit: "Cumulative Benefit",

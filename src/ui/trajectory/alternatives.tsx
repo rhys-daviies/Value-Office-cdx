@@ -2,12 +2,13 @@ import type { AlternativeTrajectoryNote, AlternativeValueTrajectories as Data } 
 import { GovernedTag, WorkingTag } from "@/ui/components/badges";
 import { Expander } from "@/ui/components/expander";
 import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
-import { SCENARIO_KIND_LABELS } from "@/ui/labels";
+import { scenarioKindLabel } from "@/ui/labels";
 import { AlternativeValueOutcomes, RECOMMENDATION_LABEL, SELECTED_LABEL } from "@/ui/outcomes/outcomes";
 
 import { AlternativeTrajectoriesChart, OptionMark } from "./alternatives-chart";
 import {
   buildAlternativePresentation,
+  DRAFT_FORECAST_STYLE,
   optionRoles,
   PENDING_RECOMMENDATION_LABEL,
   type AlternativeSeries,
@@ -27,6 +28,8 @@ const UNAVAILABLE: Partial<Record<string, string>> = {
 function noteText(n: AlternativeTrajectoryNote, a: Data): string {
   const seq = a.outcomes.review.sequence;
   switch (n) {
+    case "draft_forecast_phasing_not_entered":
+      return "Draft Formal Forecast phasing not entered, so no forecast baseline is shown.";
     case "draft_no_anchor":
       return `Draft: Review #${seq}'s realised position is not formal until finalisation, so each path begins at its first entered milestone.`;
     case "no_valid_anchor":
@@ -106,9 +109,34 @@ function DraftRecommendationState({ a }: { a: Data }) {
   );
 }
 
-function Legend({ series, history }: { series: AlternativeSeries[]; history: boolean }) {
+function Legend({
+  series,
+  history,
+  draftForecast,
+}: {
+  series: AlternativeSeries[];
+  history: boolean;
+  draftForecast: boolean;
+}) {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-700" data-testid="alternatives-legend">
+      {draftForecast && (
+        <li className="flex items-center gap-1.5">
+          <svg width="28" height="12" aria-hidden="true">
+            <line
+              x1="0"
+              y1="6"
+              x2="28"
+              y2="6"
+              stroke={DRAFT_FORECAST_STYLE.color}
+              strokeWidth="2"
+              strokeDasharray={DRAFT_FORECAST_STYLE.dash}
+            />
+            <circle cx="14" cy="6" r="3.5" fill="#fff" stroke={DRAFT_FORECAST_STYLE.color} strokeWidth="2" />
+          </svg>
+          {DRAFT_FORECAST_STYLE.label}
+        </li>
+      )}
       {history && (
         <li className="flex items-center gap-1.5">
           <svg width="28" height="12" aria-hidden="true">
@@ -194,7 +222,7 @@ function AlternativeTrajectories({ a, currency }: { a: Data; currency: string })
         )}
       </div>
       {governed ? <DecisionComparison a={a} currency={currency} /> : <DraftRecommendationState a={a} />}
-      <Legend series={p.series} history={a.history !== null} />
+      <Legend series={p.series} history={a.history !== null} draftForecast={a.draftForecast !== null} />
       <AlternativeTrajectoriesChart
         series={p.series}
         rows={p.rows}
@@ -249,7 +277,9 @@ function AlternativeTrajectories({ a, currency }: { a: Data; currency: string })
                 </th>
                 <td className="py-1.5 pr-3 text-slate-600" data-testid="alternatives-role">
                   {optionRoles(o) || "Option"}
-                  <span className="block text-xs text-slate-400">{SCENARIO_KIND_LABELS[o.kind]}</span>
+                  <span className="block text-xs text-slate-400">
+                    {scenarioKindLabel(o.kind, d.recommendation !== null)}
+                  </span>
                 </td>
                 <td className="py-1.5 pr-3 text-right tabular-nums" data-testid="alternatives-total">
                   {m(o.totalValue)}

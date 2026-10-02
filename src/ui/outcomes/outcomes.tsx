@@ -4,7 +4,7 @@ import type { AlternativeValueOutcomes as Data } from "@/server/queries/outcomes
 import { GovernedTag } from "@/ui/components/badges";
 import { TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
-import { SCENARIO_KIND_LABELS } from "@/ui/labels";
+import { scenarioKindLabel } from "@/ui/labels";
 
 import { type OutcomePoint, OutcomesChart } from "./chart";
 import { OUTCOME_COLOR, REFERENCE_COLORS } from "./marks";
@@ -66,7 +66,7 @@ function toPoints(d: Data): OutcomePoint[] {
         o.label,
         m(o.totalValue),
         ...(roles(o) ? [roles(o)] : []),
-        `Option kind: ${SCENARIO_KIND_LABELS[o.kind]}`,
+        `Option kind: ${scenarioKindLabel(o.kind, d.recommendation !== null)}`,
         at,
         `Measured against V${d.review.againstVersionNumber}`,
       ],
@@ -223,7 +223,9 @@ function CompanionTable({ d }: { d: Data }) {
                 {["Scenario", o.recommended && RECOMMENDATION_LABEL, o.selected && SELECTED_LABEL]
                   .filter(Boolean)
                   .join(" · ")}
-                <span className="block text-xs text-slate-400">{SCENARIO_KIND_LABELS[o.kind]}</span>
+                <span className="block text-xs text-slate-400">
+                  {scenarioKindLabel(o.kind, d.recommendation !== null)}
+                </span>
               </td>
               <td className="py-1.5 pr-3 text-right tabular-nums" data-testid="outcome-value">
                 {m(o.totalValue)}

@@ -403,6 +403,26 @@ with Cardaxia Recommendation only once a decision exists. A draft review shows a
 "Draft · Not governed", a saved recommendation as "Draft recommendation (not issued)", no branch anchor, governed
 history only). The primary trajectory marks the authorised Value Change that created the version in force.
 
+**Analytical hierarchy (4D.9H).** Overview answers "what is the current executive value position?" (the primary Value
+Trajectory, plus a compact Value Case governance summary from `getValueCaseSummary`). Assurance answers "what changed and
+what should management do?" (Continuous and Formal Assurance, Alternative Value Trajectories, recommendation and
+decision). The Value Case page answers "what have we committed to, and how has that changed?", in order: Current
+Authorised Value Case (version in force, basis, Value Period, any pending Value Change shown as not in force), the Value
+Trajectory ("progress against the current authorised plan"), Value Case Evolution ("history of the governed value
+commitment" — unchanged semantics, shown with or without trajectory adoption), then Value Change history and version
+history (the governed actions that produced it). A draft review preview also shows the draft's entered forecast
+milestones as "Draft Formal Forecast (not governed)". Until a recommendation is issued, the stored "recommended" option
+kind reads "Proposed recommendation".
+
+**Known limitations / backlog (not implemented).**
+
+- _Formal Assurance Evidence Snapshotting._ A finalised Formal Assurance Review should eventually preserve which evidence
+  supported each Assurance matter at that checkpoint. Today matter evidence is a mutable working relationship
+  (`evidence_link.value_leakage_id`) and is not snapshotted at finalisation, so the review story shows only the review's
+  own formal evidence. Historical matter–evidence relationships are never inferred. Needs a schema change (PMO decision).
+- _Pre-4D.1 matter state._ Reviews finalised before matters were captured at finalisation (`matter_snapshot_at` null)
+  show current matter details rather than the matter as it stood then. No retrospective reconstruction or backfill.
+
 ## Client reports (Phase 4A)
 
 ```

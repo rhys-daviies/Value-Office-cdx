@@ -4,7 +4,9 @@ import { moneyChange, versionAuthority } from "@/domain/value-case";
 import { createInheritedBusinessCaseAction } from "@/server/actions/value-case";
 import { getValueCaseEvolution } from "@/server/queries/evolution";
 import { getValueTrajectoryChart } from "@/server/queries/trajectory";
+import { listValueChanges } from "@/server/queries/response";
 import { getValueCaseTimeline, type TimelineEntry } from "@/server/queries/value-case";
+import { getValueCaseSummary } from "@/server/queries/value-case-summary";
 import { getGovernedCommitment } from "@/server/queries/workspace";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { Fragment } from "react";
@@ -19,7 +21,8 @@ import {
 } from "@/ui/components/badges";
 import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields";
 import { ButtonLink, Notice, Section, Table, TextLink } from "@/ui/components/layout";
-import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
+import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
+import { VALUE_BASIS_LABELS } from "@/ui/labels";
 import { ValueCaseEvolution } from "@/ui/evolution/evolution";
 import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 import { requireProject } from "@/ui/require";
@@ -29,12 +32,14 @@ export const metadata = { title: "Value Case" };
 export default async function ValueCasePage({ params }: PageProps<"/projects/[projectId]/value-case">) {
   const { projectId } = await params;
   const { project } = await requireProject(projectId);
-  const [timeline, commitment, evolution, trajectory] = await Promise.all([
+  const [timeline, commitment, evolution, trajectory, changes] = await Promise.all([
     getValueCaseTimeline(projectId),
     getGovernedCommitment(projectId),
     getValueCaseEvolution(projectId),
     getValueTrajectoryChart(projectId),
+    listValueChanges(projectId),
   ]);
+  const { pending } = await getValueCaseSummary(projectId, evolution);
   const inherited = timeline.find((t) => t.version.kind === "inherited_business_case");
   const valueCases = timeline.filter((t) => t.version.kind === "value_case");
   const base = `/projects/${projectId}`;
@@ -63,6 +68,22 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
                 {commitment.version.title} · authorised {formatDate(commitment.version.authorisedOn)}
                 {commitment.authorisedByName && ` by ${commitment.authorisedByName} (VCO)`}
               </p>
+              <p className="mt-0.5 text-xs text-slate-500" data-testid="commitment-basis">
+                In force ·{" "}
+                {commitment.version.valueBasisKind
+                  ? `Value Basis ${VALUE_BASIS_LABELS[commitment.version.valueBasisKind]}`
+                  : "Value Basis not classified"}{" "}
+                ·{" "}
+                {commitment.version.valuePeriodStart && commitment.version.valuePeriodEnd
+                  ? `Value Period ${formatPeriod(commitment.version.valuePeriodStart, commitment.version.valuePeriodEnd)}`
+                  : "Value Period not set"}
+              </p>
+              {pending.map((p) => (
+                <p key={p.id} className="mt-1 text-sm text-slate-700" data-testid="commitment-pending">
+                  Proposed V{p.toVersionNumber} via <TextLink href={`${base}/changes/${p.id}`}>{p.code}</TextLink> (
+                  {p.status}) — not in force until the VCO authorises it.
+                </p>
+              ))}
             </div>
             <div className="text-right">
               <p className="text-3xl font-semibold text-slate-900" data-testid="commitment-total">
@@ -128,7 +149,54 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
       )}
 
       {commitment && <ValueTrajectory chart={trajectory} currency={project.currency} id="trajectory" />}
-      {commitment && <ValueCaseEvolution evolution={evolution} id="evolution" tableOpen />}
+      {/* Governance history: shown whether or not the project has adopted trajectories (4D.9H). */}
+      <ValueCaseEvolution evolution={evolution} id="evolution" tableOpen />
+
+      <section aria-labelledby="value-change-history" className="mb-6" data-testid="value-change-history">
+        <h2 id="value-change-history" className="text-base font-semibold text-slate-900">
+          Value Change history
+        </h2>
+        <p className="mb-2 text-sm text-slate-600">
+          The governed actions that produced the movement above: each authorised Value Change created the next version.
+        </p>
+        {changes.length === 0 ? (
+          <p className="text-sm text-slate-600" data-testid="no-value-changes">
+            No Value Changes — the commitment is as first authorised.
+          </p>
+        ) : (
+          <Table>
+            <thead>
+              <tr>
+                <th>Value Change</th>
+                <th>Versions</th>
+                <th>Status</th>
+                <th className="text-right">Change to Authorised Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...changes].reverse().map((c) => (
+                <tr key={c.change.id} data-testid="value-change-row">
+                  <td>
+                    <TextLink href={`${base}/changes/${c.change.id}`}>{c.change.code}</TextLink>
+                    {c.change.reason && <span className="block text-xs text-slate-500">{c.change.reason}</span>}
+                  </td>
+                  <td>
+                    V{c.fromNumber} → V{c.toNumber}
+                  </td>
+                  <td>
+                    {c.change.status === "authorised"
+                      ? `Authorised ${formatDate(c.change.authorisedOn)}`
+                      : c.change.status === "draft" || c.change.status === "proposed"
+                        ? `${c.change.status === "draft" ? "Draft" : "Proposed"} — not in force`
+                        : c.change.status.charAt(0).toUpperCase() + c.change.status.slice(1)}
+                  </td>
+                  <td className="text-right">{formatMoneyChange(c.actualChange, project.currency)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        )}
+      </section>
 
       <h2 className="mb-2 text-base font-semibold text-slate-900">Version history</h2>
       <ol className="max-w-3xl space-y-2" data-testid="value-case-timeline">

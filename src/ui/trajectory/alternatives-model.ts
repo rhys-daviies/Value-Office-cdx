@@ -20,6 +20,12 @@ export const OPTION_STYLES = [
 ] as const;
 export type OptionMarker = (typeof OPTION_STYLES)[number]["marker"];
 export const HISTORY_STYLE = { color: TRAJECTORY_SERIES.realised.color, label: "Realised (shared history)" };
+/** Draft preview baseline: the forecast colour, but a working dash and hollow marks — never the governed forecast look. */
+export const DRAFT_FORECAST_STYLE = {
+  color: TRAJECTORY_SERIES.forecast.color,
+  dash: "4 3",
+  label: "Draft Formal Forecast (not governed)",
+};
 
 export type AlternativeSeries = {
   key: string;
@@ -36,6 +42,8 @@ export type AlternativeSeries = {
 export type AlternativeRow = {
   t: number;
   history: number | null;
+  /** Draft preview only: the draft review's entered forecast milestone on this date. */
+  draftForecast: number | null;
   /** Option values keyed by series key; null where the option has no explicit observation on this date. */
   values: Record<string, number | null>;
   /** The option values on this row are the branch anchor (the review's realised position), not option points. */
@@ -94,7 +102,15 @@ export function buildAlternativePresentation(
   const row = (asOf: string) => {
     let r = rows.get(asOf);
     if (!r) {
-      r = { t: epoch(asOf), history: null, values: {}, anchor: false, tip: [formatDate(asOf)], cells: [] };
+      r = {
+        t: epoch(asOf),
+        history: null,
+        draftForecast: null,
+        values: {},
+        anchor: false,
+        tip: [formatDate(asOf)],
+        cells: [],
+      };
       rows.set(asOf, r);
     }
     return r;
@@ -125,6 +141,21 @@ export function buildAlternativePresentation(
   }
 
   const labels: TerminalLabel[] = [];
+  if (a.draftForecast) {
+    for (const p of a.draftForecast.points) {
+      const r = row(p.asOf);
+      r.draftForecast = pos(p.value);
+      observe(r, DRAFT_FORECAST_STYLE.label, m(p.value));
+      plotted.push(p.value);
+    }
+    const last = a.draftForecast.points.at(-1)!;
+    labels.push({
+      key: "draftForecast",
+      value: pos(last.value),
+      lines: [`${m(last.value)} Draft Formal Forecast`, "Not governed"],
+      color: DRAFT_FORECAST_STYLE.color,
+    });
+  }
   a.options.forEach((o, i) => {
     const s = series[i]!;
     const roleSuffix = s.roles ? ` · ${s.roles}` : "";
@@ -161,8 +192,8 @@ export function buildAlternativePresentation(
   });
 
   const reviewDate = a.outcomes.review.date;
-  const firstPoint = a.options
-    .flatMap((o) => o.points.map((p) => p.asOf))
+  const firstPoint = [...a.options.flatMap((o) => o.points), ...(a.draftForecast?.points ?? [])]
+    .map((p) => p.asOf)
     .sort()
     .at(0);
   // With shared history the axis spans the Value Period; otherwise it starts at the review (or first milestone).
