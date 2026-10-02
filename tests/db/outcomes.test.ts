@@ -72,7 +72,7 @@ describe("Alternative Value Outcomes read model", () => {
 
     // Overview: the latest finalised review's context; a later draft review does not displace it.
     await createReview(actor, { projectId: project.id, trigger: "ad_hoc", reviewDate: review.reviewDate });
-    expect((await getLatestValueDecision(project.id))!.review.id).toBe(review.id);
+    expect((await getLatestValueDecision(project.id)).recorded!.review.id).toBe(review.id);
   });
 
   it("an older review keeps its own measured-against version and forecast; one scenario can hold both roles", async () => {
@@ -91,9 +91,12 @@ describe("Alternative Value Outcomes read model", () => {
     expect(d.differenceFromRecommendation).toBe("0.00"); // zero preserved
     expect(render(d)).toContain("Client selected Cardaxia&#x27;s recommendation");
 
-    // The latest finalised review (#3) has no options: Overview shows nothing rather than an older review.
+    // The latest finalised review (#3) has no options: the latest recorded decision is still Review #2's (4D.9L),
+    // identified as Review #2's — Review #3 gains nothing.
     expect((await getAlternativeValueOutcomes(project.id, r3!.id))!.outcomes).toEqual([]);
-    expect(await getLatestValueDecision(project.id)).toBeNull();
+    const latest = await getLatestValueDecision(project.id);
+    expect(latest.recorded!.review).toMatchObject({ id: r2!.id, sequence: 2, againstVersionNumber: 1 });
+    expect(latest.awaiting).toBeNull();
   });
 
   it("handles a missing (unissued) recommendation and a missing decision", async () => {
@@ -132,7 +135,7 @@ describe("Alternative Value Outcomes read model", () => {
     const html = render(d);
     expect(html).toContain("Not issued");
     expect(html).toContain("No decision recorded");
-    expect(await getLatestValueDecision(ctx.project.id)).toBeNull(); // no decision context → no Overview card
+    expect(await getLatestValueDecision(ctx.project.id)).toEqual({ recorded: null, awaiting: null }); // no decision context
   });
 
   it("every scenario returned has a governed quantified total: unquantified scenarios cannot be persisted", async () => {
@@ -163,7 +166,7 @@ describe("Alternative Value Outcomes read model", () => {
   it("Horizon: $15.5m authorised, $14.7m forecast, $15.3m recommendation, $14.9m selected, −$0.4m", async () => {
     const actor = await newActor();
     const { project } = await seedHorizon(actor, { projectCode: `HORIZON-${uid()}` });
-    const latest = (await getLatestValueDecision(project.id))!;
+    const latest = (await getLatestValueDecision(project.id)).recorded!;
     expect(latest.authorisedValue).toBe("15500000.00");
     expect(latest.currentFormalForecast).toBe("14700000.00");
     const rec = latest.outcomes.find((o) => o.recommended)!;

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { todayIso } from "@/domain/attention";
@@ -22,6 +24,8 @@ import { getAlternativeValueTrajectories, getValueTrajectoryChart } from "@/serv
 import { getValueCaseSummary } from "@/server/queries/value-case-summary";
 import { issueReport } from "@/server/reports/issue";
 import { getDocument } from "@/server/reports/storage";
+import { formatDate } from "@/ui/format";
+import { LatestValueDecision } from "@/ui/overview/decision";
 import { renderReportDocument } from "@/ui/reports/render";
 
 import { newActor, uid } from "../support/fixtures";
@@ -197,7 +201,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
     expect(o.formal).toMatchObject({ sequence: 2, date: M.formalDate, againstVersionNumber: 1 });
     expect(o.formal!.totals).toMatchObject({ realisedTotal: M.realised, forecastTotal: M.forecast, valueGap: M.gap });
     expect(o.attention.matter!.formal!.amounts).toEqual(M.leakage);
-    expect(o.decision!.differenceFromRecommendation).toBe(M.difference);
+    expect(o.decision.recorded!.differenceFromRecommendation).toBe(M.difference);
     expect(o.valueCase.originalBusinessCase).toEqual({ value: C.originalBusinessCase });
     // Primary trajectory
     expect(chart.period).toEqual(M.period);
@@ -371,6 +375,26 @@ describe("canonical Value Office journey (4D.9K)", () => {
     expect(chart.notes).toEqual([]);
     expect(chart.today).toEqual({ asOf: j.today, inPeriod: true });
     expect(chart.latestFormal!.reviewDate).toBe(j.today); // same calendar day → one combined marker in the web chart
+    // 4D.9L: the latest formal position (Review #3) and the latest recorded value decision (Review #2) are distinct.
+    const o = await getExecutiveOverview(s.project.id, j.today);
+    expect(o.formal).toMatchObject({ sequence: 3, date: j.today, againstVersionNumber: 2 });
+    expect(o.decision.awaiting).toBeNull(); // Review #3 made no recommendation
+    const rd = o.decision.recorded!;
+    expect(rd.review).toMatchObject({ id: s.review2.id, sequence: 2, date: C.review2.date, againstVersionNumber: 1 });
+    expect(rd.decision!.decidedOn).toBe(j.today);
+    expect(rd.outcomes.find((x) => x.recommended)).toMatchObject({ label: "Act now", totalValue: "29000000.00" });
+    expect(rd.outcomes.find((x) => x.selected)).toMatchObject({ label: "Delay 3 months", totalValue: "27000000.00" });
+    expect(rd.differenceFromRecommendation).toBe("-2000000.00");
+    const html = renderToStaticMarkup(createElement(LatestValueDecision, { o, base: "/p" }))
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ");
+    expect(html).toContain("Latest recorded value decision");
+    expect(html).toContain("Source: Review #2 · formal position as at 30 Sept 2026 · against V1");
+    expect(html).toContain(`Decision ${formatDate(j.today)}`);
+    expect(html).toContain(
+      `Recorded at Review #2. The latest formal position (Review #3 · ${formatDate(j.today)}) records no Cardaxia recommendation or management decision.`,
+    );
+    expect(html).not.toMatch(/Source: Review #3/);
     await expectReportsUnchanged();
     const rq = JSON.parse(issued["requalification"]!.snapshotJson) as RequalificationReport;
     expect(JSON.stringify(rq)).not.toMatch(/Review|realised|VL-001|VC-001/); // no later Assurance in the V1 report

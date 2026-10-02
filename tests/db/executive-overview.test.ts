@@ -128,7 +128,8 @@ describe("executive Overview", () => {
         working: null,
       },
     });
-    expect(o.decision!.differenceFromRecommendation).toBe("-2000000.00");
+    expect(o.decision.recorded!.differenceFromRecommendation).toBe("-2000000.00");
+    expect(o.decision.awaiting).toBeNull();
     expect(o.trajectory.status).toBe("ready"); // 6. Today stays distinct on the chart (4D.9E/F tests)
     expect(o.trajectory.today.asOf).not.toBe(o.trajectory.latestFormal!.reviewDate);
 
@@ -149,25 +150,69 @@ describe("executive Overview", () => {
   it("3/9/12/21. authorised V1 without reviews or phasing: commitment only, nothing invented", async () => {
     const d = await authorisedProject();
     const o = await getExecutiveOverview(d.project.id, TODAY);
-    expect(o).toMatchObject({ formal: null, decision: null, attention: { openCount: 0, matter: null } });
+    expect(o).toMatchObject({
+      formal: null,
+      decision: { recorded: null, awaiting: null },
+      attention: { openCount: 0, matter: null },
+    });
     expect(o.trajectory.status).toBe("phasing_not_entered");
     const text = render(o);
     expect(text).toContain("No formal Assurance position yet.");
     expect(text).not.toMatch(/Realised|Formal Forecast|Value Gap/);
     expect(text).toContain("No active Value Assurance matters requiring attention.");
-    expect(text).not.toContain("Latest value decision"); // nothing to say before a formal review
+    expect(text).not.toMatch(/value decision/i); // nothing to say before a formal review
     expect(text).toContain("Authorised Value Changes 0 None"); // 19. no Value Changes
   });
 
   it("11/13. recommendation issued but no decision: awaiting decision, no difference", async () => {
     const d = await authorisedProject({ plan: true, review: "recommended" });
     const o = await getExecutiveOverview(d.project.id, TODAY);
-    expect(o.decision!.recommendation).not.toBeNull();
-    expect(o.decision!.differenceFromRecommendation).toBeNull();
+    expect(o.decision.recorded).toBeNull(); // a recommendation is not a recorded management decision
+    expect(o.decision.awaiting!.recommendation).not.toBeNull();
+    expect(o.decision.awaiting!.differenceFromRecommendation).toBeNull();
     const text = render(o);
+    expect(text).toContain("Recommendation awaiting management decision");
+    expect(text).not.toContain("Latest recorded value decision");
     expect(text).toContain("Cardaxia recommendation Act now · $29.0m");
     expect(text).toContain("Management selected Awaiting management decision");
     expect(text).not.toContain("Difference");
+  });
+
+  it("4D.9L. a later review's recommendation awaiting decision does not displace or become the recorded decision", async () => {
+    const actor = await newActor();
+    const x = await seedCompactTrajectory(actor, { code: `TA-${uid()}`, name: "Awaiting", formal: true });
+    const drivers = await db().select().from(schema.valueDriver).where(eq(schema.valueDriver.projectId, x.project.id));
+    const r3 = await createReview(actor, { projectId: x.project.id, trigger: "ad_hoc", reviewDate: todayIso() });
+    await upsertValuePositions(actor, {
+      reviewId: r3.id,
+      positions: drivers.map((d, i) => ({
+        valueDriverId: d.id,
+        currentForecast: i === 0 ? "14000000.00" : i === 1 ? "8000000.00" : "4000000.00",
+        realisedValue: i === 0 ? "4500000.00" : "0.00",
+      })),
+    });
+    const sc = await upsertScenario(actor, {
+      reviewId: r3.id,
+      label: "Re-tender",
+      kind: "recommended",
+      totalValue: "28000000.00",
+    });
+    await saveRecommendation(actor, { reviewId: r3.id, scenarioId: sc.id, narrative: "Re-tender" });
+    await issueRecommendation(actor, { reviewId: r3.id });
+    await finaliseReview(actor, { reviewId: r3.id });
+
+    const o = await getExecutiveOverview(x.project.id, TODAY);
+    expect(o.formal!.sequence).toBe(3);
+    expect(o.decision.recorded!.review.sequence).toBe(2); // the decision stays Review #2's
+    expect(o.decision.awaiting!.review.sequence).toBe(3);
+    expect(o.decision.awaiting!.decision).toBeNull();
+    const text = render(o);
+    expect(text).toContain(
+      "Latest recorded value decision View Assurance decision → Source: Review #2 · formal position as at 30 Sept 2026",
+    );
+    expect(text).toContain("Management selected Delay 3 months · $27.0m");
+    expect(text).toContain("has an issued Cardaxia recommendation (Re-tender · $28.0m) awaiting management decision.");
+    expect(text).not.toContain("Source: Review #3");
   });
 
   it("12/15/16/20. legacy V2 + draft V3, no recommendation at the latest review: provisional change amount", async () => {
@@ -176,7 +221,8 @@ describe("executive Overview", () => {
     const o = await getExecutiveOverview(project.id, TODAY);
     expect(o.trajectory.status).toBe("basis_not_classified");
     expect(o.authorised!.versionNumber).toBe(2); // V3 draft never current
-    expect(o.decision).toBeNull();
+    // Latest review (#3) has no options; the latest recorded decision is Review #2's, identified as such (4D.9L).
+    expect(o.decision.recorded!.review.sequence).toBe(2);
     expect(o.valueCase.pending).toEqual([
       {
         id: expect.any(String),
@@ -190,7 +236,11 @@ describe("executive Overview", () => {
     ]);
     const text = render(o);
     expect(text).toContain("Proposed change +$450k · Draft — not in force"); // 4D.9J: never "+$0.5m"
-    expect(text).toContain("no Cardaxia recommendation or management decision at the latest formal review");
+    expect(text).toContain(
+      "Latest recorded value decision View Assurance decision → Source: Review #2 · formal position as at 30 Jun 2026",
+    );
+    expect(text).toContain("Recorded at Review #2. The latest formal position (Review #3");
+    expect(text).toContain("records no Cardaxia recommendation or management decision.");
     expect(text).toContain("Authorised Value $1.3m Authorised V2");
   });
 
@@ -198,7 +248,7 @@ describe("executive Overview", () => {
     const actor = await newActor();
     const d = await seedCompactTrajectoryDraft(actor, { code: `PA-${uid()}`, name: "Pre-auth" });
     const o = await getExecutiveOverview(d.project.id, TODAY);
-    expect(o).toMatchObject({ authorised: null, formal: null, decision: null });
+    expect(o).toMatchObject({ authorised: null, formal: null, decision: { recorded: null, awaiting: null } });
     expect(o.valueCase.current).toBeNull();
   });
 });

@@ -45,7 +45,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
         <>
           <ExecutivePosition o={x} base={base} />
           <ValueTrajectory chart={x.trajectory} currency={currency} id="trajectory" headline={false} />
-          <div className={`mb-6 grid gap-4 ${x.decision ? "xl:grid-cols-2" : ""}`}>
+          <div className={`mb-6 grid gap-4 ${x.decision.recorded || x.decision.awaiting ? "xl:grid-cols-2" : ""}`}>
             <ValueAttention o={x} base={base} />
             <LatestValueDecision o={x} base={base} />
           </div>

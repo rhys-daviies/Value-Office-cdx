@@ -108,17 +108,42 @@ export function hasDecisionContext(o: AlternativeValueOutcomes): boolean {
 }
 
 /**
- * Overview: the latest finalised review's decision context only — never an older review's, and nothing
- * when the latest finalised review has no outcomes with a recommendation or decision.
+ * Overview (Phase 4D.9L): the latest formal position and the latest recorded value decision are distinct.
+ * `recorded` is the management decision at the latest finalised review that has one (governed Assurance history,
+ * ordered by review sequence) — it may belong to an earlier review than the latest formal position. `awaiting` is
+ * the latest finalised review's issued Cardaxia recommendation when no management decision is recorded against it:
+ * a recommendation, never presented as a decision.
  */
-export async function getLatestValueDecision(projectId: string): Promise<AlternativeValueOutcomes | null> {
-  const [latest] = await db()
-    .select({ id: schema.assuranceReview.id })
-    .from(schema.assuranceReview)
-    .where(and(eq(schema.assuranceReview.projectId, projectId), eq(schema.assuranceReview.status, "finalised")))
-    .orderBy(desc(schema.assuranceReview.sequence))
-    .limit(1);
-  if (!latest) return null;
-  const outcomes = await getAlternativeValueOutcomes(projectId, latest.id);
-  return outcomes && hasDecisionContext(outcomes) ? outcomes : null;
+export type LatestValueDecision = {
+  recorded: AlternativeValueOutcomes | null;
+  awaiting: AlternativeValueOutcomes | null;
+};
+
+export async function getLatestValueDecision(projectId: string): Promise<LatestValueDecision> {
+  const finalised = and(
+    eq(schema.assuranceReview.projectId, projectId),
+    eq(schema.assuranceReview.status, "finalised"),
+  );
+  const [[latest], [decided]] = await Promise.all([
+    db()
+      .select({ id: schema.assuranceReview.id })
+      .from(schema.assuranceReview)
+      .where(finalised)
+      .orderBy(desc(schema.assuranceReview.sequence))
+      .limit(1),
+    db()
+      .select({ id: schema.assuranceReview.id })
+      .from(schema.assuranceReview)
+      .innerJoin(schema.decision, eq(schema.decision.assuranceReviewId, schema.assuranceReview.id))
+      .where(finalised)
+      .orderBy(desc(schema.assuranceReview.sequence))
+      .limit(1),
+  ]);
+  const recorded = decided ? await getAlternativeValueOutcomes(projectId, decided.id) : null;
+  let awaiting: AlternativeValueOutcomes | null = null;
+  if (latest && latest.id !== decided?.id) {
+    const o = await getAlternativeValueOutcomes(projectId, latest.id);
+    if (o && o.outcomes.length > 0 && o.recommendation && !o.decision) awaiting = o;
+  }
+  return { recorded: recorded && hasDecisionContext(recorded) ? recorded : null, awaiting };
 }

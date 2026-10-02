@@ -26,6 +26,20 @@ test("Overview and Value Case after V2: one consistent governed story", async ({
   await expect(summary.getByTestId("summary-original")).toHaveText("$32.0m");
   await expect(summary.getByTestId("summary-changes")).toHaveText("1");
   await expect(summary).toContainText("Latest VC-001 → V2");
+  // 4D.9L: the latest formal position (Review #3) and the latest recorded value decision (Review #2) are distinct.
+  const decision = page.getByTestId("latest-value-decision");
+  await expect(decision.getByRole("heading")).toHaveText("Latest recorded value decision");
+  await expect(decision.getByTestId("decision-source")).toHaveText(
+    "Source: Review #2 · formal position as at 30 Sept 2026 · against V1",
+  );
+  await expect(decision.getByTestId("overview-recommendation")).toHaveText("Act now · $29.0m");
+  await expect(decision.getByTestId("overview-decision")).toHaveText("Delay 3 months · $27.0m");
+  await expect(decision.getByTestId("overview-decision-difference")).toHaveText("-$2.0m");
+  await expect(decision.getByTestId("decision-not-latest")).toContainText("The latest formal position (Review #3");
+  await expect(decision.getByTestId("decision-not-latest")).toContainText(
+    "records no Cardaxia recommendation or management decision.",
+  );
+  await expect(page.getByTestId("latest-value-recommendation")).toHaveCount(0);
   // Trajectory on V2's plan, with the authorised Value Change marker; realised #1–#3; Today = formal position.
   const t = page.getByTestId("value-trajectory");
   await expect(t.getByTestId("trajectory-legend")).toContainText("Authorised Plan (V2)");

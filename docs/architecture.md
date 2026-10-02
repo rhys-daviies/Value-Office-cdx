@@ -419,12 +419,20 @@ is, in order: Value position (Authorised, Realised, Formal Forecast, Value Gap, 
 finalised review, next Assurance requirement from the existing cadence) → Value Trajectory (its facts strip is not
 repeated here) → Value requiring attention (one open matter chosen by `firstNeedingAttention`: the existing attention
 conditions in their "most pressing first" order, ties by matter code — never by amount — with its formal or labelled
-working Value Leakage, plus counts and the existing formal open-matter summary) → Latest value decision (issued
-recommendation, management selection and difference only once a decision exists; text, with the options on the review)
+working Value Leakage, plus counts and the existing formal open-matter summary) → Latest recorded value decision (issued
+recommendation, management selection, difference and decision date; text, with the options on the review)
 → Value Case summary (pending changes shown as "Proposed change … · Draft/Proposed — not in force") → a collapsed
 setup and mobilisation record. The Working picture, Formal Value Leakage block, Governance panel and V0 → V1 baseline
 are no longer on the post-authorisation Overview (they remain in Assurance / Value Case). Before authorisation the
 setup and re-qualification record is the page, unchanged.
+
+Decision semantics (4D.9L, PMO-approved): the **latest formal position** is the latest finalised Assurance Review; the
+**latest recorded value decision** is the management decision at the highest-sequence finalised review that has one
+(`getLatestValueDecision` → `recorded`), which may be earlier than the formal position. The card names its source
+review, that review's formal-position date and measured-against version, and the decision date; when the source is
+not the latest formal position it says so and states what the latest review records. A recommendation issued at the
+latest formal position with no decision recorded (`awaiting`) is shown as a recommendation awaiting management
+decision — never as a recorded decision. Historical reviews are read, never changed.
 
 **Attention ordering (4D.9I, confirmed 4D.9J).** `firstNeedingAttention` is an operational display rule — existing
 attention conditions in their most-pressing-first order, ties by matter code — **not** a formal materiality

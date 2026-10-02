@@ -5,7 +5,7 @@ import type { LeakageAmounts, LeakageSummary } from "@/domain/response";
 import type { AssuranceStage } from "@/domain/statuses";
 
 import { getValueCaseEvolution } from "./evolution";
-import { getLatestValueDecision, type AlternativeValueOutcomes } from "./outcomes";
+import { getLatestValueDecision, type LatestValueDecision } from "./outcomes";
 import { getValueTrajectoryChart, type ValueTrajectoryChart } from "./trajectory";
 import { loadVersionDrivers } from "./value-case";
 import { getValueCaseSummary, type ValueCaseSummary } from "./value-case-summary";
@@ -52,8 +52,8 @@ export type ExecutiveOverview = {
     formalLeakage: LeakageSummary;
     openLeakageCount: number;
   };
-  /** The latest finalised review's options with an issued recommendation or a decision (4D.6 read model). */
-  decision: AlternativeValueOutcomes | null;
+  /** Latest recorded management value decision (any finalised review) and any recommendation awaiting decision. */
+  decision: LatestValueDecision;
   valueCase: ValueCaseSummary;
 };
 

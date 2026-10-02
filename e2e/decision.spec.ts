@@ -59,7 +59,7 @@ test("Alternative Value Outcomes: latest decision on Overview → full view on t
 
   // 4D.9I: Overview states the decision as text; the option economics stay on the review.
   const latest = page.getByTestId("latest-value-decision");
-  await expect(latest.getByRole("heading", { name: "Latest value decision" })).toBeVisible();
+  await expect(latest.getByRole("heading", { name: "Latest recorded value decision" })).toBeVisible();
   await expect(latest.getByTestId("overview-recommendation")).toHaveText("Accelerate supplier onboarding · $1.9m");
   await expect(latest.getByTestId("overview-decision")).toHaveText("Phase the rollout · $1.6m");
   await expect(latest.getByTestId("overview-decision-difference")).toHaveText("-$0.3m");
