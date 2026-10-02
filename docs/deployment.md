@@ -148,6 +148,10 @@ Errors name the variable, never its value.
    CREATE ROLE vo_app LOGIN PASSWORD '<generated>';  -- run in the provider's SQL console
    ```
    The grants are applied by the migration step. Keep `vo_app` free of `CREATEROLE`, `BYPASSRLS` and superuser.
+   **Create it with SQL, never in the Neon Console, API or CLI.** Neon makes console-created roles members of
+   `neon_superuser`, which brings CREATEROLE, BYPASSRLS and `pg_write_all_data` (overriding the REVOKEs). Verify with
+   `npm run db:check-role`; the startup log must say `db-role=least-privilege`. (Production's runtime role is
+   `vo_runtime`, created this way in 4D.9M.)
 4. **[Cardaxia] Set the production environment variables** (Vercel → Settings → Environment Variables,
    _Production_):
    `DATABASE_URL` (the `vo_app` user on the pooled host), `VO_SESSION_SECRET`, `VO_APP_ORIGIN`,

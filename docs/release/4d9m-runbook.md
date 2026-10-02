@@ -8,7 +8,14 @@ needs PMO authorisation at the time. Never print or paste connection strings, pa
 | Application (Vercel, `main`) | `a5e960d`                                                    | the 4D.9L release-candidate commit (recorded in the 4D.9L report)        |
 | Database (Neon)              | 19 migrations, last `0018_phase4d3_living_drivers_integrity` | 21 migrations, last `0020_phase4d9c_value_trajectory_integrity`          |
 | Report renderer              | `report-html-2` (model v2)                                   | `report-html-3` (model v3); v1/v2 issued reports render byte-identically |
-| Tier                         | internal; runtime role `vo_app`; PDFs in `report_document`   | unchanged                                                                |
+| Tier                         | internal; runtime role `vo_app`; PDFs in `report_document`   | internal; runtime role `vo_runtime`; PDFs in `report_document`           |
+
+**Runtime role (4D.9M security remediation).** The original `vo_app` was created through the Neon Console, which made
+it a member of `neon_superuser` (CREATEROLE, CREATEDB, REPLICATION, BYPASSRLS, and `pg_read_all_data` /
+`pg_write_all_data`, which override the application's REVOKEs). Its replacement `vo_runtime` was created with SQL,
+granted by `grantAppRole`, and verified least-privilege on 2026-10-02. Its pooled connection string is in the macOS
+Keychain (service `value-office-prod-vo_runtime`). `vo_app` stays untouched until 4D.9N acceptance, as the rollback
+identity of the `a5e960d` deployment.
 
 Migration file hashes (`drizzle.__drizzle_migrations.hash` = sha256 of the file):
 
@@ -50,16 +57,21 @@ columns, constraints and triggers.
      hidden-prompt connection script. It is read-only.
    - Save the output privately; it contains hashes only.
    - Confirm `migrations = 19` and that the last hash is 0018's.
-4. **Migrate** as the owner role (`neondb_owner`, unpooled URL), re-applying `vo_app` grants. Run from the RC checkout:
-   `MIGRATION_DATABASE_URL=<owner unpooled> VO_APP_DB_ROLE=vo_app npm run db:migrate`
-   - Expect "Migrations applied" and "Application role grants applied to vo_app".
+4. **Migrate** as the owner role (`neondb_owner`, unpooled URL), applying `vo_runtime` grants. Run from the RC checkout:
+   `MIGRATION_DATABASE_URL=<owner unpooled> VO_APP_DB_ROLE=vo_runtime npm run db:migrate`
+   - Expect "Migrations applied" and "Application role grants applied to vo_runtime".
 5. **After fingerprint.**
    - Run the same SQL and diff it against step 3.
    - The only allowed difference is `migrations 19 → 21` and the two new migration rows with the hashes above.
    - Any other difference: **STOP** — do not push; go to _Recovery_.
 6. **Old app on the new schema (spot check).** On production (`a5e960d`), confirm health and that one project's
    Overview and an issued report open.
-7. **Deploy.** Push the RC commit to `main` and wait for the Vercel production deployment of that exact commit.
+7. **Switch the runtime role, then deploy.**
+   - Set Vercel's **Production** `DATABASE_URL` to the `vo_runtime` pooled string from the Keychain, piped from the
+     Keychain into `vercel env`, never printed. An environment change applies only to new deployments, so the running
+     `a5e960d` deployment keeps `vo_app`.
+   - Push the RC commit to `main` and wait for the Vercel production deployment of that exact commit. It starts on
+     `vo_runtime`.
 8. **Verify** (checklist below).
 
 ## Production verification checklist (bounded; no trajectory data created in production)
@@ -71,7 +83,7 @@ columns, constraints and triggers.
    - no `value_case_version` row has a basis kind or Value Period.
 2. **Application health:** `/api/health` → `{"status":"ok","database":"ok"}`. The deployment log shows
    `configuration ok: deployment=internal auth=password storage=database … db-role=least-privilege`.
-3. **DB health:** run `npm run db:check-role` with the runtime `DATABASE_URL`; it reports `vo_app` as least-privilege.
+3. **DB health:** run `npm run db:check-role` with the runtime `DATABASE_URL`; it reports `vo_runtime` as least-privilege.
 4. **Authentication:** sign in with an existing account; a wrong password is refused.
 5. **Protected routes:** signed out, `/projects` and an issued-report PDF URL both redirect to sign-in.
 6. **Representative legacy project** opens.
@@ -103,13 +115,13 @@ Value Change that classifies the basis and phases the plan). Do not create traje
 
 ## Recovery
 
-| Situation                                             | Action                                                                                                                                                                |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Migration fails                                       | One transaction: nothing is applied. Production stays at 0018 and `a5e960d` keeps serving. Do not push. Investigate.                                                  |
-| Migration succeeds, fingerprint differs unexpectedly  | Do not push. Hold the database (`a5e960d` stays compatible), report to PMO. If data must be restored, restore from the `pre-4d9m` branch / PITR.                      |
-| Migration succeeds, deploy fails (build/Vercel error) | Production keeps serving `a5e960d` on the migrated schema (rehearsed as safe). Fix forward or retry; no database action.                                              |
-| Deploy succeeds, health/manual checks fail            | Vercel _Instant Rollback_ to the `a5e960d` deployment. The 0020 schema stays (additive; `a5e960d` is compatible). Do not roll the database back unless data is wrong. |
-| Data found wrong after release                        | Restore the `pre-4d9m` branch / PITR (loses changes made since), after PMO decision.                                                                                  |
+| Situation                                             | Action                                                                                                                                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration fails                                       | One transaction: nothing is applied. Production stays at 0018 and `a5e960d` keeps serving. Do not push. Investigate.                                                                                                                    |
+| Migration succeeds, fingerprint differs unexpectedly  | Do not push. Hold the database (`a5e960d` stays compatible), report to PMO. If data must be restored, restore from the `pre-4d9m` branch / PITR.                                                                                        |
+| Migration succeeds, deploy fails (build/Vercel error) | Production keeps serving `a5e960d` on the migrated schema (rehearsed as safe). Fix forward or retry; no database action.                                                                                                                |
+| Deploy succeeds, health/manual checks fail            | Vercel _Instant Rollback_ to the `a5e960d` deployment, which still runs as `vo_app` (its environment is fixed at build). The 0020 schema stays (additive; `a5e960d` is compatible). Do not roll the database back unless data is wrong. |
+| Data found wrong after release                        | Restore the `pre-4d9m` branch / PITR (loses changes made since), after PMO decision.                                                                                                                                                    |
 
 ### Application rollback after the new release has been used
 
