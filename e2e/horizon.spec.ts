@@ -16,9 +16,10 @@ test("Project Horizon: $18.0m inherited, $15.5m authorised, six drivers", async 
   await expect(page.getByTestId("project-name")).toHaveText("Project Horizon");
 
   // Overview
-  await expect(page.getByTestId("overview-inherited-total")).toHaveText("$18.0m");
-  await expect(page.getByTestId("overview-requalified-total")).toHaveText("$15.5m");
-  // Unknown facts stay visibly labelled as placeholders (including the USD currency).
+  await expect(page.getByTestId("summary-original")).toHaveText("$18.0m");
+  await expect(page.getByTestId("summary-current")).toHaveText("$15.5m");
+  // Unknown facts stay visibly labelled as placeholders (including the USD currency) — in the setup record (4D.9I).
+  await page.getByTestId("overview-setup-record").locator("summary").click();
   await expect(page.getByText(/Currency USD is a placeholder/)).toBeVisible();
 
   // Value Case timeline
@@ -99,10 +100,11 @@ test("Project Horizon Phase 3: options, recommendation vs decision, unassessed l
   await page.getByRole("link", { name: "Project Horizon" }).click();
   await expect(page.getByTestId("overview-recommendation")).toContainText("$15.3m");
   await expect(page.getByTestId("overview-decision")).toContainText("$14.9m");
-  await expect(page.getByTestId("overview-decision")).toContainText("-$0.4m vs recommendation");
+  await expect(page.getByTestId("overview-decision-difference")).toHaveText("-$0.4m");
   await expect(page.getByTestId("overview-leakage-total")).toHaveText("Not yet assessed");
-  await expect(page.getByTestId("overview-authorised-version")).toContainText("V1");
-  await expect(page.getByTestId("overview-authorised-version")).toContainText("VC-002 (proposed)");
+  await expect(page.getByTestId("value-case-summary")).toContainText("V1 · authorised");
+  await expect(page.getByTestId("summary-pending")).toContainText("Proposed — not in force");
+  await expect(page.getByTestId("summary-pending")).toContainText("VC-002");
 
   await page.getByRole("navigation", { name: "Project" }).getByRole("link", { name: "Assurance", exact: true }).click();
   await page.getByTestId("review-row").getByRole("link", { name: "#1" }).click();

@@ -66,7 +66,8 @@ function Legend({ c }: { c: ValueTrajectoryChart }) {
         </>,
         `${TRAJECTORY_SERIES.plan.label} (V${c.version?.versionNumber})`,
       )}
-      {c.measure === "cumulative" &&
+      {/* Only what is drawn (4D.9I): absent series are explained by the notes, not shown as empty legend keys. */}
+      {(c.realised?.checkpoints.length ?? 0) > 0 &&
         item(
           <>
             <line x1="0" y1="6" x2="28" y2="6" stroke={TRAJECTORY_SERIES.realised.color} strokeWidth="3" />
@@ -74,24 +75,26 @@ function Legend({ c }: { c: ValueTrajectoryChart }) {
           </>,
           `${TRAJECTORY_SERIES.realised.label} (formal checkpoints)`,
         )}
-      {item(
-        <>
-          <line
-            x1="0"
-            y1="6"
-            x2="28"
-            y2="6"
-            stroke={TRAJECTORY_SERIES.forecast.color}
-            strokeWidth="2.5"
-            strokeDasharray="2 4"
-            strokeLinecap="round"
-          />
-          <circle cx="14" cy="6" r="3.5" fill={TRAJECTORY_SERIES.forecast.color} />
-        </>,
-        `${TRAJECTORY_SERIES.forecast.label} (latest review)`,
-      )}
-      {item(<line x1="14" y1="0" x2="14" y2="12" stroke="#334155" strokeDasharray="3 2" />, "Formal position")}
-      {item(<line x1="14" y1="0" x2="14" y2="12" stroke="#b45309" strokeWidth="1.5" />, "Today")}
+      {c.forecast &&
+        item(
+          <>
+            <line
+              x1="0"
+              y1="6"
+              x2="28"
+              y2="6"
+              stroke={TRAJECTORY_SERIES.forecast.color}
+              strokeWidth="2.5"
+              strokeDasharray="2 4"
+              strokeLinecap="round"
+            />
+            <circle cx="14" cy="6" r="3.5" fill={TRAJECTORY_SERIES.forecast.color} />
+          </>,
+          `${TRAJECTORY_SERIES.forecast.label} (latest review)`,
+        )}
+      {c.latestFormal &&
+        item(<line x1="14" y1="0" x2="14" y2="12" stroke="#334155" strokeDasharray="3 2" />, "Formal position")}
+      {c.today.inPeriod && item(<line x1="14" y1="0" x2="14" y2="12" stroke="#b45309" strokeWidth="1.5" />, "Today")}
       {c.versionChange?.inPeriod &&
         item(
           <line x1="14" y1="0" x2="14" y2="12" stroke="#2563eb" strokeDasharray="1 3" strokeWidth="1.5" />,
@@ -105,10 +108,16 @@ export function ValueTrajectory({
   chart: c,
   currency,
   id,
+  headline = true,
 }: {
   chart: ValueTrajectoryChart;
   currency: string;
   id?: string;
+  /**
+   * The facts strip (Authorised / Realised / Formal forecast). Off on Overview (4D.9I), where the Executive Value
+   * Position directly above already states them; the "as at" notes and the values table stay.
+   */
+  headline?: boolean;
 }) {
   const m = (v: string | null) => formatMoneyShort(v, currency);
   if (!c.version) return null; // no Authorised Value Case yet: nothing governed to plot
@@ -177,16 +186,18 @@ export function ValueTrajectory({
 
   return shell(
     <>
-      <dl className="mb-3 flex flex-wrap gap-x-8 gap-y-2" data-testid="trajectory-facts">
-        {facts.map(([k, v, n]) => (
-          <div key={k}>
-            <dt className="text-xs text-slate-500">{k}</dt>
-            <dd className="text-lg font-semibold text-slate-900">
-              {v} <span className="text-xs font-normal text-slate-500">{n}</span>
-            </dd>
-          </div>
-        ))}
-      </dl>
+      {headline && (
+        <dl className="mb-3 flex flex-wrap gap-x-8 gap-y-2" data-testid="trajectory-facts">
+          {facts.map(([k, v, n]) => (
+            <div key={k}>
+              <dt className="text-xs text-slate-500">{k}</dt>
+              <dd className="text-lg font-semibold text-slate-900">
+                {v} <span className="text-xs font-normal text-slate-500">{n}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <Legend c={c} />
       <Chart
         rows={p.rows}

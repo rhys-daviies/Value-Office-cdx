@@ -1,8 +1,10 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 
+import { toDbMoney } from "@/domain/money";
 import { db, schema } from "@/server/db/client";
 
 import type { ValueCaseEvolution } from "./evolution";
+import { getVersionTotal } from "./value-case";
 
 // Value Case governance summary (Phase 4D.9H): the compact Overview treatment that replaced the full Value Case
 // Evolution chart there. Derived from the governed Evolution read model (authorised versions, Original Business Case,
@@ -19,7 +21,14 @@ export type ValueCaseSummary = {
   authorisedChangeCount: number;
   latestAuthorisedChange: { code: string; versionNumber: number; authorisedOn: string | null } | null;
   /** Draft or proposed Value Changes: pending, not in force. */
-  pending: { id: string; code: string; status: "draft" | "proposed"; toVersionNumber: number }[];
+  pending: {
+    id: string;
+    code: string;
+    status: "draft" | "proposed";
+    toVersionNumber: number;
+    /** Proposed version total − version-from total (exact decimal). Provisional: never in force until authorised. */
+    proposedChange: string;
+  }[];
 };
 
 export async function getValueCaseSummary(projectId: string, evolution: ValueCaseEvolution): Promise<ValueCaseSummary> {
@@ -29,6 +38,8 @@ export async function getValueCaseSummary(projectId: string, evolution: ValueCas
       code: schema.valueChange.code,
       status: schema.valueChange.status,
       toVersionNumber: schema.valueCaseVersion.versionNumber,
+      fromVersionId: schema.valueChange.fromVersionId,
+      toVersionId: schema.valueChange.toVersionId,
     })
     .from(schema.valueChange)
     .innerJoin(schema.valueCaseVersion, eq(schema.valueCaseVersion.id, schema.valueChange.toVersionId))
@@ -47,11 +58,17 @@ export async function getValueCaseSummary(projectId: string, evolution: ValueCas
     latestAuthorisedChange: latest
       ? { code: latest.valueChangeCode!, versionNumber: latest.versionNumber, authorisedOn: latest.date }
       : null,
-    pending: open.map((c) => ({
-      id: c.id,
-      code: c.code,
-      status: c.status as "draft" | "proposed",
-      toVersionNumber: c.toVersionNumber,
-    })),
+    pending: await Promise.all(
+      open.map(async (c) => {
+        const [from, to] = await Promise.all([getVersionTotal(c.fromVersionId), getVersionTotal(c.toVersionId)]);
+        return {
+          id: c.id,
+          code: c.code,
+          status: c.status as "draft" | "proposed",
+          toVersionNumber: c.toVersionNumber,
+          proposedChange: toDbMoney(to.total.minus(from.total)),
+        };
+      }),
+    ),
   };
 }

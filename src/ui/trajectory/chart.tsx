@@ -96,10 +96,12 @@ function dot(series: "plan" | "realised" | "forecast") {
       <g data-series={series} data-t={payload.t}>
         {mark}
         {label && (
+          // Plan and forecast end on the Value Period end: label to the right of the point (the margin holds it), so
+          // it never sits on a line. The realised label ends mid-chart and stays above-left of its point.
           <text
-            x={cx - 6}
-            y={series === "forecast" ? cy + 16 : cy - 9}
-            textAnchor="end"
+            x={series === "realised" ? cx - 6 : cx + 8}
+            y={series === "realised" ? cy - 9 : cy + 4}
+            textAnchor={series === "realised" ? "end" : "start"}
             className="fill-slate-800 text-[11px] font-semibold"
           >
             {label}
@@ -136,7 +138,7 @@ export function ValueTrajectoryChart({
   return (
     <div className="h-[340px] w-full" role="img" aria-label={ariaLabel} data-testid="trajectory-chart">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows} margin={{ top: 34, right: 24, bottom: 4, left: 8 }}>
+        <ComposedChart data={rows} margin={{ top: 34, right: 60, bottom: 4, left: 8 }}>
           <CartesianGrid stroke="#e2e8f0" vertical={false} />
           <XAxis
             dataKey="t"

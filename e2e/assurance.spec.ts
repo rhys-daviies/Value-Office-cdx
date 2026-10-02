@@ -32,10 +32,12 @@ test("Authorised V1 → review → positions → finalise → second review comp
   await page.goto("/projects");
   await page.getByRole("link", { name: "Assurance Compact" }).click();
 
-  // Before any review the overview shows Authorised Value only — no fake forecast.
+  // Before any review the overview shows Authorised Value only — no fake forecast, realised or gap.
   await expect(page.getByTestId("overview-authorised-value")).toHaveText("$1.5m");
-  await expect(page.getByTestId("overview-forecast")).toHaveText("Not yet assessed");
-  await expect(page.getByTestId("overview-gap")).toHaveText("Not yet assessed");
+  await expect(page.getByTestId("overview-formal-position")).toHaveText("No formal Assurance position yet.");
+  for (const id of ["overview-forecast", "overview-realised", "overview-gap"]) {
+    await expect(page.getByTestId(id)).toHaveCount(0);
+  }
 
   // ---- Review #1 (kick-off) -------------------------------------------------------
   await tab(page, "Assurance").click();

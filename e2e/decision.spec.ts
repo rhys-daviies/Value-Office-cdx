@@ -57,14 +57,19 @@ test("Alternative Value Outcomes: latest decision on Overview → full view on t
   await page.goto("/projects");
   await page.getByRole("link", { name: "Decision Compact" }).click();
 
+  // 4D.9I: Overview states the decision as text; the option economics stay on the review.
   const latest = page.getByTestId("latest-value-decision");
-  await expect(latest.getByRole("heading", { name: "Latest Value Decision" })).toBeVisible();
-  await latest.getByText("Outcomes table").click(); // collapsed on Overview
-  await expectDecisionEconomics(latest, "latest-decision-chart");
-  // The pending Value Change is still visible as governance elsewhere — just not as an outcome.
-  await expect(page.getByText("VC-001 (draft)")).toBeVisible();
+  await expect(latest.getByRole("heading", { name: "Latest value decision" })).toBeVisible();
+  await expect(latest.getByTestId("overview-recommendation")).toHaveText("Accelerate supplier onboarding · $1.9m");
+  await expect(latest.getByTestId("overview-decision")).toHaveText("Phase the rollout · $1.6m");
+  await expect(latest.getByTestId("overview-decision-difference")).toHaveText("-$0.3m");
+  await expect(latest.getByRole("img")).toHaveCount(0); // no chart on Overview
+  // The pending Value Change is governance, shown provisionally in the Value Case summary — never as an outcome.
+  // (Its draft version's drivers are unchanged so far, so the proposed version-total change is $0.)
+  await expect(page.getByTestId("summary-pending")).toContainText("Proposed change $0 · Draft — not in force");
+  await expect(latest).not.toContainText("VC-001");
 
-  await latest.getByRole("link", { name: /View Assurance Review #1/ }).click();
+  await latest.getByRole("link", { name: "View Assurance decision →" }).click();
   const full = page.getByTestId("alternative-value-outcomes");
   await expect(full.getByRole("heading", { name: "Alternative Value Outcomes" })).toBeVisible();
   await expect(full.getByTestId("outcomes-table")).toBeVisible(); // open by default on the review

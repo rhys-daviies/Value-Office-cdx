@@ -1,7 +1,7 @@
 import type { ValueCaseSummary as Summary } from "@/server/queries/value-case-summary";
 import { GovernedTag } from "@/ui/components/badges";
 import { TextLink } from "@/ui/components/layout";
-import { formatDate, formatMoneyShort } from "@/ui/format";
+import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
 
 // Compact Value Case governance summary for Overview (Phase 4D.9H). Text only: the full Value Case Evolution and the
 // Value Change history live on the Value Case page.
@@ -61,13 +61,14 @@ export function ValueCaseSummary({ summary: s, base }: { summary: Summary; base:
         )}
         {item(
           "Pending Value Change",
-          s.pending.length === 0 ? "None" : s.pending.map((p) => p.code).join(", "),
+          s.pending.length === 0 ? "None" : s.pending.map((p) => `${p.code} → V${p.toVersionNumber}`).join(", "),
           s.pending.length === 0
             ? null
             : s.pending.map((p) => (
                 <span key={p.id} className="block" data-testid="summary-pending">
-                  <TextLink href={`${base}/changes/${p.id}`}>{p.code}</TextLink> · {p.status} V{p.toVersionNumber} — not
-                  in force
+                  Proposed change {formatMoneyChange(p.proposedChange, s.currency)} ·{" "}
+                  {p.status === "draft" ? "Draft" : "Proposed"} — not in force ·{" "}
+                  <TextLink href={`${base}/changes/${p.id}`}>Open {p.code}</TextLink>
                 </span>
               )),
           "summary-pending-codes",

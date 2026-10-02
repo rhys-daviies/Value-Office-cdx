@@ -61,3 +61,33 @@ export function deriveMatterAttention(m: AttentionInput, today: string): Attenti
 
 /** Today's ISO date in UTC — the same convention as the rest of the application. */
 export const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * The order deriveMatterAttention already lists conditions in ("most pressing first"). Phase 4D.9I uses it, unchanged,
+ * to pick ONE matter for the Overview: a presentation order over existing conditions — not a materiality score, and
+ * it never looks at amounts.
+ */
+export const ATTENTION_ORDER: readonly AttentionKind[] = [
+  "escalated",
+  "decision_overdue",
+  "decision_approaching",
+  "awaiting_evidence",
+  "no_owner",
+  "unquantified",
+  "monitor_ended",
+  "monitor_ending",
+];
+
+/**
+ * Of the matters needing attention (any condition other than "not yet quantified"), the one whose most pressing
+ * condition comes first in ATTENTION_ORDER; ties keep the given order (the register's matter-code order).
+ */
+export function firstNeedingAttention<T extends { attention: AttentionItem[]; needsAttention: boolean }>(
+  matters: readonly T[],
+): T | null {
+  const rank = (m: T) =>
+    Math.min(...m.attention.filter((a) => a.kind !== "unquantified").map((a) => ATTENTION_ORDER.indexOf(a.kind)));
+  return matters
+    .filter((m) => m.needsAttention)
+    .reduce<T | null>((best, m) => (!best || rank(m) < rank(best) ? m : best), null);
+}

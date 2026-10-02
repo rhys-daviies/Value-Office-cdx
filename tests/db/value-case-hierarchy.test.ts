@@ -167,9 +167,12 @@ describe("Value Case governance summary and current authorised version", () => {
     const { version: v3 } = await change(actor, x.project.id, x.vco.id, "VC-002", false);
     s = await summaryOf(x.project.id);
     expect(s.current!.versionNumber).toBe(2); // 11. a draft V3 never becomes current
-    expect(s.pending).toEqual([{ id: expect.any(String), code: "VC-002", status: "draft", toVersionNumber: 3 }]);
+    // A re-phasing draft at an unchanged total: the provisional change is exactly zero.
+    expect(s.pending).toEqual([
+      { id: expect.any(String), code: "VC-002", status: "draft", toVersionNumber: 3, proposedChange: "0.00" },
+    ]);
     expect(strip(renderToStaticMarkup(createElement(ValueCaseSummary, { summary: s, base: "/p" })))).toContain(
-      "VC-002 · draft V3 — not in force",
+      "Proposed change $0 · Draft — not in force",
     );
     // 12. The primary trajectory's plan is the version in force (V2), never the draft V3.
     const c = await getValueTrajectoryChart(x.project.id, { today: TODAY });

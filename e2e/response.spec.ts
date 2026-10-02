@@ -145,8 +145,7 @@ test("position → leakage → options → recommendation → decision → Value
   await expect(page.getByTestId("previous-position")).toContainText("Review #1");
 
   await tab(page, "Overview").click();
-  await expect(page.getByTestId("overview-authorised-version")).toContainText("V2");
-  await expect(page.getByTestId("overview-leakage-total")).toHaveText("$0.3m");
-  await expect(page.getByTestId("overview-leakage-recoverable")).toHaveText("$0.2m");
+  await expect(page.getByTestId("value-case-summary")).toContainText("V2 · authorised");
+  await expect(page.getByTestId("overview-leakage-total")).toHaveText("$300,000");
   await expect(page.getByTestId("overview-decision")).toContainText("Delay one quarter");
 });

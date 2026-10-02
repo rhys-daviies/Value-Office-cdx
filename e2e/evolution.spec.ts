@@ -40,7 +40,9 @@ test("Value Case Evolution: compact governance summary on Overview; full governe
   await expect(summary.getByTestId("summary-original")).toHaveText("$2.0m");
   await expect(summary.getByTestId("summary-changes")).toHaveText("1");
   await expect(summary).toContainText("Latest VC-001 → V2");
-  await expect(summary.getByTestId("summary-pending")).toHaveText("VC-002 · draft V3 — not in force");
+  await expect(summary.getByTestId("summary-pending")).toHaveText(
+    "Proposed change +$0.5m · Draft — not in force · Open VC-002",
+  );
   await summary.getByRole("link", { name: "View Value Case history →" }).click();
   await expect(page).toHaveURL(/\/value-case#evolution$/);
 

@@ -26,20 +26,19 @@ test("daily Value Office: overview → assurance → matter → formal → drive
     await expect(more.getByRole("link", { name, exact: true })).toBeVisible();
   }
 
-  // Overview: governed position and working picture, side by side but separate.
+  // Overview (4D.9I): the governed position, then ONE matter requiring attention (working figures labelled).
   await expect(page.getByTestId("overview-authorised-value")).toHaveText("$1.5m");
   await expect(page.getByTestId("overview-forecast")).toHaveText("$1.4m");
   await expect(page.getByTestId("overview-gap")).toHaveText("$0.1m");
-  const working = page.getByTestId("working-picture");
-  await expect(working).toContainText("Working · not formally reviewed");
-  await expect(page.getByTestId("working-active-matters")).toHaveText("2");
-  await expect(page.getByTestId("working-leakage-total")).toHaveText("$0.3m");
-  await expect(page.getByTestId("working-leakage-total-note")).toHaveText("+ 1 matter not yet quantified");
+  await expect(page.getByTestId("working-picture")).toHaveCount(0); // the working detail lives in Assurance
   const attention = page.getByTestId("overview-attention");
   await expect(attention).toContainText("VL-101");
-  await expect(attention).toContainText("Escalated — decision required");
-  await expect(attention).toContainText("Awaiting evidence");
-  await expect(page.getByTestId("overview-drivers")).toContainText("3 in Value Case · 1 emerging");
+  await expect(attention.getByTestId("attention-conditions")).toContainText("Escalated — decision required");
+  await expect(attention).toContainText("Working · not formally reviewed");
+  await expect(attention.getByTestId("attention-leakage")).toContainText("$300,000");
+  await expect(attention.getByTestId("attention-summary")).toContainText(
+    "2 active Assurance matters · 2 need attention",
+  );
 
   // Assurance: Continuous (working) and Formal (governed) are distinct areas.
   await tab(page, "Assurance").click();

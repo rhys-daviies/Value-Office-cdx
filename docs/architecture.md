@@ -414,6 +414,18 @@ history (the governed actions that produced it). A draft review preview also sho
 milestones as "Draft Formal Forecast (not governed)". Until a recommendation is issued, the stored "recommended" option
 kind reads "Proposed recommendation".
 
+**Executive Overview (4D.9I).** `getExecutiveOverview` composes existing read models; after authorisation the Overview
+is, in order: Value position (Authorised, Realised, Formal Forecast, Value Gap, "Formal position as at" the latest
+finalised review, next Assurance requirement from the existing cadence) → Value Trajectory (its facts strip is not
+repeated here) → Value requiring attention (one open matter chosen by `firstNeedingAttention`: the existing attention
+conditions in their "most pressing first" order, ties by matter code — never by amount — with its formal or labelled
+working Value Leakage, plus counts and the existing formal open-matter summary) → Latest value decision (issued
+recommendation, management selection and difference only once a decision exists; text, with the options on the review)
+→ Value Case summary (pending changes shown as "Proposed change … · Draft/Proposed — not in force") → a collapsed
+setup and mobilisation record. The Working picture, Formal Value Leakage block, Governance panel and V0 → V1 baseline
+are no longer on the post-authorisation Overview (they remain in Assurance / Value Case). Before authorisation the
+setup and re-qualification record is the page, unchanged.
+
 **Known limitations / backlog (not implemented).**
 
 - _Formal Assurance Evidence Snapshotting._ A finalised Formal Assurance Review should eventually preserve which evidence

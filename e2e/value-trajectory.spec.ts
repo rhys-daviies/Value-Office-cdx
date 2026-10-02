@@ -23,11 +23,41 @@ test("Value Trajectory is the primary Overview visual: plan, realised, formal ch
   await expect(page.getByTestId("value-case-summary").getByTestId("summary-current")).toHaveText("$30.0m");
   await expect(page.getByTestId("value-case-summary").getByTestId("summary-changes")).toHaveText("0");
 
+  // 4D.9I hierarchy: value requiring attention and the latest decision follow the trajectory; no duplicates remain.
+  const attention = page.getByTestId("overview-attention");
+  await expect(attention).toContainText("Vendor sequencing risk");
+  await expect(attention.getByTestId("attention-leakage")).toContainText("$700,000");
+  await expect(attention).toContainText("is not the Value Gap");
+  const decision = page.getByTestId("latest-value-decision");
+  await expect(decision.getByTestId("overview-recommendation")).toHaveText("Act now · $29.0m");
+  await expect(decision.getByTestId("overview-decision")).toHaveText("Delay 3 months · $27.0m");
+  await expect(decision.getByTestId("overview-decision-difference")).toHaveText("-$2.0m");
+  for (const gone of [
+    "overview-authorised-version",
+    "overview-value-case",
+    "working-picture",
+    "overview-leakage-recoverable",
+  ]) {
+    await expect(page.getByTestId(gone)).toHaveCount(0);
+  }
+  const top = (id: string) =>
+    page.evaluate((x) => document.querySelector(`[data-testid="${x}"]`)!.getBoundingClientRect().top, id);
+  const tops = await Promise.all(
+    ["executive-position", "value-trajectory", "overview-attention", "value-case-summary"].map(top),
+  );
+  expect([...tops].sort((a, b) => a - b)).toEqual(tops);
+
   await expect(t).toContainText("Value Period 1 Jan 2026 – 31 Dec 2028 · Cumulative Value");
-  const facts = t.getByTestId("trajectory-facts");
-  await expect(facts).toContainText(/Authorised V1\s*\$30\.0m by 31 Dec 2028/);
-  await expect(facts).toContainText(/Realised\s*\$4\.0m at 30 Sept 2026/);
-  await expect(facts).toContainText(/Formal forecast\s*\$26\.0m as at 30 Sept 2026 \(Review #2\)/);
+  // 4D.9I: the Executive Value Position states the headline figures and "as at" date; the chart's facts strip is
+  // not repeated on Overview (it remains on the Value Case page).
+  await expect(t.getByTestId("trajectory-facts")).toHaveCount(0);
+  await expect(page.getByTestId("overview-authorised-value")).toHaveText("$30.0m");
+  await expect(page.getByTestId("overview-realised")).toHaveText("$4.0m");
+  await expect(page.getByTestId("overview-forecast")).toHaveText("$26.0m");
+  await expect(page.getByTestId("overview-gap")).toHaveText("$4.0m");
+  await expect(page.getByTestId("overview-formal-position")).toContainText(
+    "Formal position as at 30 Sept 2026 · Review #2",
+  );
   await expect(t.getByTestId("trajectory-legend")).toContainText("Authorised Plan (V1)");
   await expect(t.getByTestId("trajectory-notes")).toContainText("Formal position as at 30 Sept 2026 (Review #2)");
 
@@ -48,7 +78,7 @@ test("Value Trajectory is the primary Overview visual: plan, realised, formal ch
   ]);
 
   // Tooltip at an explicit point shows only stored observations for that date.
-  const forecastEnd = chart.locator('[data-series="forecast"]').last();
+  const forecastEnd = chart.locator('[data-series="forecast"]').last().locator("circle");
   await forecastEnd.hover();
   await expect(page.getByTestId("trajectory-tooltip")).toContainText("31 Dec 2028");
   await expect(page.getByTestId("trajectory-tooltip")).toContainText("Formal Forecast: $26.0m");

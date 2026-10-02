@@ -195,8 +195,9 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
 
   // Overview reflects the authorised state
   await tab(page, "Overview").click();
-  await expect(page.getByText("Authorised Value Case V1 is in force")).toBeVisible();
-  await expect(page.getByTestId("overview-requalified-total")).toHaveText("NZ$4.5m");
+  await expect(page.getByTestId("overview-authorised-value")).toHaveText("NZ$4.5m");
+  await expect(page.getByTestId("overview-formal-position")).toHaveText("No formal Assurance position yet.");
+  await expect(page.getByTestId("overview-value-case")).toHaveCount(0); // the V0 → V1 baseline no longer competes
 
   // History shows the attributed commands
   await tab(page, "History").click();

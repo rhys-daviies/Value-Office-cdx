@@ -190,7 +190,11 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
                         ? `${c.change.status === "draft" ? "Draft" : "Proposed"} — not in force`
                         : c.change.status.charAt(0).toUpperCase() + c.change.status.slice(1)}
                   </td>
-                  <td className="text-right">{formatMoneyChange(c.actualChange, project.currency)}</td>
+                  <td className="text-right">
+                    {c.change.status === "draft" || c.change.status === "proposed"
+                      ? `Proposed change ${formatMoneyChange(c.actualChange, project.currency)}`
+                      : formatMoneyChange(c.actualChange, project.currency)}
+                  </td>
                 </tr>
               ))}
             </tbody>
