@@ -1,3 +1,4 @@
+import { todayIso } from "@/domain/attention";
 import { eq } from "drizzle-orm";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -135,7 +136,7 @@ async function reviewWithOptions(
       reviewId: review.id,
       selectedScenarioId: scenarios[opts.select]!.id,
       decidedByPersonId: ctx.vco.id,
-      decidedOn: "2026-10-15",
+      decidedOn: todayIso(), // after the recommendation was issued (4D.9K temporal order)
     });
   }
   const a = (await getAlternativeValueTrajectories(ctx.project.id, review.id))!;

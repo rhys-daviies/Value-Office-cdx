@@ -92,9 +92,15 @@ function Legend({ c }: { c: ValueTrajectoryChart }) {
           </>,
           `${TRAJECTORY_SERIES.forecast.label} (latest review)`,
         )}
+      {/* Same calendar day: one combined "Today · formal position" marker, so one legend key (4D.9K). */}
       {c.latestFormal &&
+        !(c.today.inPeriod && c.today.asOf === c.latestFormal.reviewDate) &&
         item(<line x1="14" y1="0" x2="14" y2="12" stroke="#334155" strokeDasharray="3 2" />, "Formal position")}
-      {c.today.inPeriod && item(<line x1="14" y1="0" x2="14" y2="12" stroke="#b45309" strokeWidth="1.5" />, "Today")}
+      {c.today.inPeriod &&
+        item(
+          <line x1="14" y1="0" x2="14" y2="12" stroke="#b45309" strokeWidth="1.5" />,
+          c.latestFormal && c.today.asOf === c.latestFormal.reviewDate ? "Today · formal position" : "Today",
+        )}
       {c.versionChange?.inPeriod &&
         item(
           <line x1="14" y1="0" x2="14" y2="12" stroke="#2563eb" strokeDasharray="1 3" strokeWidth="1.5" />,

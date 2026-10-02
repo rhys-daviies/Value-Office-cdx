@@ -1,20 +1,13 @@
 import { and, eq } from "drizzle-orm";
 
-import {
-  createReview,
-  finaliseReview,
-  linkReviewEvidence,
-  updateReview,
-  upsertValuePositions,
-} from "@/server/commands/assurance";
+import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { createEmergingDriver } from "@/server/commands/drivers";
 import { recordEvidence } from "@/server/commands/evidence";
 import { documentMatterEvidence, requestMatterEvidence } from "@/server/commands/matter-evidence";
 import { assessMatterWorking, createMatter, setMatterRemediation, setMatterStage } from "@/server/commands/matters";
 import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
-import { assessLeakage } from "@/server/commands/leakage";
 import { createProject } from "@/server/commands/project";
-import { setForecastPoint, setPlanPoint, setScenarioPoint, setVersionBasis } from "@/server/commands/trajectory";
+import { setForecastPoint, setScenarioPoint } from "@/server/commands/trajectory";
 import type { Actor } from "@/server/commands/run";
 import { addStakeholder, setValueCaseOwner } from "@/server/commands/stakeholders";
 import {
@@ -33,6 +26,8 @@ import {
   proposeValueChange,
 } from "@/server/commands/value-change";
 import { db, schema } from "@/server/db/client";
+
+import { CANONICAL, canonicalJourney } from "./canonical";
 
 // A small synthetic engagement at Authorised V1 with no Assurance Reviews, for
 // exercising the Value Assurance workflow. Not client data; not Horizon.
@@ -462,82 +457,22 @@ export async function seedCompactTrajectory(
   opts: {
     code: string;
     name: string;
-    /** 4D.9E: also a finalised Review #1 and the 30 Sep review finalised; 4D.9F: client selects "Delay 3 months". */
+    /**
+     * The canonical journey (Phase 4D.9K, src/fixtures/canonical.ts) through Review #2: V0 $32.0m → Authorised V1
+     * $30.0m with plan; Reviews #1 and #2 finalised; VL-001; three phased options; recommendation issued; management
+     * selects "Delay 3 months". Without it: V1 plus a DRAFT 30 Sep review with forecast and option paths (4D.9D).
+     */
     formal?: boolean;
   },
 ) {
-  const { project } = await createProject(actor, {
-    newClientName: "Synthetic Test Client",
-    code: opts.code,
-    name: opts.name,
-    currency: "USD",
-    valueBasisDescription: "Synthetic: cumulative benefit over FY26–FY28",
-    valuePeriodStart: "2026-01-01",
-    valuePeriodEnd: "2028-12-31",
-  });
-  const { person: vco } = await addStakeholder(actor, {
-    projectId: project.id,
-    name: "Test VCO",
-    roleDescription: "VCO",
-  });
-  await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
-  const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
-  const drivers = [
-    ["VD-01", "Procurement Savings", "15000000.00"],
-    ["VD-02", "Revenue Uplift", "10000000.00"],
-    ["VD-03", "Working Capital", "5000000.00"],
-  ] as const;
-  const ids: string[] = [];
-  for (const [i, [code, name, value]] of drivers.entries()) {
-    const { driver } = await addValueDriver(actor, {
-      versionId: v1.id,
-      code,
-      name,
-      financialValue: value,
-      sortOrder: i + 1,
-    });
-    ids.push(driver.id);
-  }
-  await setVersionBasis(actor, {
-    versionId: v1.id,
-    valueBasisKind: "cumulative_benefit",
-    valuePeriodStart: "2026-01-01",
-    valuePeriodEnd: "2028-12-31",
-  });
-  for (const [asOf, value] of [
-    ["2026-01-01", "0.00"],
-    ["2026-12-31", "6000000.00"],
-    ["2027-12-31", "18000000.00"],
-    ["2028-12-31", "30000000.00"],
-  ] as const) {
-    await setPlanPoint(actor, { versionId: v1.id, asOf, value });
-  }
-  await proposeVersion(actor, { versionId: v1.id });
-  const evidence = await recordEvidence(actor, {
-    projectId: project.id,
-    code: "E-001",
-    title: "Synthetic authorisation",
-  });
-  await authoriseInitialVersion(actor, {
-    versionId: v1.id,
-    authorisedByPersonId: vco.id,
-    authorisedOn: "2026-01-15",
-    authorisationEvidenceId: evidence.id,
-  });
+  const j = canonicalJourney(actor, opts);
+  const s = await j.establish({ inherited: opts.formal });
   if (opts.formal) {
-    // Synthetic earlier checkpoint: complete realised $1.0m at 31 Mar 2026 (forecast $28.0m, no forecast phasing).
-    const first = await createReview(actor, { projectId: project.id, trigger: "kickoff", reviewDate: "2026-03-31" });
-    await upsertValuePositions(actor, {
-      reviewId: first.id,
-      positions: [
-        { valueDriverId: ids[0]!, currentForecast: "14000000.00", realisedValue: "600000.00" },
-        { valueDriverId: ids[1]!, currentForecast: "9500000.00", realisedValue: "300000.00" },
-        { valueDriverId: ids[2]!, currentForecast: "4500000.00", realisedValue: "100000.00" },
-      ],
-    });
-    await finaliseReview(actor, { reviewId: first.id });
+    await j.assure();
+    return { project: s.project, vco: s.vco, v1: s.v1, review: s.review2 };
   }
-  const review = await createReview(actor, { projectId: project.id, trigger: "ad_hoc", reviewDate: "2026-09-30" });
+  const ids = s.drivers;
+  const review = await createReview(actor, { projectId: s.project.id, trigger: "ad_hoc", reviewDate: "2026-09-30" });
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
@@ -548,74 +483,19 @@ export async function seedCompactTrajectory(
   });
   await setForecastPoint(actor, { reviewId: review.id, asOf: "2027-12-31", value: "16000000.00" });
   await setForecastPoint(actor, { reviewId: review.id, asOf: "2028-12-31", value: "26000000.00" });
-  const option = async (
-    label: string,
-    kind: "recommended" | "alternative" | "no_action",
-    total: string,
-    n: number,
-    mid: string,
-  ) => {
-    const s = await upsertScenario(actor, { reviewId: review.id, label, kind, totalValue: total, sortOrder: n });
-    await setScenarioPoint(actor, { scenarioId: s.id, asOf: "2027-12-31", value: mid });
-    await setScenarioPoint(actor, { scenarioId: s.id, asOf: "2028-12-31", value: total });
-    return s;
-  };
-  const act = await option("Act now", "recommended", "29000000.00", 1, "18000000.00");
-  const delay = await option("Delay 3 months", "alternative", "27000000.00", 2, "16500000.00");
-  await option("No action", "no_action", "23000000.00", 3, "15000000.00");
+  let act: { id: string } | null = null;
+  for (const [n, [label, kind, total, mid]] of CANONICAL.review2.options.entries()) {
+    const sc = await upsertScenario(actor, { reviewId: review.id, label, kind, totalValue: total, sortOrder: n + 1 });
+    await setScenarioPoint(actor, { scenarioId: sc.id, asOf: "2027-12-31", value: mid });
+    await setScenarioPoint(actor, { scenarioId: sc.id, asOf: "2028-12-31", value: total });
+    if (label === "Act now") act = sc;
+  }
   await saveRecommendation(actor, {
     reviewId: review.id,
-    scenarioId: act.id,
+    scenarioId: act!.id,
     narrative: "Act now to protect the plan",
   });
-  if (opts.formal) {
-    // 4D.9G synthetic Assurance story: a Continuous Assurance matter on VD-01, evidenced and formally assessed here.
-    const { person: lead } = await addStakeholder(actor, {
-      projectId: project.id,
-      name: "Test Delivery Lead",
-      roleDescription: "Risk / Leakage Owner",
-    });
-    const matter = await createMatter(actor, {
-      projectId: project.id,
-      code: "VL-001",
-      title: "Vendor sequencing risk",
-      identifiedOn: "2026-08-14",
-      responseOwnerPersonId: lead.id,
-      driverIds: [ids[0]!],
-    });
-    await setMatterStage(actor, { matterId: matter.id, stage: "escalated" });
-    const plan = await recordEvidence(actor, {
-      projectId: project.id,
-      code: "E-002",
-      title: "Revised mobilisation plan",
-      isMaterialChange: true,
-    });
-    await updateReview(actor, {
-      reviewId: review.id,
-      trigger: "material_evidence_change",
-      triggerEvidenceId: plan.id,
-      whatChanged: "Synthetic: the vendor's revised mobilisation plan moves procurement onboarding by two quarters.",
-    });
-    await linkReviewEvidence(actor, { reviewId: review.id, evidenceId: plan.id });
-    await assessLeakage(actor, {
-      leakageId: matter.id,
-      reviewId: review.id,
-      totalAmount: "700000.00",
-      unrecoverableAmount: "250000.00",
-      unrecoverableRationale: "Synthetic: one quarter of savings is lost under the revised plan (E-002)",
-    });
-    await issueRecommendation(actor, { reviewId: review.id });
-    await finaliseReview(actor, { reviewId: review.id });
-    // 4D.9F: the client selects a different option from Cardaxia's recommendation (synthetic).
-    await recordDecision(actor, {
-      reviewId: review.id,
-      selectedScenarioId: delay.id,
-      decidedByPersonId: vco.id,
-      decidedOn: "2026-10-15",
-      rationale: "Synthetic: delay to align with the budget cycle",
-    });
-  }
-  return { project, vco, v1, review };
+  return { project: s.project, vco: s.vco, v1: s.v1, review };
 }
 
 /**

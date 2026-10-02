@@ -3,7 +3,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { firstNeedingAttention, type AttentionItem } from "@/domain/attention";
+import { firstNeedingAttention, todayIso, type AttentionItem } from "@/domain/attention";
+import { formatDate } from "@/ui/format";
 import { seedCompactEvolution, seedCompactTrajectory, seedCompactTrajectoryDraft } from "@/fixtures/compact";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
@@ -141,7 +142,7 @@ describe("executive Overview", () => {
     expect(text).toContain("Cardaxia recommendation Act now · $29.0m");
     expect(text).toContain("Management selected Delay 3 months · $27.0m");
     expect(text).toContain("Difference -$2.0m");
-    expect(text).toContain("Decision 15 Oct 2026 · Test VCO");
+    expect(text).toContain(`Decision ${formatDate(todayIso())} · Test VCO`); // decided after the recommendation issued
     expect(text).toContain("View Value Case history →");
   });
 

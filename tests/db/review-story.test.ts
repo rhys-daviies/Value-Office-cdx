@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { todayIso } from "@/domain/attention";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -107,7 +108,7 @@ describe("review story", () => {
       totalValue: "27000000.00",
       milestones: 2,
       deciderName: "Test VCO",
-      decidedOn: "2026-10-15",
+      decidedOn: todayIso(), // after the recommendation was issued (4D.9K temporal order)
       rationale: "Synthetic: delay to align with the budget cycle",
       differenceFromRecommendation: "-2000000.00",
     });

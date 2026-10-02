@@ -23,6 +23,13 @@ export function renderValueChangeNotice(m: ValueChangeNotice, meta: ReportIssueM
   // spliced in without whitespace so v1/v2 snapshots render byte-for-byte as issued.
   const v3 = m.header.modelVersion >= 3 && m.plans !== undefined;
   const adaptive = (v: string | null) => formatMoneyAdaptiveChange(v, m.header.currency);
+  // Model v3 (Phase 4D.9K): when the stated change and the resulting version movement differ, both are headline
+  // figures with the reconciliation state — presentation of the existing rule; neither value is adjusted.
+  const mismatchFigures = () =>
+    html`${figure(authorised ? "Resulting version movement" : "Resulting draft movement", adaptive(m.actualChange), {
+      testId: "vc-movement",
+      tone: "warn",
+    })}${figure("Reconciliation", "Does not reconcile", { testId: "vc-reconciliation", tone: "warn" })}`;
   const plansSection = () =>
     v3
       ? html`${plansBlock(
@@ -88,7 +95,7 @@ export function renderValueChangeNotice(m: ValueChangeNotice, meta: ReportIssueM
           testId: "vc-current",
           note: `Value Case V${m.current.versionNumber}${authorised ? " (superseded, preserved)" : ""}`,
         })}
-        ${figure("Stated change", v3 ? adaptive(c.statedChange) : $.shortChange(c.statedChange), { testId: "vc-stated", tone: "gap" })}
+        ${figure("Stated change", v3 ? adaptive(c.statedChange) : $.shortChange(c.statedChange), { testId: "vc-stated", tone: "gap" })}${v3 && notReconciled ? mismatchFigures() : null}
         ${figure(
           authorised ? "New authorised value" : "Proposed authorised value",
           $.short(authorised ? m.proposed.total : (m.projectedFromStated ?? m.proposed.total)),

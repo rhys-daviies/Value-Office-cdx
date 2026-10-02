@@ -9,6 +9,7 @@ import {
   seedCompactTrajectory,
   seedCompactTrajectoryDraft,
 } from "@/fixtures/compact";
+import { seedCanonicalJourney } from "@/fixtures/canonical";
 import { ensureUser } from "@/server/commands/users";
 import { closeDb, db, schema } from "@/server/db/client";
 
@@ -33,12 +34,16 @@ try {
     ["TRAJ", "Trajectory Compact"],
     ["TRAJD", "Trajectory Draft"],
     ["TRAJX", "Trajectory Executive"],
+    ["CANON", "Canonical Value Journey"],
   ] as const) {
     const [existing] = await db().select().from(schema.project).where(eq(schema.project.code, code));
     if (existing) {
       console.log(`${name} already seeded; nothing to do.`);
     } else {
-      if (code === "TRAJX") {
+      if (code === "CANON") {
+        await seedCanonicalJourney(actor, { code, name });
+        console.log(`Seeded ${name}: V0 $32.0m → V1 $30.0m → Reviews #1–#2 → VC-001 −$1.0m → V2 $29.0m → Review #3`);
+      } else if (code === "TRAJX") {
         await seedCompactTrajectory(actor, { code, name, formal: true });
         console.log(
           `Seeded ${name}: finalised reviews 31 Mar and 30 Sep 2026; three option paths; client selects Delay`,

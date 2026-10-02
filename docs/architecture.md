@@ -456,6 +456,31 @@ with no surrounding whitespace (templates are `prettier-ignore`). Goldens: `test
 (released a88cc72) and `*-v2.*` for all four report types (captured from 41275e4) must render byte-for-byte; issued
 snapshots are never rewritten.
 
+**Canonical end-to-end journey (4D.9K).** `src/fixtures/canonical.ts` builds ONE synthetic engagement through commands
+only, in stages a test can pause between (`establish` → `assure` → `change` → `proposeChange` → `authoriseChange` →
+`continueAssurance`). "Trajectory Executive" is the journey through Review #2; "Canonical Value Journey" (seed `CANON`)
+runs it to the end. `tests/db/canonical-journey.test.ts` validates it across every surface and `e2e/canonical-journey.spec.ts`
+in the browser.
+
+| Stage                                              | Synthetic values                                                                                                           |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Original Business Case (V0)                        | $32.0m, headline only                                                                                                      |
+| Authorised V1 (15 Jan 2026)                        | $30.0m (VD-01 $15.0m, VD-02 $10.0m, VD-03 $5.0m); Value Period 1 Jan 2026 – 31 Dec 2028; plan $0 / $6.0m / $18.0m / $30.0m |
+| Review #1 (31 Mar 2026, V1)                        | forecast $28.0m, realised $1.0m                                                                                            |
+| VL-001 Vendor sequencing risk (14 Aug 2026, VD-01) | working evidence E-003; formal leakage in Review #2 $700,000 = $450,000 + $250,000                                         |
+| Review #2 (30 Sep 2026, V1)                        | forecast $26.0m (milestones $16.0m / $26.0m), realised $4.0m, Value Gap $4.0m                                              |
+| Options at Review #2                               | Act now $29.0m (Cardaxia recommendation), Delay 3 months $27.0m (management selected), No action $23.0m; difference −$2.0m |
+| VC-001 (from Review #2 and its decision)           | stated −$1.0m = VD-01 $15.0m → $14.0m; own rationale; V2 plan $0 / $5.0m / $16.5m / $29.0m                                 |
+| Authorised V2 (journey date)                       | $29.0m; V1 superseded and unchanged                                                                                        |
+| Review #3 (journey date, V2)                       | forecast $26.5m, realised $4.6m, Value Gap $2.5m                                                                           |
+
+Rules the journey proves: the selection ($27.0m) does not become the commitment — only an authorised, reconciled Value
+Change moves it; a historical review keeps the version it measured against (its live rebuild differs from its issued
+record only in that version's lifecycle status); issued reports keep their snapshot, rendering and PDF; Value Gap and
+Value Leakage are separate numbers; draft and proposed versions are never the current plan. Recommendation issue and
+finalisation are timestamped "now", so the decision, the Value Change authorisation and Review #3 fall on the day the
+journey runs.
+
 **Known limitations / backlog (not implemented).**
 
 - _Formal Assurance Evidence Snapshotting._ A finalised Formal Assurance Review should eventually preserve which evidence

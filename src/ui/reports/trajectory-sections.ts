@@ -278,8 +278,11 @@ export function plansBlock(
         ({ p, why }) =>
           html`<p class="rpt-small">
             <strong>${p.label}:</strong>
-            ${why ?? (p.plan.milestones.length ? "phasing entered" : "Authorised plan phasing not entered.")} ·
-            ${basisLine(p.plan)}
+            ${
+              // The unavailability reason already names the missing basis/period; otherwise state basis and period.
+              why ??
+              `${p.plan.milestones.length ? "Phasing entered" : "Authorised plan phasing not entered"} · ${basisLine(p.plan)}`
+            }
           </p>`,
       )}
       <p class="rpt-small rpt-muted">

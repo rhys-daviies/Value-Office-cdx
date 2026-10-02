@@ -134,7 +134,8 @@ describe("draft preview refinements", () => {
 describe("Value Case governance summary and current authorised version", () => {
   it("9/15/16. A: authorised V1, no Value Changes, no Original Business Case", async () => {
     const actor = await newActor();
-    const x = await seedCompactTrajectory(actor, { code: `TX-${uid()}`, name: "Trajectory Executive", formal: true });
+    // Trajectory Compact: Authorised V1 without an inherited Business Case (the canonical project records one).
+    const x = await seedCompactTrajectory(actor, { code: `TJ-${uid()}`, name: "Trajectory Compact" });
     const s = await summaryOf(x.project.id);
     expect(s).toEqual({
       currency: "USD",
