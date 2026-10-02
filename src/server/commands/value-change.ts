@@ -101,9 +101,29 @@ export const createValueChange = defineCommand(
         title: `Value Case (${input.code})`,
         basedOnVersionId: inForce.id,
         createdBy: actor.userId,
+        // Phase 4D.9: the commitment's basis kind and Value Period carry forward; re-phasing is edited on the draft.
+        valueBasisKind: inForce.valueBasisKind,
+        valuePeriodStart: inForce.valuePeriodStart,
+        valuePeriodEnd: inForce.valuePeriodEnd,
       })
       .returning();
     await copyVersionContents(tx, inForce.id, version!.id);
+    const plan = await tx
+      .select()
+      .from(schema.valueTrajectoryPoint)
+      .where(eq(schema.valueTrajectoryPoint.valueCaseVersionId, inForce.id));
+    if (plan.length) {
+      await tx.insert(schema.valueTrajectoryPoint).values(
+        plan.map((p) => ({
+          projectId: p.projectId,
+          valueCaseVersionId: version!.id,
+          asOf: p.asOf,
+          value: p.value,
+          note: p.note,
+          createdBy: actor.userId,
+        })),
+      );
+    }
 
     const [change] = await tx
       .insert(schema.valueChange)

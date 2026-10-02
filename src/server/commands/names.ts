@@ -36,6 +36,14 @@ export const COMMANDS = {
   proposeVersion: "valueCase.proposeVersion", // trigger-checked
   returnVersionToDraft: "valueCase.returnVersionToDraft", // trigger-checked
   authoriseInitialVersion: "valueCase.authoriseInitialVersion", // trigger-checked
+  // Phase 4D.9: governed Value Trajectories (trigger-checked: editability, basis, dates, reconciliation).
+  setVersionBasis: "valueCase.setVersionBasis", // trigger-checked
+  setPlanPoint: "trajectory.setPlanPoint", // trigger-checked
+  removePlanPoint: "trajectory.removePlanPoint", // trigger-checked
+  setForecastPoint: "trajectory.setForecastPoint", // trigger-checked
+  removeForecastPoint: "trajectory.removeForecastPoint", // trigger-checked
+  setScenarioPoint: "trajectory.setScenarioPoint", // trigger-checked
+  removeScenarioPoint: "trajectory.removeScenarioPoint", // trigger-checked
   createAssuranceReview: "assurance.createReview",
   updateAssuranceReview: "assurance.updateReview",
   upsertValuePositions: "assurance.upsertValuePositions",

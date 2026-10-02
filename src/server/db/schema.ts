@@ -29,6 +29,7 @@ import {
   LEAKAGE_STATUSES,
   ASSURANCE_STAGES,
   SCENARIO_KINDS,
+  VALUE_BASIS_KINDS,
   VALUE_CHANGE_STATUSES,
   INFORMATION_REQUEST_PURPOSES,
   INFORMATION_REQUEST_STATUSES,
@@ -60,6 +61,7 @@ export const leakageStatus = pgEnum("leakage_status", LEAKAGE_STATUSES);
 export const assuranceStage = pgEnum("assurance_stage", ASSURANCE_STAGES);
 export const scenarioKind = pgEnum("scenario_kind", SCENARIO_KINDS);
 export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
+export const valueBasisKind = pgEnum("value_basis_kind", VALUE_BASIS_KINDS);
 export const reportType = pgEnum("report_type", REPORT_TYPES);
 export const informationRequestStatus = pgEnum("information_request_status", INFORMATION_REQUEST_STATUSES);
 export const informationRequestPurpose = pgEnum("information_request_purpose", INFORMATION_REQUEST_PURPOSES);
@@ -382,6 +384,11 @@ export const valueCaseVersion = pgTable(
     authorisationRecordedBy: uuid().references(() => appUser.id),
     authorisationRecordedAt: timestamp({ withTimezone: true }),
     supersededAt: timestamp({ withTimezone: true }),
+    // Phase 4D.9: economic basis kind and Value Period of this version's commitment (null on legacy
+    // versions). Immutable with the version; carried into the next version by valueChange.create.
+    valueBasisKind: valueBasisKind(),
+    valuePeriodStart: date(),
+    valuePeriodEnd: date(),
   },
   (t) => [
     unique("value_case_version_number_uq").on(t.valueCaseId, t.versionNumber),
@@ -435,6 +442,15 @@ export const valueCaseVersion = pgTable(
     ),
     check("value_case_version_superseded_shape", sql`(${t.status} = 'superseded') = (${t.supersededAt} is not null)`),
     check("value_case_version_not_self_based", sql`${t.basedOnVersionId} is distinct from ${t.id}`),
+    check(
+      "value_case_version_period_order",
+      sql`${t.valuePeriodStart} is null or ${t.valuePeriodEnd} is null or ${t.valuePeriodStart} <= ${t.valuePeriodEnd}`,
+    ),
+    // The inherited Business Case (V0) is end-value history only: no basis kind, period or phasing.
+    check(
+      "value_case_version_v0_no_trajectory",
+      sql`${t.kind} = 'value_case' or (${t.valueBasisKind} is null and ${t.valuePeriodStart} is null and ${t.valuePeriodEnd} is null)`,
+    ),
   ],
 );
 
@@ -858,6 +874,7 @@ export const scenario = pgTable(
   },
   (t) => [
     unique("scenario_id_review_uq").on(t.id, t.assuranceReviewId),
+    unique("scenario_id_project_uq").on(t.id, t.projectId),
     foreignKey({
       name: "scenario_review_fk",
       columns: [t.assuranceReviewId, t.projectId],
@@ -1146,6 +1163,61 @@ export const valueDriverRecordAssumption = pgTable(
     }),
     check("value_driver_record_assumption_not_blank", sql`length(trim(${t.statement})) > 0`),
     index("value_driver_record_assumption_record_idx").on(t.valueDriverRecordId),
+  ],
+);
+
+/**
+ * Phase 4D.9: a governed Value Trajectory point — a consultant-entered value at a real date, owned by
+ * exactly one parent: a Value Case version (authorised plan), an Assurance Review (formal forecast
+ * path) or a scenario (option path). Whether a value is cumulative or a run-rate comes from the
+ * governing version's basis kind, never from the point. Nothing is interpolated or generated.
+ * Editability, dates and terminal reconciliation are enforced by drizzle/0020 triggers.
+ */
+export const valueTrajectoryPoint = pgTable(
+  "value_trajectory_point",
+  {
+    id: id(),
+    projectId: uuid().notNull(),
+    valueCaseVersionId: uuid(),
+    assuranceReviewId: uuid(),
+    scenarioId: uuid(),
+    asOf: date().notNull(),
+    value: moneyCol().notNull(),
+    note: text(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "value_trajectory_point_version_fk",
+      columns: [t.valueCaseVersionId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.projectId],
+    }),
+    foreignKey({
+      name: "value_trajectory_point_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    foreignKey({
+      name: "value_trajectory_point_scenario_fk",
+      columns: [t.scenarioId, t.projectId],
+      foreignColumns: [scenario.id, scenario.projectId],
+    }),
+    check(
+      "value_trajectory_point_one_parent",
+      sql`num_nonnulls(${t.valueCaseVersionId}, ${t.assuranceReviewId}, ${t.scenarioId}) = 1`,
+    ),
+    uniqueIndex("value_trajectory_point_version_date_uq")
+      .on(t.valueCaseVersionId, t.asOf)
+      .where(sql`${t.valueCaseVersionId} is not null`),
+    uniqueIndex("value_trajectory_point_review_date_uq")
+      .on(t.assuranceReviewId, t.asOf)
+      .where(sql`${t.assuranceReviewId} is not null`),
+    uniqueIndex("value_trajectory_point_scenario_date_uq")
+      .on(t.scenarioId, t.asOf)
+      .where(sql`${t.scenarioId} is not null`),
   ],
 );
 

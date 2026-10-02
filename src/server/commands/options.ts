@@ -54,6 +54,8 @@ export const removeScenario = defineCommand(
   COMMANDS.removeScenario,
   z.object({ scenarioId: uuid }),
   async ({ tx }, input) => {
+    // Phase 4D.9: an option's path goes with it (the point guard admits this command only while editable).
+    await tx.delete(schema.valueTrajectoryPoint).where(eq(schema.valueTrajectoryPoint.scenarioId, input.scenarioId));
     const [row] = await tx.delete(schema.scenario).where(eq(schema.scenario.id, input.scenarioId)).returning();
     if (!row) throw new DomainError("VO_NOT_FOUND", "Scenario not found");
     return row;

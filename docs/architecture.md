@@ -318,6 +318,65 @@ Alternative Value Outcomes is a **point-in-time comparison of stored, quantified
 - **Issued reports snapshot chart data.** `REPORT_MODEL_VERSION` 1 → 2 (Assurance gains `evolution` and `outcomes`); `RENDERER_VERSION` `report-html-1` → `report-html-2`. Stored v1 snapshots are never rewritten and render through the v1 path byte-for-byte as the **released renderer (a88cc72)** did (golden fixture `tests/fixtures/reports/assurance-v1.*`: a real a88cc72-issued snapshot and that release's own rendering, hashes pinned): same sections, numbering, "Alternative trajectories" and "Response owner (AVO)" wording, no charts. Wording changed after release (e.g. Phase 4D.1's "Risk / Leakage Owner") applies to v2 only. v2-only styles are emitted inside v2 reports, so the shared stylesheet — and therefore v1 output — is unchanged. v2 reports use "Alternative Value Outcomes" and renumber: 2 Value Case Evolution, 7 Alternative Value Outcomes.
 - Print: each visual (heading, explanation, summary strip, legend, SVG) is one `break-inside: avoid` block well under an A4 page; tables continue naturally. Series differ by line style and marker shape as well as colour; no working violet.
 
+## Value Trajectory methodology contract (Phase 4D.9B, approved)
+
+Canonical contract for governed Value Trajectories. 4D.9C implements the domain (below); authoring UI, charts and
+reports follow in 4D.9D–J. The Cardaxia Portal is a visual reference only: no linear plans, uplift/decay formulas,
+generated ranges, delay simulators or red-vs-green option framing.
+
+**Principles.** (1) A trajectory exists only when the governing Value Case version declares a trajectory-capable
+**basis kind** and a **Value Period**. (2) Only consultant-entered, dated points are stored; nothing is interpolated,
+generated or simulated, and there are no ranges. Straight joins between points are presentation only. (3) Every
+line that has points ends on the Value Period end date at its governed total. (4) The plan is part of the authorised
+commitment: re-phasing, even at an unchanged total, is a VCO-authorised Value Change; earlier plans stay immutable.
+(5) The formal position comes from the latest finalised Assurance Review, distinct from Today; Continuous Assurance
+working matters and emerging-driver estimates never enter the trajectory (a future Working Outlook would be separate).
+(6) Realised value is not duplicated: finalised reviews' cumulative realised checkpoints are the actual line, shown
+only where comparable. (7) Option paths share history to the review date and diverge after it; "delayed action" is an
+ordinary consultant-defined option. (8) Value Trajectory, Alternative Value Trajectories and Value Case Evolution stay
+three distinct visuals.
+
+**Value Basis kind** (`value_basis_kind`, on the version; the free-text Value Basis description is unchanged):
+
+| Kind                 | Trajectory | Y-axis                                                               | Authorised terminal means        | Cumulative Realised comparable       |
+| -------------------- | ---------- | -------------------------------------------------------------------- | -------------------------------- | ------------------------------------ |
+| `cumulative_benefit` | yes        | cumulative benefit since Value Period start (origin 0 by definition) | cumulative benefit by period end | yes                                  |
+| `annual_run_rate`    | yes (rate) | annualised benefit run-rate at each date                             | target run-rate by period end    | **no** — plan + formal forecast only |
+| `net_present_value`  | no         | —                                                                    | a single valuation               | —                                    |
+| `other`              | no         | —                                                                    | as described                     | —                                    |
+
+Kinds are never converted. Once a version is classified, later versions keep the same kind; a legacy (unclassified)
+case is classified by a new version created through a Value Change.
+
+**Ownership and lifecycle** (`value_trajectory_point`, exactly one parent):
+
+| Line            | Parent                                       | Editable while                             | Frozen when                                   | Dates                                              |
+| --------------- | -------------------------------------------- | ------------------------------------------ | --------------------------------------------- | -------------------------------------------------- |
+| Plan            | Value Case version (V1+; never inherited V0) | version draft                              | version proposed (editable again if returned) | within the version's Value Period                  |
+| Formal forecast | Assurance Review                             | review draft                               | review finalised                              | after the review date, within the governing period |
+| Option path     | Scenario                                     | review draft and recommendation not issued | recommendation issued / review finalised      | after the review date, within the governing period |
+| Realised        | — (finalised reviews' cumulative realised)   | —                                          | at finalisation                               | review dates                                       |
+
+The governing period and kind for forecast and option points are those of the version the review measured against.
+
+**Reconciliation** (no points = allowed, shown as "Phasing not entered"; drafts may be incomplete). When points exist:
+version proposal and VCO authorisation require a point on the period end equal to the version total, all points in
+the period; recommendation issue requires each option's period-end point to equal its stored total; review
+finalisation requires the forecast period-end point to equal the complete formal forecast total (an incomplete
+forecast cannot keep points) and re-checks option paths. Totals match exactly (numeric(18,2)).
+
+**Value Changes.** `valueChange.create` copies the basis kind, Value Period and plan points into the draft version.
+A phasing-only change (stated change 0, unchanged drivers) reconciles under the existing rule. The Value Period may
+change through a Value Change; the earlier version is never mutated.
+
+**Legacy.** Migration 0019/0020 is additive, with no backfill: unclassified versions, missing periods and absent
+points stay valid and behave exactly as before. Existing projects adopt trajectories through a VCO-authorised Value
+Change (stated change 0 where the total is unchanged). Project-level Value Basis description and Value Period remain
+setup information and keep their existing lock.
+
+**Out of MVP:** forecast ranges, a realised run-rate measure, Original Business Case (V0) phasing, per-driver
+phasing, AI-generated points, Working Outlook.
+
 ## Client reports (Phase 4A)
 
 ```

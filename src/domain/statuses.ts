@@ -33,6 +33,17 @@ export const VERSION_STATUSES = [
 ] as const;
 export type VersionStatus = (typeof VERSION_STATUSES)[number];
 
+/**
+ * Phase 4D.9: the economic basis a Value Case version is expressed on (the free-text Value Basis
+ * description still describes it). Only some kinds support a time trajectory; kinds are never converted.
+ */
+export const VALUE_BASIS_KINDS = ["cumulative_benefit", "annual_run_rate", "net_present_value", "other"] as const;
+export type ValueBasisKind = (typeof VALUE_BASIS_KINDS)[number];
+export const TRAJECTORY_BASIS_KINDS = [
+  "cumulative_benefit",
+  "annual_run_rate",
+] as const satisfies readonly ValueBasisKind[];
+
 export const KEY_DATE_KINDS = ["kickoff", "go_live", "six_month_review", "other"] as const;
 export type KeyDateKind = (typeof KEY_DATE_KINDS)[number];
 
