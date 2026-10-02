@@ -28,6 +28,7 @@ import { getAlternativeValueOutcomes, hasDecisionContext } from "./outcomes";
 import { getInformationRequestWorkspace } from "./information-request";
 import { getProjectHeader, type ProjectHeader } from "./projects";
 import { getReviewResponse, getValueChangeDetail, listValueChanges } from "./response";
+import { getAlternativesSnapshot, getReviewTrajectorySnapshot, getVersionPlanSnapshot } from "./trajectory";
 import { getRequalificationWorkspace, getVersionDetail } from "./value-case";
 
 // Report read models (Phase 4A). Each builder projects existing authoritative read
@@ -203,6 +204,7 @@ export async function buildRequalificationReport(
           evidence: d.evidence.map(ref),
         };
       }),
+      plan: await getVersionPlanSnapshot(version.id),
       notCarriedForward: ws.inheritedDrivers
         .filter((d) => !inV1.has(d.valueDriverId))
         .map((d) => ({ code: d.code, name: d.name, financialValue: d.financialValue })),
@@ -463,6 +465,8 @@ export async function buildAssuranceReport(
       nextActions,
       evolution: await assuranceEvolution(projectId, review.sequence),
       outcomes: await assuranceOutcomes(projectId, review.id),
+      trajectory: await getReviewTrajectorySnapshot(projectId, review.id),
+      alternatives: await getAlternativesSnapshot(projectId, review.id),
     },
     issuable: issuability("assurance", review.status),
   };
@@ -559,6 +563,10 @@ export async function buildValueChangeNotice(
               note: change.authorisationNote,
             }
           : null,
+      plans: {
+        from: await getVersionPlanSnapshot(d.fromVersion.id),
+        to: await getVersionPlanSnapshot(d.toVersion.id),
+      },
     },
     issuable: issuability("value_change_notice", change.status),
   };

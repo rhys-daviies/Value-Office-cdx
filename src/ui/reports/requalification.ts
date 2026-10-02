@@ -15,6 +15,8 @@ import {
   type ReportIssueMeta,
 } from "./common";
 import { html, type SafeHtml } from "./html";
+import { plansBlock, TRAJECTORY_CSS } from "./trajectory-sections";
+import { TRAJECTORY_SERIES } from "@/ui/trajectory/series";
 
 const AUTHORITY: Record<string, string> = {
   authorised: "Authorised",
@@ -32,9 +34,28 @@ export function renderRequalification(m: RequalificationReport, meta: ReportIssu
   const bare = m.drivers.filter((d) => d.assumptions.length === 0 && d.evidence.length === 0);
   const detailed = m.drivers.filter((d) => !bare.includes(d));
   const gaps = m.drivers.filter((d) => d.evidenceStatus !== "evidenced" || d.qualificationStatus !== "qualified");
+  // Model v3 (Phase 4D.9J): the authorised plan as recorded, spliced in without whitespace so v1/v2 render as issued.
+  const v3 = m.header.modelVersion >= 3 && m.plan !== undefined;
+  const planBlock = () =>
+    v3
+      ? html`${plansBlock(
+          [
+            {
+              plan: m.plan!,
+              label: `Authorised Plan (V${m.plan!.versionNumber})`,
+              color: TRAJECTORY_SERIES.plan.color,
+              dash: "7 4",
+            },
+          ],
+          $,
+          { testId: "rq-plan", title: "Value Basis and Authorised Plan" },
+        )}`
+      : null;
 
+  // v1/v2 layout is byte-exact (golden-tested); v3 sections are spliced in without whitespace. Never reformat.
+  // prettier-ignore
   return html`
-    ${reportHeader(m.header, meta, { asAtLabel: "Authorised on", status })}
+    ${reportHeader(m.header, meta, { asAtLabel: "Authorised on", status })}${v3 ? TRAJECTORY_CSS : null}
     ${
       a.status === "superseded"
         ? html`<div class="callout bad" data-testid="rq-superseded">
@@ -81,7 +102,7 @@ export function renderRequalification(m: RequalificationReport, meta: ReportIssu
             : ""
         }
       </p>
-      ${a.summary ? text(a.summary) : null}
+      ${a.summary ? text(a.summary) : null}${planBlock()}
     </section>
 
     <section>

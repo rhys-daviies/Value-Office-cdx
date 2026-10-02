@@ -65,8 +65,10 @@ test("Alternative Value Outcomes: latest decision on Overview → full view on t
   await expect(latest.getByTestId("overview-decision-difference")).toHaveText("-$0.3m");
   await expect(latest.getByRole("img")).toHaveCount(0); // no chart on Overview
   // The pending Value Change is governance, shown provisionally in the Value Case summary — never as an outcome.
-  // (Its draft version's drivers are unchanged so far, so the proposed version-total change is $0.)
-  await expect(page.getByTestId("summary-pending")).toContainText("Proposed change $0 · Draft — not in force");
+  // 4D.9J: its stated +$250k does not yet reconcile with the draft version (unchanged drivers): both are shown.
+  await expect(page.getByTestId("summary-pending")).toContainText(
+    "Stated change +$250k · Current draft movement $0 · Does not reconcile · Draft — not in force",
+  );
   await expect(latest).not.toContainText("VC-001");
 
   await latest.getByRole("link", { name: "View Assurance decision →" }).click();

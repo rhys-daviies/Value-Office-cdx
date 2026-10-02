@@ -1,0 +1,212 @@
+<style>
+      
+.vo-report {
+  --ink: #0f172a; --muted: #475569; --faint: #94a3b8; --rule: #cbd5e1; --panel: #f8fafc;
+  --accent: #0f766e; --warn: #b45309; --warn-bg: #fffbeb; --bad: #b91c1c; --bad-bg: #fef2f2;
+  --info: #6d28d9; --info-bg: #f5f3ff;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--ink); font-size: 10.5pt; line-height: 1.45; background: #fff;
+  max-width: 190mm; margin: 0 auto;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.vo-report * { box-sizing: border-box; }
+.vo-report .rpt-banner { border: 1.5px dashed var(--warn); background: var(--warn-bg); color: var(--warn);
+  font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 9pt; padding: 6px 10px; margin-bottom: 14px; }
+.vo-report .rpt-head { border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 18px; }
+.vo-report .rpt-brand { display: flex; justify-content: space-between; font-size: 8.5pt; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); }
+.vo-report .rpt-brand b { color: var(--accent); }
+.vo-report h1 { font-size: 21pt; line-height: 1.15; margin: 10px 0 2px; font-weight: 700; }
+.vo-report .rpt-subject { font-size: 12pt; color: var(--muted); margin: 0 0 10px; }
+.vo-report .rpt-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 18px; margin: 0; font-size: 9pt; }
+.vo-report .rpt-meta div { min-width: 0; }
+.vo-report .rpt-meta dt { color: var(--muted); font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; }
+.vo-report .rpt-meta dd { margin: 0; font-weight: 600; }
+.vo-report section { margin: 0 0 18px; }
+.vo-report h2 { font-size: 12.5pt; margin: 0 0 8px; padding-bottom: 3px; border-bottom: 1px solid var(--rule);
+  break-after: avoid; page-break-after: avoid; }
+.vo-report h3 { font-size: 10.5pt; margin: 12px 0 4px; break-after: avoid; }
+.vo-report p { margin: 0 0 8px; }
+.vo-report .rpt-text { white-space: pre-line; }
+.vo-report .rpt-muted { color: var(--muted); }
+.vo-report .rpt-small { font-size: 8.5pt; }
+.vo-report .rpt-headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(30mm, 1fr)); gap: 8px;
+  margin: 0 0 10px; break-inside: avoid; }
+.vo-report .rpt-figure { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; background: var(--panel); }
+.vo-report .rpt-figure .k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.vo-report .rpt-figure .v { font-size: 16pt; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.vo-report .rpt-figure .n { font-size: 8pt; color: var(--muted); margin-top: 2px; }
+.vo-report .rpt-figure.is-gap { border-color: #fdba74; }
+.vo-report .rpt-figure.is-leak { border-color: #fca5a5; }
+.vo-report .rpt-figure.is-info { border-color: #c4b5fd; background: var(--info-bg); }
+.vo-report .rpt-figure.is-warn { border-color: #fcd34d; background: var(--warn-bg); }
+.vo-report .rpt-figure.is-warn .v { color: var(--warn); }
+.vo-report table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 0 0 8px; }
+.vo-report th { text-align: left; font-weight: 600; color: var(--muted); font-size: 7.5pt; text-transform: uppercase;
+  letter-spacing: .04em; border-bottom: 1.5px solid var(--ink); padding: 4px 6px; vertical-align: bottom; }
+.vo-report td { border-bottom: 1px solid var(--rule); padding: 5px 6px; vertical-align: top; }
+.vo-report tr { break-inside: avoid; page-break-inside: avoid; }
+.vo-report thead { display: table-header-group; }
+.vo-report .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vo-report tfoot td { font-weight: 700; border-top: 1.5px solid var(--ink); border-bottom: none; }
+.vo-report .tag { display: inline-block; font-size: 7.5pt; font-weight: 600; padding: 1px 6px; border-radius: 9px;
+  border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+.vo-report .tag.good { color: #047857; border-color: #6ee7b7; }
+.vo-report .tag.part { color: var(--warn); border-color: #fcd34d; }
+.vo-report .tag.none { color: var(--bad); border-color: #fca5a5; }
+.vo-report .tag.info { color: var(--info); border-color: #c4b5fd; }
+.vo-report .unq { color: var(--warn); font-style: italic; font-weight: 600; }
+.vo-report .callout { border-left: 3px solid var(--rule); background: var(--panel); padding: 7px 10px; margin: 0 0 10px;
+  break-inside: avoid; }
+.vo-report .callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+.vo-report .callout.bad { border-color: var(--bad); background: var(--bad-bg); }
+.vo-report .callout.info { border-color: var(--info); background: var(--info-bg); }
+.vo-report .callout strong { display: block; }
+.vo-report .stamp { display: inline-block; border: 2px solid var(--bad); color: var(--bad); font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; margin: 0 6px 6px 0; font-size: 9.5pt; }
+.vo-report .stamp.neutral { border-color: var(--muted); color: var(--muted); }
+.vo-report .stamp.good { border-color: #047857; color: #047857; }
+.vo-report .rpt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; break-inside: avoid; }
+.vo-report .rpt-panel { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; }
+.vo-report .rpt-panel h3 { margin-top: 0; }
+.vo-report .rpt-kv { display: grid; grid-template-columns: 38% 1fr; gap: 3px 10px; font-size: 9pt; margin: 0; }
+.vo-report .rpt-kv dt { color: var(--muted); }
+.vo-report .rpt-kv dd { margin: 0; }
+.vo-report .bars { margin: 4px 0 10px; break-inside: avoid; }
+.vo-report .bar { display: grid; grid-template-columns: 48mm 1fr 22mm; align-items: center; gap: 8px; margin: 3px 0; font-size: 9pt; }
+.vo-report .bar .track { background: #eef2f7; height: 12px; border-radius: 2px; }
+.vo-report .bar .fill { background: #64748b; height: 12px; border-radius: 2px; }
+.vo-report .bar.current .fill { background: #0369a1; }
+.vo-report .bar.recommended .fill { background: var(--accent); }
+.vo-report .bar.selected .fill { background: #7c3aed; }
+.vo-report .rpt-list { margin: 0 0 8px; padding-left: 18px; }
+.vo-report .rpt-list li { margin: 2px 0; }
+.vo-report .rpt-end { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 8pt; color: var(--muted); }
+@media print { .vo-report { max-width: none; } }
+
+    </style>
+    <article class="vo-report" data-report-type="information_request">
+    
+    <div class="rpt-banner" data-testid="report-draft-banner">
+            Draft preview — not issued. Figures reflect the Value Record now and may change before issue.
+          </div>
+    <header class="rpt-head">
+      <div class="rpt-brand">
+        <span><b>Cardaxia</b> · Value Office</span>
+        <span data-testid="report-issue-line"
+          >Draft preview</span
+        >
+      </div>
+      <h1>Information Request</h1>
+      <p class="rpt-subject">Request IR-01</p>
+      <dl class="rpt-meta">
+        <div>
+          <dt>Client</dt>
+          <dd>Synthetic Test Client</dd>
+        </div>
+        <div>
+          <dt>Project</dt>
+          <dd>Golden Information Request</dd>
+        </div>
+        <div>
+          <dt>Report date</dt>
+          <dd>Not issued</dd>
+        </div>
+        <div>
+          <dt>Request issued</dt>
+          <dd>—</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd data-testid="report-status">Draft</dd>
+        </div>
+        <div>
+          <dt>Value Basis</dt>
+          <dd>Synthetic test basis · USD</dd>
+        </div>
+      </dl>
+    </header>
+  
+    <section>
+      <h2>Baseline data</h2>
+      <p>
+        Reference IR-01. This request sets out the information Cardaxia needs from Synthetic Test Client
+        to establish and re-qualify the Value Case for Golden Information Request. Each item supports the evidence behind a
+        Value Driver, its assumptions or its financial value.
+      </p>
+      <p class="rpt-muted rpt-small">
+        Please provide each item to the named contact by the due date. Where information is not available, please say
+        so, so that the Value Case can record the gap rather than assume a value.
+      </p>
+    </section>
+    <section>
+      <h2>Request summary</h2>
+      <div class="rpt-headline" data-testid="ir-summary">
+        <div class="rpt-figure" data-testid="">
+    <div class="k">Items</div>
+    <div class="v">2</div>
+    
+  </div> <div class="rpt-figure" data-testid="">
+    <div class="k">Open</div>
+    <div class="v">2</div>
+    
+  </div>
+        <div class="rpt-figure" data-testid="">
+    <div class="k">Partial</div>
+    <div class="v">0</div>
+    
+  </div> <div class="rpt-figure" data-testid="">
+    <div class="k">Received</div>
+    <div class="v">0</div>
+    
+  </div>
+        <div class="rpt-figure" data-testid="">
+    <div class="k">Not available</div>
+    <div class="v">0</div>
+    
+  </div>
+      </div>
+    </section>
+    <section>
+      <h2>Information requested</h2>
+      <table data-testid="ir-items">
+              <thead>
+                <tr>
+                  <th style="width:6%">#</th>
+                  <th>Information requested</th>
+                  <th style="width:16%">Requested from</th>
+                  <th style="width:12%">Due</th>
+                  <th style="width:18%">Value Driver</th>
+                  <th style="width:11%">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                      <td>1</td>
+                      <td>
+                        Baseline tickets
+                        
+                      </td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>General</td>
+                      <td>Open</td>
+                    </tr><tr>
+                      <td>2</td>
+                      <td>
+                        Org chart
+                        
+                      </td>
+                      <td>—</td>
+                      <td>—</td>
+                      <td>General</td>
+                      <td>Open</td>
+                    </tr>
+              </tbody>
+            </table>
+    </section>
+    <p class="rpt-end">
+    Prepared by Cardaxia from the governed Value Record.
+    Draft preview — not an issued report.
+  </p>
+  </article>

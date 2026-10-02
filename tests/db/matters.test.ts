@@ -357,7 +357,9 @@ describe("formal Assurance Review snapshot", () => {
     expect(items.get("VL-102")!.assessment).toBeNull();
     expect(items.get("VL-102")!.identifiedInReview).toBeNull();
     const rendered = text(renderReportArticle(report, { state: "preview" }));
-    const row = rendered.slice(rendered.indexOf("VL-102 Unquantified"));
+    // Model v3 (4D.9J): the matter also appears in the story; the leakage table is under its own heading.
+    const table = rendered.slice(rendered.indexOf(". Value Leakage Per matter"));
+    const row = table.slice(table.indexOf("VL-102 Unquantified"));
     expect(row).toMatch(/^VL-102 Unquantified \S+ Not assigned Not yet quantified/);
     expect(rendered).not.toContain("777,777");
     expect(rendered).not.toContain("$0.8m");

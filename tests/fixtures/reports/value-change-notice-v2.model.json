@@ -1,0 +1,82 @@
+{
+  "header": {
+    "modelVersion": 2,
+    "type": "value_change_notice",
+    "title": "Value Change Notice",
+    "subjectLabel": "Value Change VC-001",
+    "subjectStatus": "authorised",
+    "clientName": "Synthetic Test Client",
+    "projectName": "Golden Evolution",
+    "projectCode": "GOLD-EV",
+    "currency": "USD",
+    "asAt": "2026-07-15",
+    "valueBasis": {
+      "description": "Synthetic test basis",
+      "periodStart": null,
+      "periodEnd": null
+    }
+  },
+  "change": {
+    "code": "VC-001",
+    "status": "authorised",
+    "reason": "Rebase Alpha Savings to $0.8m",
+    "economicImpactNarrative": null,
+    "statedChange": "-200000.00",
+    "proposedOn": "2026-10-02"
+  },
+  "current": {
+    "versionNumber": 1,
+    "title": "Re-Qualified Value Case",
+    "status": "superseded",
+    "total": "1500000.00"
+  },
+  "proposed": {
+    "versionNumber": 2,
+    "title": "Value Case (VC-001)",
+    "status": "authorised",
+    "total": "1300000.00"
+  },
+  "projectedFromStated": "1300000.00",
+  "actualChange": "-200000.00",
+  "reconciled": true,
+  "readyForAuthorisation": false,
+  "changedDrivers": [
+    {
+      "code": "VD-01",
+      "name": "Alpha Savings",
+      "fromValue": "1000000.00",
+      "toValue": "800000.00",
+      "change": "-200000.00",
+      "added": false,
+      "removed": false
+    }
+  ],
+  "unchangedDriverCount": 1,
+  "origin": {
+    "review": {
+      "sequence": 2,
+      "reviewDate": "2026-06-30"
+    },
+    "recommendation": {
+      "label": "Rebase Alpha Savings",
+      "totalValue": "1300000.00"
+    },
+    "decision": {
+      "label": "Rebase Alpha Savings",
+      "totalValue": "1300000.00",
+      "decidedBy": "Test VCO",
+      "decidedOn": "2026-07-01",
+      "clientElectedDifference": "0.00"
+    }
+  },
+  "authorisation": {
+    "vco": "Test VCO",
+    "authorisedBy": "Test VCO",
+    "authorisedOn": "2026-07-15",
+    "evidence": {
+      "code": "E-002",
+      "title": "V2 authorisation"
+    },
+    "note": null
+  }
+}

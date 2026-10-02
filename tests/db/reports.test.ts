@@ -172,12 +172,15 @@ describe("report read models use the authoritative Value Record", () => {
     expect(built.model.drivers.every((d) => d.realisedValue === null)).toBe(true);
 
     const text = textOf(renderReportArticle(built.model, preview));
-    expect(text).toMatch(/Authorised Value \$15\.5m/);
-    expect(text).toMatch(/Current Forecast \$14\.7m/);
-    expect(text).toMatch(/Value Gap \$0\.8m/);
-    expect(text).toMatch(/Movement -\$0\.8m/);
-    expect(text).toMatch(/Unattributed Realised \$2\.8m Not allocated to any Value Driver/);
-    expect(text).toMatch(/Attributed Realised — No realised value attributed to drivers/);
+    // Model v3 (4D.9J) executive position: Authorised / Realised / Formal Forecast / Value Gap, as at the review.
+    expect(text).toMatch(/Authorised Value \$15\.5m V1/);
+    expect(text).toMatch(/Realised \$2\.8m All recorded as unattributed \(project level\)/);
+    expect(text).toMatch(/Formal Forecast \$14\.7m/);
+    expect(text).toMatch(/Value Gap \$0\.8m Authorised − Formal Forecast/);
+    expect(text).toContain(
+      "Realised includes $2,800,000 recorded at project level and not attributed to any Value Driver",
+    );
+    expect(text).toMatch(/Total \(financial drivers\) \$15,500,000 \S+ \$14,700,000 -\$800,000/); // movement kept
     expect(text).toContain("Unattributed realised value (not allocated to any Value Driver) $2,800,000");
   });
 
@@ -198,13 +201,14 @@ describe("report read models use the authoritative Value Record", () => {
     expect(m.scenarios.find((s) => s.isClientSelection)!.totalValue).toBe("14900000.00");
 
     const text = textOf(renderReportArticle(m, preview));
-    // Model v2 numbering (Phase 4D.7: Value Case Evolution is section 2).
-    const rec = text.slice(text.indexOf("8. Cardaxia recommendation"), text.indexOf("9. Client decision"));
-    const dec = text.slice(text.indexOf("9. Client decision"), text.indexOf("10. Value Change"));
+    // Model v3 (4D.9J) sections: recommendation and management decision stay separate.
+    const decAt = text.indexOf(". Management decision Selected option");
+    const rec = text.slice(text.lastIndexOf(". Cardaxia recommendation", decAt), decAt);
+    const dec = text.slice(decAt, text.indexOf(". Governance and Value Change"));
     expect(rec).toContain("$15.3m");
     expect(rec).not.toContain("$14.9m");
     expect(dec).toContain("$14.9m");
-    expect(dec).toMatch(/Difference vs Cardaxia recommendation -\$0\.4m/);
+    expect(dec).toMatch(/Difference from Cardaxia recommendation -\$0\.4m/);
   });
 
   it("Assurance: Horizon VL-001 renders as not yet quantified — never $0, never the prototype figures", async () => {
@@ -216,7 +220,10 @@ describe("report read models use the authoritative Value Record", () => {
 
     const markup = renderReportArticle(m, preview);
     const text = textOf(markup);
-    const leakage = text.slice(text.indexOf("6. Value Leakage"), text.indexOf("7. Alternative Value Outcomes"));
+    const leakage = text.slice(
+      text.indexOf(". Value Leakage Per matter"),
+      text.indexOf(". Alternative Value Outcomes"),
+    );
     expect(leakage).toContain("Not yet quantified");
     expect(leakage).not.toMatch(/\$0(\b|\.)/);
     for (const figure of Object.values(HORIZON.response.prototypeLeakage)) expect(text).not.toContain(figure);
@@ -239,7 +246,8 @@ describe("report read models use the authoritative Value Record", () => {
     expect(text).not.toContain("$320,000");
     expect(text).not.toContain("$0.3m");
     // The unquantified item says so rather than showing zero.
-    const row = text.slice(text.indexOf("VL-002 Unsized vendor risk"));
+    const table = text.slice(text.indexOf(". Value Leakage Per matter")); // v3: the story names it first
+    const row = table.slice(table.indexOf("VL-002 Unsized vendor risk"));
     expect(row).toMatch(/^VL-002 Unsized vendor risk Not specified Not assigned Not yet quantified/);
   });
 
@@ -263,7 +271,7 @@ describe("report read models use the authoritative Value Record", () => {
     expect(text).toContain("NOT RECONCILED");
     expect(text).toContain("NOT READY FOR AUTHORISATION");
     expect(text).toMatch(/Current authorised value \$15\.5m/);
-    expect(text).toMatch(/Stated change -\$0\.6m/);
+    expect(text).toMatch(/Stated change -\$600k/); // v3: adaptive precision for change amounts
     expect(text).toMatch(/Proposed authorised value \$14\.9m/);
     expect(text).toContain("No Value Driver has been changed in the proposed version");
   });

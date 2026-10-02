@@ -1,0 +1,129 @@
+{
+  "header": {
+    "modelVersion": 2,
+    "type": "requalification",
+    "title": "Re-Qualification Report",
+    "subjectLabel": "Value Case V1",
+    "subjectStatus": "authorised",
+    "clientName": "Synthetic Test Client",
+    "projectName": "Golden Trajectory Executive",
+    "projectCode": "GOLD-TX",
+    "currency": "USD",
+    "asAt": "2026-01-15",
+    "valueBasis": {
+      "description": "Synthetic: cumulative benefit over FY26–FY28",
+      "periodStart": "2026-01-01",
+      "periodEnd": "2028-12-31"
+    }
+  },
+  "inherited": null,
+  "authorised": {
+    "versionNumber": 1,
+    "title": "Re-Qualified Value Case",
+    "summary": null,
+    "status": "authorised",
+    "total": "30000000.00",
+    "authorisedOn": "2026-01-15",
+    "authorisedBy": "Test VCO",
+    "evidence": {
+      "code": "E-001",
+      "title": "Synthetic authorisation"
+    },
+    "note": null,
+    "supersededOn": null
+  },
+  "movement": null,
+  "currentVersion": null,
+  "drivers": [
+    {
+      "code": "VD-01",
+      "name": "Procurement Savings",
+      "description": null,
+      "metric": null,
+      "metricUnit": null,
+      "baselineValue": null,
+      "targetValue": null,
+      "financialValue": "15000000.00",
+      "timing": null,
+      "avoName": null,
+      "qualificationStatus": "unqualified",
+      "evidenceStatus": "unevidenced",
+      "economicRationale": null,
+      "inherited": {
+        "present": false,
+        "financialValue": null,
+        "change": null
+      },
+      "assumptions": [],
+      "evidence": []
+    },
+    {
+      "code": "VD-02",
+      "name": "Revenue Uplift",
+      "description": null,
+      "metric": null,
+      "metricUnit": null,
+      "baselineValue": null,
+      "targetValue": null,
+      "financialValue": "10000000.00",
+      "timing": null,
+      "avoName": null,
+      "qualificationStatus": "unqualified",
+      "evidenceStatus": "unevidenced",
+      "economicRationale": null,
+      "inherited": {
+        "present": false,
+        "financialValue": null,
+        "change": null
+      },
+      "assumptions": [],
+      "evidence": []
+    },
+    {
+      "code": "VD-03",
+      "name": "Working Capital",
+      "description": null,
+      "metric": null,
+      "metricUnit": null,
+      "baselineValue": null,
+      "targetValue": null,
+      "financialValue": "5000000.00",
+      "timing": null,
+      "avoName": null,
+      "qualificationStatus": "unqualified",
+      "evidenceStatus": "unevidenced",
+      "economicRationale": null,
+      "inherited": {
+        "present": false,
+        "financialValue": null,
+        "change": null
+      },
+      "assumptions": [],
+      "evidence": []
+    }
+  ],
+  "notCarriedForward": [],
+  "counts": {
+    "driverCount": 3,
+    "financialCount": 3,
+    "nonFinancialCount": 0,
+    "qualification": {
+      "unqualified": 3,
+      "partially_qualified": 0,
+      "qualified": 0
+    },
+    "evidence": {
+      "unevidenced": 3,
+      "partially_evidenced": 0,
+      "evidenced": 0
+    },
+    "withoutEvidenceLinks": 3,
+    "withoutAvo": 3,
+    "assumptionCount": 0,
+    "assumptionEvidence": {
+      "unevidenced": 0,
+      "partially_evidenced": 0,
+      "evidenced": 0
+    }
+  }
+}

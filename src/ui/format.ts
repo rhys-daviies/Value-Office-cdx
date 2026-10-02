@@ -77,6 +77,38 @@ export function formatMoneyChange(value: string | null | undefined, currency: st
     : `${d.isPositive() ? "+" : ""}${formatMoneyShort(value, currency)}`;
 }
 
+/**
+ * Governance / Value Change amount (Phase 4D.9J): precise enough that a smaller change is never rounded into a
+ * different-looking figure. $1m and above in millions with one or two decimals ($30.0m, $2.5m, $1.25m); $1k–$1m in
+ * thousands ($450k, $12.3k); below $1k exactly. Unlike formatMoneyShort, $450,000 reads $450k, never $0.5m.
+ */
+export function formatMoneyAdaptive(value: string | null | undefined, currency: string): string {
+  if (value === null || value === undefined) return "—";
+  const d = new Decimal(value);
+  const sign = d.isNegative() ? "-" : "";
+  const abs = d.abs();
+  const trim = (x: Decimal, max: number, min: number) => {
+    const [int, frac = ""] = x.toFixed(max).split(".");
+    const kept = frac.replace(/0+$/, "").padEnd(min, "0");
+    return `${groupThousands(int!)}${kept ? `.${kept}` : ""}`;
+  };
+  let body: string;
+  if (abs.isZero()) body = "0";
+  else if (abs.gte(1_000_000)) body = `${trim(abs.dividedBy(1_000_000), 2, 1)}m`;
+  else if (abs.gte(1_000)) body = `${trim(abs.dividedBy(1_000), 1, 0)}k`;
+  else body = trim(abs, 2, 0);
+  return `${sign}${currencySymbol(currency)}${body}`;
+}
+
+/** Signed governance change: +$450k / -$1.25m / $0. */
+export function formatMoneyAdaptiveChange(value: string | null | undefined, currency: string): string {
+  if (value === null || value === undefined) return "—";
+  const d = new Decimal(value);
+  return d.isZero()
+    ? formatMoneyAdaptive("0", currency)
+    : `${d.isPositive() ? "+" : ""}${formatMoneyAdaptive(value, currency)}`;
+}
+
 /** Metric values are numeric(20,6); trim trailing zeros but keep one decimal where given. */
 export function formatMetric(value: string | null | undefined, unit?: string | null): string {
   if (value === null || value === undefined) return "—";

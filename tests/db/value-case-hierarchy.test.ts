@@ -169,7 +169,15 @@ describe("Value Case governance summary and current authorised version", () => {
     expect(s.current!.versionNumber).toBe(2); // 11. a draft V3 never becomes current
     // A re-phasing draft at an unchanged total: the provisional change is exactly zero.
     expect(s.pending).toEqual([
-      { id: expect.any(String), code: "VC-002", status: "draft", toVersionNumber: 3, proposedChange: "0.00" },
+      {
+        id: expect.any(String),
+        code: "VC-002",
+        status: "draft",
+        toVersionNumber: 3,
+        proposedChange: "0.00",
+        statedChange: "0.00",
+        reconciled: true, // stated 0 = movement 0: one provisional amount
+      },
     ]);
     expect(strip(renderToStaticMarkup(createElement(ValueCaseSummary, { summary: s, base: "/p" })))).toContain(
       "Proposed change $0 · Draft — not in force",

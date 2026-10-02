@@ -21,7 +21,8 @@ import {
 } from "@/ui/components/badges";
 import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields";
 import { ButtonLink, Notice, Section, Table, TextLink } from "@/ui/components/layout";
-import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
+import { formatDate, formatMoneyAdaptiveChange, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
+import { money } from "@/domain/money";
 import { VALUE_BASIS_LABELS } from "@/ui/labels";
 import { ValueCaseEvolution } from "@/ui/evolution/evolution";
 import { ValueTrajectory } from "@/ui/trajectory/trajectory";
@@ -191,9 +192,20 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
                         : c.change.status.charAt(0).toUpperCase() + c.change.status.slice(1)}
                   </td>
                   <td className="text-right">
-                    {c.change.status === "draft" || c.change.status === "proposed"
-                      ? `Proposed change ${formatMoneyChange(c.actualChange, project.currency)}`
-                      : formatMoneyChange(c.actualChange, project.currency)}
+                    {c.change.status === "draft" || c.change.status === "proposed" ? (
+                      c.change.statedChangeAmount !== null &&
+                      !money(c.change.statedChangeAmount).equals(money(c.actualChange)) ? (
+                        // Existing invariant surfaced: stated ≠ draft movement; neither is adjusted.
+                        <span data-testid="value-change-unreconciled">
+                          Stated {formatMoneyAdaptiveChange(c.change.statedChangeAmount, project.currency)} · draft
+                          movement {formatMoneyAdaptiveChange(c.actualChange, project.currency)} · does not reconcile
+                        </span>
+                      ) : (
+                        `Proposed change ${formatMoneyAdaptiveChange(c.actualChange, project.currency)}`
+                      )
+                    ) : (
+                      formatMoneyAdaptiveChange(c.actualChange, project.currency)
+                    )}
                   </td>
                 </tr>
               ))}

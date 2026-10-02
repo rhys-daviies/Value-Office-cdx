@@ -1,7 +1,7 @@
 import type { ValueCaseSummary as Summary } from "@/server/queries/value-case-summary";
 import { GovernedTag } from "@/ui/components/badges";
 import { TextLink } from "@/ui/components/layout";
-import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
+import { formatDate, formatMoneyAdaptiveChange, formatMoneyShort } from "@/ui/format";
 
 // Compact Value Case governance summary for Overview (Phase 4D.9H). Text only: the full Value Case Evolution and the
 // Value Change history live on the Value Case page.
@@ -66,8 +66,19 @@ export function ValueCaseSummary({ summary: s, base }: { summary: Summary; base:
             ? null
             : s.pending.map((p) => (
                 <span key={p.id} className="block" data-testid="summary-pending">
-                  Proposed change {formatMoneyChange(p.proposedChange, s.currency)} ·{" "}
-                  {p.status === "draft" ? "Draft" : "Proposed"} — not in force ·{" "}
+                  {p.reconciled === false ? (
+                    // Existing invariant surfaced: both figures shown as recorded; neither is adjusted.
+                    <>
+                      Stated change {formatMoneyAdaptiveChange(p.statedChange, s.currency)} · Current draft movement{" "}
+                      {formatMoneyAdaptiveChange(p.proposedChange, s.currency)} ·{" "}
+                      <span className="font-medium text-slate-700" data-testid="summary-pending-unreconciled">
+                        Does not reconcile
+                      </span>
+                    </>
+                  ) : (
+                    <>Proposed change {formatMoneyAdaptiveChange(p.proposedChange, s.currency)}</>
+                  )}{" "}
+                  · {p.status === "draft" ? "Draft" : "Proposed"} — not in force ·{" "}
                   <TextLink href={`${base}/changes/${p.id}`}>Open {p.code}</TextLink>
                 </span>
               )),

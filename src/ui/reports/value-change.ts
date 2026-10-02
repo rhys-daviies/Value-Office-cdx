@@ -1,8 +1,10 @@
 import type { ValueChangeNotice } from "@/domain/reports";
-import { formatDate } from "@/ui/format";
+import { formatDate, formatMoneyAdaptiveChange } from "@/ui/format";
 
 import { figure, moneyFormatters, reportEnd, reportHeader, text, type ReportIssueMeta } from "./common";
 import { html, type SafeHtml } from "./html";
+import { plansBlock, TRAJECTORY_CSS } from "./trajectory-sections";
+import { TRAJECTORY_SERIES } from "@/ui/trajectory/series";
 
 const STATUS = {
   draft: "Draft — in preparation",
@@ -17,12 +19,45 @@ export function renderValueChangeNotice(m: ValueChangeNotice, meta: ReportIssueM
   const c = m.change;
   const authorised = c.status === "authorised";
   const notReconciled = m.reconciled === false;
+  // Model v3 (Phase 4D.9J): plans before/after, provisional wording and adaptive precision for change amounts —
+  // spliced in without whitespace so v1/v2 snapshots render byte-for-byte as issued.
+  const v3 = m.header.modelVersion >= 3 && m.plans !== undefined;
+  const adaptive = (v: string | null) => formatMoneyAdaptiveChange(v, m.header.currency);
+  const plansSection = () =>
+    v3
+      ? html`${plansBlock(
+            [
+              {
+                plan: m.plans!.from,
+                label: `V${m.plans!.from.versionNumber} (${authorised ? "before" : "in force"})`,
+                color: "#64748b",
+                dash: "4 3",
+              },
+              {
+                plan: m.plans!.to,
+                label: `V${m.plans!.to.versionNumber} (${authorised ? "authorised" : `${c.status} — not in force`})`,
+                color: TRAJECTORY_SERIES.plan.color,
+              },
+            ],
+            $,
+            { testId: "vc-plans", title: `Authorised Plan ${authorised ? "before and after" : "now and as proposed"}` },
+          )}
+          <p class="rpt-small" data-testid="vc-change-precision">
+            ${
+              m.reconciled === false
+                ? `Stated change ${adaptive(c.statedChange)} · ${authorised ? "version" : "current draft"} movement ${adaptive(m.actualChange)} · does not reconcile${authorised ? "" : " — not in force"}.`
+                : `${authorised ? "Authorised" : "Proposed"} change ${adaptive(m.actualChange)}${authorised ? "" : " — not in force"}.`
+            }
+          </p>`
+      : null;
 
+  // v1/v2 layout is byte-exact (golden-tested); v3 sections are spliced in without whitespace. Never reformat.
+  // prettier-ignore
   return html`
     ${reportHeader(m.header, meta, {
       asAtLabel: authorised ? "Authorised on" : "Proposed on",
       status: STATUS[c.status],
-    })}
+    })}${v3 ? TRAJECTORY_CSS : null}
 
     <div data-testid="vc-stamps">
       <span class="stamp ${authorised ? "good" : "neutral"}"
@@ -53,7 +88,7 @@ export function renderValueChangeNotice(m: ValueChangeNotice, meta: ReportIssueM
           testId: "vc-current",
           note: `Value Case V${m.current.versionNumber}${authorised ? " (superseded, preserved)" : ""}`,
         })}
-        ${figure("Stated change", $.shortChange(c.statedChange), { testId: "vc-stated", tone: "gap" })}
+        ${figure("Stated change", v3 ? adaptive(c.statedChange) : $.shortChange(c.statedChange), { testId: "vc-stated", tone: "gap" })}
         ${figure(
           authorised ? "New authorised value" : "Proposed authorised value",
           $.short(authorised ? m.proposed.total : (m.projectedFromStated ?? m.proposed.total)),
@@ -142,7 +177,7 @@ export function renderValueChangeNotice(m: ValueChangeNotice, meta: ReportIssueM
               </tbody>
             </table>`
       }
-      <p class="rpt-small rpt-muted">${m.unchangedDriverCount} Value Driver(s) unchanged and not listed.</p>
+      <p class="rpt-small rpt-muted">${m.unchangedDriverCount} Value Driver(s) unchanged and not listed.</p>${plansSection()}
     </section>
 
     <section>

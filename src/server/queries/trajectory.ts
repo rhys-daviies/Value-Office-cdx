@@ -13,6 +13,7 @@ import {
   type TrajectoryMeasure,
   type TrajectoryStatus,
 } from "@/domain/trajectory";
+import type { ReportAlternatives, ReportPlan, ReportTrajectory } from "@/domain/reports";
 import { db, schema } from "@/server/db/client";
 
 import { getAssuranceReviewList } from "./assurance";
@@ -784,5 +785,131 @@ export async function getAlternativeValueTrajectories(
     notes,
     decisionComparison,
     outcomes,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Report snapshots (Phase 4D.9J, model v3). Built once at report build/issue time and stored verbatim in the issued
+// snapshot; the report renderer never reads live trajectory data. Same governed semantics as the application's
+// charts, taken AS AT the report subject (a version, or one Assurance Review) — never "today".
+
+/** One version's plan as recorded (basis, period, milestones, total, availability). */
+export async function getVersionPlanSnapshot(versionId: string): Promise<ReportPlan> {
+  const [v] = await db().select().from(schema.valueCaseVersion).where(eq(schema.valueCaseVersion.id, versionId));
+  const [{ total }, points] = await Promise.all([
+    getVersionTotal(v!.id),
+    pointsBy("valueCaseVersionId", [v!.id]).then((m) => m.get(v!.id) ?? []),
+  ]);
+  const supported = trajectoryMeasure(v!.valueBasisKind) !== null && v!.valuePeriodStart && v!.valuePeriodEnd;
+  return {
+    versionNumber: v!.versionNumber,
+    status: v!.status,
+    valueBasisKind: v!.valueBasisKind,
+    period: v!.valuePeriodStart && v!.valuePeriodEnd ? { start: v!.valuePeriodStart, end: v!.valuePeriodEnd } : null,
+    total: toDbMoney(total),
+    milestones: supported ? points.map((p) => ({ asOf: p.asOf, value: p.value })) : [],
+    availability: trajectoryStatus(v!, points.length),
+  };
+}
+
+/**
+ * The primary Value Trajectory as at one review: the plan of the version it measured against; realised positions of
+ * finalised reviews up to and including it (cumulative, comparable, complete, in period); its own forecast milestones,
+ * anchored on its own complete realised position; the authorised Value Change that created that version.
+ */
+export async function getReviewTrajectorySnapshot(projectId: string, reviewId: string): Promise<ReportTrajectory> {
+  const [[review], versions, reviews] = await Promise.all([
+    db().select().from(schema.assuranceReview).where(eq(schema.assuranceReview.id, reviewId)),
+    listVersions(projectId),
+    getAssuranceReviewList(projectId),
+  ]);
+  const plan = await getVersionPlanSnapshot(review!.againstVersionId);
+  const measure = trajectoryMeasure(plan.valueBasisKind);
+  const available = measure !== null && plan.period !== null;
+  const within = (d: string) => plan.period !== null && d >= plan.period.start && d <= plan.period.end;
+  const kindOf = new Map(versions.map((v) => [v.versionNumber, v.valueBasisKind]));
+  const notes: ReportTrajectory["notes"] = [];
+  if (available && plan.milestones.length === 0) notes.push("plan_phasing_not_entered");
+
+  let realised: ReportTrajectory["realised"] = null;
+  if (available && measure === "cumulative") {
+    const checkpoints: { sequence: number; asOf: string; value: string }[] = [];
+    const excluded: { sequence: number; reason: "incomplete" | "not_recorded" | "outside_period" }[] = [];
+    for (const r of reviews) {
+      const isSelf = r.review.id === reviewId;
+      if (!isSelf && (r.review.status !== "finalised" || r.review.sequence > review!.sequence)) continue;
+      if (!realisedComparable(plan.valueBasisKind, kindOf.get(r.againstVersionNumber) ?? null)) continue;
+      if (r.totals.realisedTotal === null) excluded.push({ sequence: r.review.sequence, reason: "not_recorded" });
+      else if (!realisedPositionComplete(r.totals))
+        excluded.push({ sequence: r.review.sequence, reason: "incomplete" });
+      else if (!within(r.review.reviewDate)) excluded.push({ sequence: r.review.sequence, reason: "outside_period" });
+      else checkpoints.push({ sequence: r.review.sequence, asOf: r.review.reviewDate, value: r.totals.realisedTotal });
+    }
+    if (excluded.some((e) => e.reason === "incomplete")) notes.push("realised_partial_excluded");
+    realised = { origin: { asOf: plan.period!.start, value: "0.00" }, checkpoints, excluded };
+  }
+  if (available && measure === "run_rate") notes.push("realised_run_rate_not_recorded");
+
+  const self = reviews.find((r) => r.review.id === reviewId)!;
+  let forecast: ReportTrajectory["forecast"] = null;
+  if (available) {
+    const fp = (await pointsBy("assuranceReviewId", [reviewId])).get(reviewId) ?? [];
+    if (fp.length === 0) notes.push("forecast_phasing_not_entered");
+    else {
+      const own = realised?.checkpoints.find((c) => c.sequence === self.review.sequence) ?? null;
+      forecast = {
+        anchor: own ? { asOf: own.asOf, value: own.value } : null,
+        points: fp.map((p) => ({ asOf: p.asOf, value: p.value })),
+      };
+    }
+  }
+
+  const [vc] = await db()
+    .select({ code: schema.valueChange.code, authorisedOn: schema.valueChange.authorisedOn })
+    .from(schema.valueChange)
+    .where(
+      and(eq(schema.valueChange.toVersionId, review!.againstVersionId), eq(schema.valueChange.status, "authorised")),
+    );
+  return {
+    plan,
+    measure: available ? measure : null,
+    realised,
+    formal: {
+      sequence: self.review.sequence,
+      reviewDate: self.review.reviewDate,
+      forecastTotal: self.totals.forecastTotal,
+    },
+    forecast,
+    versionChange:
+      vc?.authorisedOn && available
+        ? { code: vc.code, versionNumber: plan.versionNumber, authorisedOn: vc.authorisedOn }
+        : null,
+    notes,
+  };
+}
+
+/** Alternative Value Trajectories for a report: null unless at least one option has explicit milestones. */
+export async function getAlternativesSnapshot(projectId: string, reviewId: string): Promise<ReportAlternatives | null> {
+  const a = await getAlternativeValueTrajectories(projectId, reviewId);
+  if (!a || !a.available || !a.measure || !a.period) return null;
+  return {
+    measure: a.measure,
+    period: a.period,
+    history: a.history,
+    anchor: a.anchor,
+    options: a.options.map((o) => ({
+      label: o.label,
+      kind: o.kind,
+      totalValue: o.totalValue,
+      recommended: o.recommended,
+      selected: o.selected,
+      milestones: o.points.map((p) => ({ asOf: p.asOf, value: p.value })),
+      reconciled: o.reconciliation.state === "reconciled",
+    })),
+    notes: a.notes.filter(
+      (n): n is ReportAlternatives["notes"][number] =>
+        n !== "draft_no_anchor" && n !== "draft_forecast_phasing_not_entered",
+    ),
+    decisionComparison: a.decisionComparison,
   };
 }

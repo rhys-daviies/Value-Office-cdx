@@ -16,8 +16,10 @@ import { html, type SafeHtml } from "./html";
  * Bump when the rendered layout changes; recorded on every issue.
  * report-html-1 — Phase 4A. report-html-2 — Phase 4D.7: Assurance model v2 adds the Value Case Evolution
  * and Alternative Value Outcomes sections (server-side SVG). v1 snapshots still render the v1 layout.
+ * report-html-3 — Phase 4D.9J: model v3 Value Trajectory sections (Assurance narrative, Re-Qualification plan,
+ * Value Change Notice plans). v1/v2 snapshots render byte-for-byte as before.
  */
-export const RENDERER_VERSION = "report-html-2";
+export const RENDERER_VERSION = "report-html-3";
 
 /** Preview (draft, not issued) or an issued report's issue details. */
 export type ReportIssueMeta =

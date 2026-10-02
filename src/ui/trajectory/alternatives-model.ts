@@ -10,15 +10,8 @@ import { TRAJECTORY_SERIES } from "./series";
 // which is the review's own realised position). Amounts become numbers only for placement; every value a person reads
 // is a server-formatted string. Nothing is interpolated and terminal values are the stored option totals.
 
-/** Option line styles by position in the semantic order. Distinguished by dash and marker as well as colour. */
-export const OPTION_STYLES = [
-  { color: "#1d4ed8", dash: undefined, marker: "circle" },
-  { color: "#0f766e", dash: "8 4", marker: "diamond" },
-  { color: "#7c3aed", dash: "2 4", marker: "triangle" },
-  { color: "#b45309", dash: "10 3 2 3", marker: "square" },
-  { color: "#334155", dash: "5 3", marker: "circle" },
-] as const;
-export type OptionMarker = (typeof OPTION_STYLES)[number]["marker"];
+export { OPTION_STYLES, type OptionMarker } from "./series";
+import { OPTION_STYLES, type OptionMarker } from "./series";
 export const HISTORY_STYLE = { color: TRAJECTORY_SERIES.realised.color, label: "Realised (shared history)" };
 /** Draft preview baseline: the forecast colour, but a working dash and hollow marks — never the governed forecast look. */
 export const DRAFT_FORECAST_STYLE = {

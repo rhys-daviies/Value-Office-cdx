@@ -177,10 +177,18 @@ describe("executive Overview", () => {
     expect(o.authorised!.versionNumber).toBe(2); // V3 draft never current
     expect(o.decision).toBeNull();
     expect(o.valueCase.pending).toEqual([
-      { id: expect.any(String), code: "VC-002", status: "draft", toVersionNumber: 3, proposedChange: "450000.00" },
+      {
+        id: expect.any(String),
+        code: "VC-002",
+        status: "draft",
+        toVersionNumber: 3,
+        proposedChange: "450000.00",
+        statedChange: null, // nothing stated, so nothing to reconcile
+        reconciled: null,
+      },
     ]);
     const text = render(o);
-    expect(text).toContain("Proposed change +$0.5m · Draft — not in force");
+    expect(text).toContain("Proposed change +$450k · Draft — not in force"); // 4D.9J: never "+$0.5m"
     expect(text).toContain("no Cardaxia recommendation or management decision at the latest formal review");
     expect(text).toContain("Authorised Value $1.3m Authorised V2");
   });

@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 
-import { toDbMoney } from "@/domain/money";
+import { money, toDbMoney } from "@/domain/money";
 import { db, schema } from "@/server/db/client";
 
 import type { ValueCaseEvolution } from "./evolution";
@@ -28,6 +28,13 @@ export type ValueCaseSummary = {
     toVersionNumber: number;
     /** Proposed version total − version-from total (exact decimal). Provisional: never in force until authorised. */
     proposedChange: string;
+    /** The Value Change's own stated change to Authorised Value; null when none was stated. */
+    statedChange: string | null;
+    /**
+     * Existing invariant surfaced (not a new rule): a stated change must equal the version movement before VCO
+     * authorisation. null = no stated change; false = they differ now. Neither value is adjusted here.
+     */
+    reconciled: boolean | null;
   }[];
 };
 
@@ -40,6 +47,7 @@ export async function getValueCaseSummary(projectId: string, evolution: ValueCas
       toVersionNumber: schema.valueCaseVersion.versionNumber,
       fromVersionId: schema.valueChange.fromVersionId,
       toVersionId: schema.valueChange.toVersionId,
+      statedChange: schema.valueChange.statedChangeAmount,
     })
     .from(schema.valueChange)
     .innerJoin(schema.valueCaseVersion, eq(schema.valueCaseVersion.id, schema.valueChange.toVersionId))
@@ -61,12 +69,15 @@ export async function getValueCaseSummary(projectId: string, evolution: ValueCas
     pending: await Promise.all(
       open.map(async (c) => {
         const [from, to] = await Promise.all([getVersionTotal(c.fromVersionId), getVersionTotal(c.toVersionId)]);
+        const movement = to.total.minus(from.total);
         return {
           id: c.id,
           code: c.code,
           status: c.status as "draft" | "proposed",
           toVersionNumber: c.toVersionNumber,
-          proposedChange: toDbMoney(to.total.minus(from.total)),
+          proposedChange: toDbMoney(movement),
+          statedChange: c.statedChange,
+          reconciled: c.statedChange === null ? null : money(c.statedChange).equals(movement),
         };
       }),
     ),

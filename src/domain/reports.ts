@@ -1,7 +1,9 @@
 import type { PositionTotals } from "./assurance";
 import type { LeakageSummary } from "./response";
+import type { TrajectoryStatus } from "./trajectory";
 import type {
   EvidenceStatus,
+  ValueBasisKind,
   QualificationStatus,
   ReportType,
   ScenarioKind,
@@ -22,10 +24,12 @@ import type {
 /**
  * Bump when a model's shape changes, so issued snapshots stay interpretable.
  * 1 — Phase 4A models. 2 — Phase 4D.7: the Assurance model also snapshots `evolution` and `outcomes`
- * (report visuals). Issued v1 snapshots are never rewritten; they render through the v1 layout.
+ * (report visuals). 3 — Phase 4D.9J: Value Trajectory snapshots — Re-Qualification `plan`, Assurance `trajectory`
+ * and `alternatives`, Value Change Notice `plans`. Issued v1/v2 snapshots are never rewritten; they render through
+ * their own layouts, byte-for-byte as issued.
  */
-export const REPORT_MODEL_VERSION = 2;
-export type ReportModelVersion = 1 | typeof REPORT_MODEL_VERSION;
+export const REPORT_MODEL_VERSION = 3;
+export type ReportModelVersion = 1 | 2 | typeof REPORT_MODEL_VERSION;
 
 export const REPORT_TITLES: Record<ReportType, string> = {
   information_request: "Information Request",
@@ -121,6 +125,8 @@ export type RequalificationReport = {
    */
   currentVersion?: { versionNumber: number; title: string; total: string } | null;
   drivers: RequalificationDriver[];
+  /** Model v3+: the Re-Qualified version's Value Basis, Value Period and authorised plan as recorded. */
+  plan?: ReportPlan;
   /** Inherited drivers that are not part of the Re-Qualified Value Case. */
   notCarriedForward: { code: string; name: string; financialValue: string | null }[];
   counts: {
@@ -269,6 +275,10 @@ export type AssuranceReport = {
   evolution?: AssuranceEvolution;
   /** Model v2+: this review's decision economics; null when it has no options with a recommendation or decision. */
   outcomes?: AssuranceOutcomes | null;
+  /** Model v3+: the primary Value Trajectory as at this review. */
+  trajectory?: ReportTrajectory;
+  /** Model v3+: phased option paths; null when no option has milestones (or no trajectory basis/period). */
+  alternatives?: ReportAlternatives | null;
 };
 
 /**
@@ -379,6 +389,88 @@ export type ValueChangeNotice = {
     authorisedOn: string | null;
     evidence: EvidenceRef | null;
     note: string | null;
+  } | null;
+  /** Model v3+: the plans before and after the change, as recorded. */
+  plans?: { from: ReportPlan; to: ReportPlan };
+};
+
+// ---------------------------------------------------------------------------
+// Value Trajectory snapshots (Phase 4D.9J, model v3). Only stored governed values: explicit milestones, finalised
+// reviews' realised positions, stored option totals. Nothing interpolated, generated or ranged; straight joins in the
+// rendered chart are presentation only. Rendered from the snapshot alone — never from live data.
+
+export type ReportMilestone = { asOf: string; value: string };
+
+/** One version's authorised (or proposed) plan as recorded. */
+export type ReportPlan = {
+  versionNumber: number;
+  status: VersionStatus;
+  valueBasisKind: ValueBasisKind | null;
+  period: { start: string; end: string } | null;
+  /** The version's total — its governed terminal. */
+  total: string;
+  milestones: ReportMilestone[];
+  /** Why a trajectory can or cannot be drawn for this version (basis, period, phasing). */
+  availability: TrajectoryStatus;
+};
+
+export type ReportTrajectoryNote =
+  | "plan_phasing_not_entered"
+  | "forecast_phasing_not_entered"
+  | "realised_run_rate_not_recorded"
+  | "realised_partial_excluded";
+
+/**
+ * The primary Value Trajectory AS AT one Assurance Review (same semantics as the application's chart, at that review):
+ * the plan of the version the review measured against, realised positions of finalised reviews up to and including it,
+ * and its own formal forecast milestones. There is no "Today" in a report.
+ */
+export type ReportTrajectory = {
+  plan: ReportPlan;
+  measure: "cumulative" | "run_rate" | null;
+  /** Cumulative basis only. */
+  realised: {
+    origin: ReportMilestone;
+    checkpoints: { sequence: number; asOf: string; value: string }[];
+    excluded: { sequence: number; reason: "incomplete" | "not_recorded" | "outside_period" }[];
+  } | null;
+  formal: { sequence: number; reviewDate: string; forecastTotal: string | null };
+  /** This review's forecast milestones; the anchor is its own complete realised position (never stored). */
+  forecast: { anchor: ReportMilestone | null; points: ReportMilestone[] } | null;
+  /** The authorised Value Change that created the plan's version (V2+). */
+  versionChange: { code: string; versionNumber: number; authorisedOn: string } | null;
+  notes: ReportTrajectoryNote[];
+};
+
+export type ReportAlternativesNote =
+  | "no_valid_anchor"
+  | "realised_run_rate_not_recorded"
+  | "realised_partial_excluded"
+  | "options_without_phasing"
+  | "path_not_reconciled";
+
+/** Alternative Value Trajectories assessed at this review (only when at least one option has milestones). */
+export type ReportAlternatives = {
+  measure: "cumulative" | "run_rate";
+  period: { start: string; end: string };
+  history: { origin: ReportMilestone; checkpoints: { sequence: number; asOf: string; value: string }[] } | null;
+  anchor: { sequence: number; asOf: string; value: string } | null;
+  /** 4D.6 semantic order (recommendation, other options, client selection); never ranked. */
+  options: {
+    label: string;
+    kind: ScenarioKind;
+    totalValue: string;
+    recommended: boolean;
+    selected: boolean;
+    milestones: ReportMilestone[];
+    reconciled: boolean;
+  }[];
+  notes: ReportAlternativesNote[];
+  /** Selected − recommended stored totals, only once a decision exists. */
+  decisionComparison: {
+    recommended: { label: string; totalValue: string };
+    selected: { label: string; totalValue: string };
+    difference: string;
   } | null;
 };
 

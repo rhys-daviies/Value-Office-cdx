@@ -1,0 +1,852 @@
+<style>
+      
+.vo-report {
+  --ink: #0f172a; --muted: #475569; --faint: #94a3b8; --rule: #cbd5e1; --panel: #f8fafc;
+  --accent: #0f766e; --warn: #b45309; --warn-bg: #fffbeb; --bad: #b91c1c; --bad-bg: #fef2f2;
+  --info: #6d28d9; --info-bg: #f5f3ff;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--ink); font-size: 10.5pt; line-height: 1.45; background: #fff;
+  max-width: 190mm; margin: 0 auto;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.vo-report * { box-sizing: border-box; }
+.vo-report .rpt-banner { border: 1.5px dashed var(--warn); background: var(--warn-bg); color: var(--warn);
+  font-weight: 700; letter-spacing: .06em; text-transform: uppercase; font-size: 9pt; padding: 6px 10px; margin-bottom: 14px; }
+.vo-report .rpt-head { border-bottom: 2px solid var(--ink); padding-bottom: 12px; margin-bottom: 18px; }
+.vo-report .rpt-brand { display: flex; justify-content: space-between; font-size: 8.5pt; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); }
+.vo-report .rpt-brand b { color: var(--accent); }
+.vo-report h1 { font-size: 21pt; line-height: 1.15; margin: 10px 0 2px; font-weight: 700; }
+.vo-report .rpt-subject { font-size: 12pt; color: var(--muted); margin: 0 0 10px; }
+.vo-report .rpt-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 18px; margin: 0; font-size: 9pt; }
+.vo-report .rpt-meta div { min-width: 0; }
+.vo-report .rpt-meta dt { color: var(--muted); font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; }
+.vo-report .rpt-meta dd { margin: 0; font-weight: 600; }
+.vo-report section { margin: 0 0 18px; }
+.vo-report h2 { font-size: 12.5pt; margin: 0 0 8px; padding-bottom: 3px; border-bottom: 1px solid var(--rule);
+  break-after: avoid; page-break-after: avoid; }
+.vo-report h3 { font-size: 10.5pt; margin: 12px 0 4px; break-after: avoid; }
+.vo-report p { margin: 0 0 8px; }
+.vo-report .rpt-text { white-space: pre-line; }
+.vo-report .rpt-muted { color: var(--muted); }
+.vo-report .rpt-small { font-size: 8.5pt; }
+.vo-report .rpt-headline { display: grid; grid-template-columns: repeat(auto-fit, minmax(30mm, 1fr)); gap: 8px;
+  margin: 0 0 10px; break-inside: avoid; }
+.vo-report .rpt-figure { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; background: var(--panel); }
+.vo-report .rpt-figure .k { font-size: 7.5pt; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.vo-report .rpt-figure .v { font-size: 16pt; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.vo-report .rpt-figure .n { font-size: 8pt; color: var(--muted); margin-top: 2px; }
+.vo-report .rpt-figure.is-gap { border-color: #fdba74; }
+.vo-report .rpt-figure.is-leak { border-color: #fca5a5; }
+.vo-report .rpt-figure.is-info { border-color: #c4b5fd; background: var(--info-bg); }
+.vo-report .rpt-figure.is-warn { border-color: #fcd34d; background: var(--warn-bg); }
+.vo-report .rpt-figure.is-warn .v { color: var(--warn); }
+.vo-report table { width: 100%; border-collapse: collapse; font-size: 9pt; margin: 0 0 8px; }
+.vo-report th { text-align: left; font-weight: 600; color: var(--muted); font-size: 7.5pt; text-transform: uppercase;
+  letter-spacing: .04em; border-bottom: 1.5px solid var(--ink); padding: 4px 6px; vertical-align: bottom; }
+.vo-report td { border-bottom: 1px solid var(--rule); padding: 5px 6px; vertical-align: top; }
+.vo-report tr { break-inside: avoid; page-break-inside: avoid; }
+.vo-report thead { display: table-header-group; }
+.vo-report .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vo-report tfoot td { font-weight: 700; border-top: 1.5px solid var(--ink); border-bottom: none; }
+.vo-report .tag { display: inline-block; font-size: 7.5pt; font-weight: 600; padding: 1px 6px; border-radius: 9px;
+  border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+.vo-report .tag.good { color: #047857; border-color: #6ee7b7; }
+.vo-report .tag.part { color: var(--warn); border-color: #fcd34d; }
+.vo-report .tag.none { color: var(--bad); border-color: #fca5a5; }
+.vo-report .tag.info { color: var(--info); border-color: #c4b5fd; }
+.vo-report .unq { color: var(--warn); font-style: italic; font-weight: 600; }
+.vo-report .callout { border-left: 3px solid var(--rule); background: var(--panel); padding: 7px 10px; margin: 0 0 10px;
+  break-inside: avoid; }
+.vo-report .callout.warn { border-color: var(--warn); background: var(--warn-bg); }
+.vo-report .callout.bad { border-color: var(--bad); background: var(--bad-bg); }
+.vo-report .callout.info { border-color: var(--info); background: var(--info-bg); }
+.vo-report .callout strong { display: block; }
+.vo-report .stamp { display: inline-block; border: 2px solid var(--bad); color: var(--bad); font-weight: 800;
+  letter-spacing: .08em; text-transform: uppercase; padding: 3px 8px; margin: 0 6px 6px 0; font-size: 9.5pt; }
+.vo-report .stamp.neutral { border-color: var(--muted); color: var(--muted); }
+.vo-report .stamp.good { border-color: #047857; color: #047857; }
+.vo-report .rpt-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; break-inside: avoid; }
+.vo-report .rpt-panel { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; }
+.vo-report .rpt-panel h3 { margin-top: 0; }
+.vo-report .rpt-kv { display: grid; grid-template-columns: 38% 1fr; gap: 3px 10px; font-size: 9pt; margin: 0; }
+.vo-report .rpt-kv dt { color: var(--muted); }
+.vo-report .rpt-kv dd { margin: 0; }
+.vo-report .bars { margin: 4px 0 10px; break-inside: avoid; }
+.vo-report .bar { display: grid; grid-template-columns: 48mm 1fr 22mm; align-items: center; gap: 8px; margin: 3px 0; font-size: 9pt; }
+.vo-report .bar .track { background: #eef2f7; height: 12px; border-radius: 2px; }
+.vo-report .bar .fill { background: #64748b; height: 12px; border-radius: 2px; }
+.vo-report .bar.current .fill { background: #0369a1; }
+.vo-report .bar.recommended .fill { background: var(--accent); }
+.vo-report .bar.selected .fill { background: #7c3aed; }
+.vo-report .rpt-list { margin: 0 0 8px; padding-left: 18px; }
+.vo-report .rpt-list li { margin: 2px 0; }
+.vo-report .rpt-end { margin-top: 20px; padding-top: 8px; border-top: 1px solid var(--rule); font-size: 8pt; color: var(--muted); }
+@media print { .vo-report { max-width: none; } }
+
+    </style>
+    <article class="vo-report" data-report-type="assurance">
+    
+    <div class="rpt-banner" data-testid="report-draft-banner">
+            Draft preview — not issued. Figures reflect the Value Record now and may change before issue.
+          </div>
+    <header class="rpt-head">
+      <div class="rpt-brand">
+        <span><b>Cardaxia</b> · Value Office</span>
+        <span data-testid="report-issue-line"
+          >Draft preview</span
+        >
+      </div>
+      <h1>Value Assurance Report</h1>
+      <p class="rpt-subject">Assurance Review 2</p>
+      <dl class="rpt-meta">
+        <div>
+          <dt>Client</dt>
+          <dd>Synthetic Test Client</dd>
+        </div>
+        <div>
+          <dt>Project</dt>
+          <dd>Golden Trajectory Executive</dd>
+        </div>
+        <div>
+          <dt>Report date</dt>
+          <dd>Not issued</dd>
+        </div>
+        <div>
+          <dt>Review date</dt>
+          <dd>30 Sept 2026</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd data-testid="report-status">Finalised Assurance Review</dd>
+        </div>
+        <div>
+          <dt>Value Basis</dt>
+          <dd>Synthetic: cumulative benefit over FY26–FY28 (1 Jan 2026 – 31 Dec 2028) · USD</dd>
+        </div>
+      </dl>
+    </header>
+  <style>
+.vo-report .rpt-keep { break-inside: avoid; page-break-inside: avoid; }
+.vo-report .rpt-svg { display: block; width: 100%; height: auto; margin: 4px 0 6px; }
+.vo-report .rpt-legend { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 8pt; color: var(--muted); margin: 2px 0; }
+.vo-report .rpt-legend .lg { display: inline-flex; align-items: center; gap: 4px; }
+.vo-report .rpt-legend b { color: var(--ink); font-weight: 600; }
+.vo-report .rpt-compact td, .vo-report .rpt-compact th { padding: 3px 5px; }
+.vo-report .rpt-compact { font-size: 8.5pt; }
+.vo-report .rpt-compact td:nth-child(2) { white-space: nowrap; }
+.vo-report .rpt-compact td:first-child { min-width: 34mm; }
+.vo-report .rpt-compact th.num { white-space: normal; }
+</style>
+
+    <section>
+      <h2>1. Executive value position</h2>
+      <div class="rpt-headline" data-testid="as-headline">
+        <div class="rpt-figure" data-testid="as-authorised">
+    <div class="k">Authorised Value</div>
+    <div class="v">$30.0m</div>
+    <div class="n">Value Case V1</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-forecast">
+    <div class="k">Current Forecast</div>
+    <div class="v">$26.0m</div>
+    <div class="n">All financial drivers forecast</div>
+  </div>
+        <div class="rpt-figure is-gap" data-testid="as-gap">
+    <div class="k">Value Gap</div>
+    <div class="v">$4.0m</div>
+    <div class="n">Authorised Value − Current Forecast</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-movement">
+    <div class="k">Movement</div>
+    <div class="v">-$2.0m</div>
+    <div class="n">Since Review 1</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-realised">
+    <div class="k">Realised Value</div>
+    <div class="v">$4.0m</div>
+    <div class="n">3 of 3 drivers assessed</div>
+  </div>
+      </div>
+      
+      
+      <div class="callout" data-testid="as-leakage-headline">
+        <strong>Value Leakage — reported separately from Value Gap</strong>
+        1 open item(s).
+              Quantified in this review: 1 of 1 — Total
+                    $0.7m (Recoverable $0.5m, Unrecoverable
+                    $0.3m).
+                    
+        Value Gap and Value Leakage are separate measures and are not added together.
+      </div>
+    </section><section data-testid="as-evolution">
+    <div class="rpt-keep">
+      <h2>2. Value Case Evolution</h2>
+      <p class="rpt-small rpt-muted">
+        How the authorised commitment, formal forecast and realised value have moved, as at this review. Governed
+        history only; events are shown in order, not to a time scale. The forecast connector breaks where the Value Case
+        version measured against changes.
+      </p>
+      <div class="rpt-legend" data-testid="as-evolution-legend">
+    <span class="lg"
+      ><svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true">
+        <path d="M12,1 l5,5 l-5,5 l-5,-5 Z" fill="#c2410c" /></svg
+      ><b>Original Business Case</b> starting point, not dated</span
+    >
+    <span class="lg"
+      ><svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true">
+        <path d="M0,9 H9 V3 H24" fill="none" stroke="#2563eb" stroke-width="2" /></svg
+      ><b>Authorised Value</b> solid step, in force until superseded</span
+    >
+    <span class="lg"
+      ><svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true">
+        <line
+          x1="0"
+          y1="6"
+          x2="24"
+          y2="6"
+          stroke="#0891b2"
+          stroke-width="1.4"
+          stroke-dasharray="1.5 3"
+        />
+        <circle cx="12" cy="6" r="4" fill="#0891b2" /></svg
+      ><b>Formal Forecast</b> dotted, at each finalised review</span
+    >
+    <span class="lg"
+      ><svg width="24" height="12" viewBox="0 0 24 12" aria-hidden="true">
+        <line
+          x1="0"
+          y1="6"
+          x2="24"
+          y2="6"
+          stroke="#65a30d"
+          stroke-width="1.4"
+          stroke-dasharray="6 3"
+        />
+        <rect x="8" y="2" width="8" height="8" fill="#65a30d" /></svg
+      ><b>Realised Value</b> dashed, recorded at each review</span
+    >
+  </div> <svg
+    class="rpt-svg"
+    viewBox="0 0 680 250"
+    width="100%"
+    role="img"
+    aria-labelledby="vce-title vce-desc"
+    data-testid="as-evolution-svg"
+    data-forecast-connectors="r1&gt;r2"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <title id="vce-title">Value Case Evolution</title>
+    <desc id="vce-desc">Governed events in order: V1 (15 Jan 2026); Review #1 (31 Mar 2026); Review #2 (30 Sept 2026). Exact values are in the table below.</desc>
+    <style>
+      .v {
+        font:
+          600 8px Helvetica,
+          Arial,
+          sans-serif;
+        fill: #0f172a;
+      }
+      .xl {
+        font:
+          600 8.5px Helvetica,
+          Arial,
+          sans-serif;
+        fill: #0f172a;
+      }
+      .xs,
+      .yl {
+        font:
+          7.5px Helvetica,
+          Arial,
+          sans-serif;
+        fill: #475569;
+      }
+    </style>
+    <line x1="58" x2="646" y1="210.0" y2="210.0" stroke="#e2e8f0" />
+          <text x="52" y="213.0" text-anchor="end" class="yl">$0</text><line x1="58" x2="646" y1="148.7" y2="148.7" stroke="#e2e8f0" />
+          <text x="52" y="151.7" text-anchor="end" class="yl">$10.0m</text><line x1="58" x2="646" y1="87.3" y2="87.3" stroke="#e2e8f0" />
+          <text x="52" y="90.3" text-anchor="end" class="yl">$20.0m</text><line x1="58" x2="646" y1="26.0" y2="26.0" stroke="#e2e8f0" />
+          <text x="52" y="29.0" text-anchor="end" class="yl">$30.0m</text>
+    <line
+            x1="84.0"
+            x2="84.0"
+            y1="26"
+            y2="210"
+            stroke="#cbd5e1"
+            stroke-dasharray="3 3"
+          />
+    <path d="M84.0,26.0 H352.0 V26.0 H620.0 V26.0" fill="none" stroke="#2563eb" stroke-width="2.2" />
+    <path
+          d="M352.0,38.3 L620.0,50.5"
+          fill="none"
+          stroke="#0891b2"
+          stroke-width="1.4"
+          stroke-dasharray="1.5 3"
+        />
+    <polyline
+            points="352.0,203.9 620.0,185.5"
+            fill="none"
+            stroke="#65a30d"
+            stroke-width="1.4"
+            stroke-dasharray="6 3"
+          />
+    <rect
+            x="76.0"
+            y="23.0"
+            width="16"
+            height="6"
+            rx="1"
+            fill="#2563eb"
+            stroke="#fff"
+            stroke-width="1.5"
+            data-series="authorised"
+          />
+          <text x="95.0" y="20.0" class="v">$30.0m</text><text x="84.0" y="225" text-anchor="middle" class="xl">V1</text>
+        <text x="84.0" y="237" text-anchor="middle" class="xs">15 Jan 2026</text><circle
+            cx="352.0"
+            cy="38.3"
+            r="5"
+            fill="#0891b2"
+            stroke="#fff"
+            stroke-width="1.5"
+            data-series="forecast"
+          />
+          <text x="360.0" y="32.3" class="v">$28.0m</text><rect
+            x="347.5"
+            y="199.4"
+            width="9"
+            height="9"
+            fill="#65a30d"
+            stroke="#fff"
+            stroke-width="1.5"
+            data-series="realised"
+          />
+          <text x="360.0" y="206.9" class="v">$1.0m</text><text x="352.0" y="225" text-anchor="middle" class="xl">Review #1</text>
+        <text x="352.0" y="237" text-anchor="middle" class="xs">31 Mar 2026</text><circle
+            cx="620.0"
+            cy="50.5"
+            r="5"
+            fill="#0891b2"
+            stroke="#fff"
+            stroke-width="1.5"
+            data-series="forecast"
+          />
+          <text x="628.0" y="44.5" class="v">$26.0m</text><rect
+            x="615.5"
+            y="181.0"
+            width="9"
+            height="9"
+            fill="#65a30d"
+            stroke="#fff"
+            stroke-width="1.5"
+            data-series="realised"
+          />
+          <text x="628.0" y="188.5" class="v">$4.0m</text><text x="620.0" y="225" text-anchor="middle" class="xl">Review #2</text>
+        <text x="620.0" y="237" text-anchor="middle" class="xs">30 Sept 2026</text>
+  </svg>
+    </div>
+    <table class="rpt-compact" data-testid="as-evolution-table">
+      <thead>
+        <tr>
+          <th>Event</th>
+          <th>Date</th>
+          <th class="num">Business Case</th>
+          <th class="num">Authorised Value</th>
+          <th class="num">Formal Forecast</th>
+          <th class="num">Realised Value</th>
+          <th class="num">Value Gap</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-testid="as-evolution-row-v1">
+            <td>
+              Authorised V1
+              <div class="rpt-small rpt-muted" data-testid="as-evolution-v1-basis">VCO: Test VCO</div>
+            </td>
+            <td>15 Jan 2026</td>
+            <td class="num" data-testid="as-evolution-v1-original"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-v1-authorised">$30.0m</td>
+            <td class="num" data-testid="as-evolution-v1-forecast"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-v1-realised"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-v1-gap"><span class="rpt-muted">—</span></td>
+          </tr><tr data-testid="as-evolution-row-r1">
+            <td>
+              Assurance Review 1
+              <div class="rpt-small rpt-muted" data-testid="as-evolution-r1-basis">Measured against V1</div>
+            </td>
+            <td>31 Mar 2026</td>
+            <td class="num" data-testid="as-evolution-r1-original"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-r1-authorised"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-r1-forecast">$28.0m</td>
+            <td class="num" data-testid="as-evolution-r1-realised">$1.0m</td>
+            <td class="num" data-testid="as-evolution-r1-gap">$2.0m</td>
+          </tr><tr data-testid="as-evolution-row-r2">
+            <td>
+              Assurance Review 2 (this review)
+              <div class="rpt-small rpt-muted" data-testid="as-evolution-r2-basis">Measured against V1</div>
+            </td>
+            <td>30 Sept 2026</td>
+            <td class="num" data-testid="as-evolution-r2-original"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-r2-authorised"><span class="rpt-muted">—</span></td>
+            <td class="num" data-testid="as-evolution-r2-forecast">$26.0m</td>
+            <td class="num" data-testid="as-evolution-r2-realised">$4.0m</td>
+            <td class="num" data-testid="as-evolution-r2-gap">$4.0m</td>
+          </tr>
+      </tbody>
+    </table>
+  </section>
+
+    <section>
+      <h2>3. Review context</h2>
+      <dl class="rpt-kv" data-testid="as-context">
+        <dt>Review</dt>
+        <dd>Assurance Review 2</dd>
+        <dt>Review date</dt>
+        <dd>30 Sept 2026</dd>
+        <dt>Trigger</dt>
+        <dd>
+          Material evidence change — E-002 Revised mobilisation plan
+        </dd>
+        <dt>Measured against</dt>
+        <dd>Authorised Value Case V1 · Re-Qualified Value Case</dd>
+        <dt>Previous position</dt>
+        <dd>
+          Assurance Review 1 (31 Mar 2026)
+        </dd>
+        <dt>Finalised</dt>
+        <dd>2 Oct 2026 by Consultant a6a3e6b5</dd>
+      </dl>
+    </section>
+
+    <section>
+      <h2>4. What changed</h2>
+      <h3>What changed</h3>
+      <p class="rpt-text">Synthetic: the vendor&#39;s revised mobilisation plan moves procurement onboarding by two quarters.</p>
+      <h3>Why it matters</h3>
+      <p class="rpt-muted"><em>Not recorded.</em></p>
+      
+      <h3>Evidence considered</h3>
+      <table>
+              <tbody>
+                <tr>
+                      <td style="width:14%">E-002</td>
+                      <td>
+                        Revised mobilisation plan <span class="tag part">Material change</span>
+                        
+                      </td>
+                    </tr>
+              </tbody>
+            </table>
+    </section>
+
+    <section>
+      <h2>5. Value Driver position</h2>
+      <p class="rpt-small rpt-muted">Movement is measured against Assurance Review 1 (31 Mar 2026).</p>
+      <table data-testid="as-drivers">
+        <thead>
+          <tr>
+            <th>Value Driver</th>
+            <th class="num">Authorised</th>
+            <th class="num">Previous</th>
+            <th class="num">Current Forecast</th>
+            <th class="num">Movement</th>
+            <th class="num">Realised</th>
+            <th class="num">Value Gap</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+                  <td><strong>VD-01</strong> Procurement Savings</td>
+                  <td class="num">$15,000,000</td>
+                  <td class="num">$14,000,000</td>
+                  <td class="num">
+                    $13,000,000
+                  </td>
+                  <td class="num">-$1,000,000</td>
+                  <td class="num">
+                    $2,500,000
+                  </td>
+                  <td class="num">$2,000,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-02</strong> Revenue Uplift</td>
+                  <td class="num">$10,000,000</td>
+                  <td class="num">$9,500,000</td>
+                  <td class="num">
+                    $9,000,000
+                  </td>
+                  <td class="num">-$500,000</td>
+                  <td class="num">
+                    $1,000,000
+                  </td>
+                  <td class="num">$1,000,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr><tr>
+                  <td><strong>VD-03</strong> Working Capital</td>
+                  <td class="num">$5,000,000</td>
+                  <td class="num">$4,500,000</td>
+                  <td class="num">
+                    $4,000,000
+                  </td>
+                  <td class="num">-$500,000</td>
+                  <td class="num">
+                    $500,000
+                  </td>
+                  <td class="num">$1,000,000</td>
+                  <td><span class="tag none">Unqualified</span> <span class="tag none">Unevidenced</span></td>
+                </tr>
+          
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total (financial drivers)</td>
+            <td class="num">$30,000,000</td>
+            <td class="num">$28,000,000</td>
+            <td class="num">$26,000,000</td>
+            <td class="num">-$2,000,000</td>
+            <td class="num">$4,000,000</td>
+            <td class="num">$4,000,000</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+      
+    </section>
+
+    <section>
+      <h2>6. Value Leakage</h2>
+      <p class="rpt-small rpt-muted">
+        Value Leakage is value that has been, or is at risk of being, lost. Total = Recoverable + Unrecoverable. It is
+        reported separately from Value Gap and is not reconciled to it.
+      </p>
+      <table data-testid="as-leakage">
+                <thead>
+                  <tr>
+                    <th>Issue</th>
+                    <th>Affected drivers</th>
+                    <th>Risk / Leakage Owner</th>
+                    <th class="num">Total VL</th>
+                    <th class="num">Recoverable</th>
+                    <th class="num">Unrecoverable</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr data-testid="as-leakage-row">
+                        <td><strong>VL-001</strong> Vendor sequencing risk</td>
+                        <td>
+                          VD-01
+                        </td>
+                        <td>Test Delivery Lead</td>
+                        <td class="num">$700,000</td>
+                                <td class="num">$450,000</td>
+                                <td class="num">$250,000</td>
+                        <td>Open</td>
+                      </tr>
+                </tbody>
+              </table>
+              <h3>VL-001 Vendor sequencing risk</h3>
+                    
+                    <dl class="rpt-kv">
+                      <dt>Identified</dt>
+                      <dd>
+                        Continuous Assurance, 14 Aug 2026
+                      </dd>
+                      
+                      <dt>Consultant assessment</dt>
+                      <dd class="rpt-text">Not recorded.</dd>
+                      <dt>Why unrecoverable</dt>
+                                    <dd class="rpt-text">Synthetic: one quarter of savings is lost under the revised plan (E-002)</dd>
+                            
+                    </dl>
+    </section>
+
+    <section data-testid="as-outcomes">
+    <div class="rpt-keep">
+      <h2>7. Alternative Value Outcomes</h2>
+      <p class="rpt-small rpt-muted">
+        A point-in-time comparison of the options recorded at this review, measured against Authorised Value Case
+        V1. Each option is one assessed total entered from Cardaxia's analysis — not a path over
+        time. The Value Office records and compares them; it does not calculate them.
+      </p>
+      <div class="rpt-headline" data-testid="as-outcomes-summary">
+        <div class="rpt-figure" data-testid="as-outcomes-forecast">
+    <div class="k">Formal Forecast</div>
+    <div class="v">$26.0m</div>
+    <div class="n">Review 2 · Authorised V1 $30.0m</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-outcomes-recommendation">
+    <div class="k">Cardaxia recommendation</div>
+    <div class="v">$29.0m</div>
+    <div class="n">Act now</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-outcomes-selected">
+    <div class="k">Client selected</div>
+    <div class="v">$27.0m</div>
+    <div class="n">Delay 3 months</div>
+  </div>
+        <div class="rpt-figure" data-testid="as-outcomes-difference">
+    <div class="k">Difference from Cardaxia recommendation</div>
+    <div class="v">-$2.0m</div>
+    <div class="n">Client selected − Cardaxia recommendation</div>
+  </div>
+      </div>
+      <div class="rpt-legend" data-testid="as-outcomes-legend">
+    <span class="lg"
+      ><svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
+        <path d="M10,1 l6,6 l-6,6 l-6,-6 Z" fill="#fff" stroke="#2563eb" stroke-width="2" /></svg
+      ><b>Authorised Value</b> reference</span
+    >
+    <span class="lg"
+      ><svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
+        <circle cx="10" cy="7" r="5" fill="#fff" stroke="#0891b2" stroke-width="2" /></svg
+      ><b>Formal Forecast</b> reference</span
+    >
+    <span class="lg"
+      ><svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
+        <circle cx="10" cy="7" r="4.5" fill="#334155" /></svg
+      ><b>Option</b> stored assessed total</span
+    >
+    <span class="lg"
+      ><svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
+        <circle cx="10" cy="7" r="6.5" fill="none" stroke="#334155" stroke-width="1.4" />
+        <circle cx="10" cy="7" r="3.5" fill="#334155" /></svg
+      ><b>Cardaxia recommendation</b></span
+    >
+    <span class="lg"
+      ><svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true">
+        <rect x="5" y="2" width="10" height="10" rx="1" fill="#334155" /></svg
+      ><b>Client selected</b></span
+    >
+  </div> <svg
+    class="rpt-svg"
+    viewBox="0 0 680 166"
+    width="100%"
+    role="img"
+    aria-labelledby="avo-title avo-desc"
+    data-testid="as-outcomes-svg"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <title id="avo-title">Alternative Value Outcomes</title>
+    <desc id="avo-desc">Authorised Value (V1) (Reference) $30.0m; Formal Forecast (Reference · Review #2) $26.0m; Act now (Cardaxia recommendation) $29.0m; No action $23.0m; Delay 3 months (Client selected) $27.0m. Each option is one assessed total, not a path over time.</desc>
+    <style>
+      .l {
+        font:
+          600 8.5px Helvetica,
+          Arial,
+          sans-serif;
+        fill: #0f172a;
+      }
+      .s,
+      .t {
+        font:
+          7.5px Helvetica,
+          Arial,
+          sans-serif;
+        fill: #475569;
+      }
+      .v {
+        font:
+          600 8.5px Helvetica,
+          Arial,
+          sans-serif;
+        fill: #0f172a;
+      }
+    </style>
+    <line x1="222.0" x2="222.0" y1="10" y2="140" stroke="#e2e8f0" />
+          <text x="222.0" y="154" text-anchor="middle" class="t">$0</text><line x1="351.3" x2="351.3" y1="10" y2="140" stroke="#e2e8f0" />
+          <text x="351.3" y="154" text-anchor="middle" class="t">$10.0m</text><line x1="480.7" x2="480.7" y1="10" y2="140" stroke="#e2e8f0" />
+          <text x="480.7" y="154" text-anchor="middle" class="t">$20.0m</text><line x1="610.0" x2="610.0" y1="10" y2="140" stroke="#e2e8f0" />
+          <text x="610.0" y="154" text-anchor="middle" class="t">$30.0m</text>
+    <line x1="222" x2="610" y1="140" y2="140" stroke="#cbd5e1" />
+    <line
+            x1="610.0"
+            x2="610.0"
+            y1="10"
+            y2="140"
+            stroke="#2563eb"
+            stroke-dasharray="4 3"
+          />
+    <line
+            x1="558.3"
+            x2="558.3"
+            y1="10"
+            y2="140"
+            stroke="#0891b2"
+            stroke-dasharray="1.5 3"
+          />
+    <g
+      data-role="authorised"
+      data-recommended="false"
+      data-selected="false"
+    >
+      <line x1="222" x2="610" y1="23" y2="23" stroke="#f1f5f9" />
+      <text x="212" y="21.0" text-anchor="end" class="l"
+        >Authorised Value (V1)</text
+      >
+      <text x="212" y="32.0" text-anchor="end" class="s">Reference</text>
+      <path
+        d="M610.0,16.5 l6.5,6.5 l-6.5,6.5 l-6.5,-6.5 Z"
+        fill="#fff"
+        stroke="#2563eb"
+        stroke-width="2"
+      /> <text x="676" y="26.0" text-anchor="end" class="v">$30.0m</text>
+    </g><g
+      data-role="forecast"
+      data-recommended="false"
+      data-selected="false"
+    >
+      <line x1="222" x2="610" y1="49" y2="49" stroke="#f1f5f9" />
+      <text x="212" y="47.0" text-anchor="end" class="l"
+        >Formal Forecast</text
+      >
+      <text x="212" y="58.0" text-anchor="end" class="s">Reference · Review #2</text>
+      <circle
+        cx="558.3"
+        cy="49"
+        r="5.5"
+        fill="#fff"
+        stroke="#0891b2"
+        stroke-width="2"
+      /> <text x="676" y="52.0" text-anchor="end" class="v">$26.0m</text>
+    </g><g
+      data-role="outcome"
+      data-recommended="true"
+      data-selected="false"
+    >
+      <line x1="222" x2="610" y1="75" y2="75" stroke="#f1f5f9" />
+      <text x="212" y="73.0" text-anchor="end" class="l"
+        >Act now</text
+      >
+      <text x="212" y="84.0" text-anchor="end" class="s">Cardaxia recommendation</text>
+      <circle cx="597.1" cy="75" r="9" fill="none" stroke="#334155" stroke-width="1.4" /><circle cx="597.1" cy="75" r="5" fill="#334155" /> <text x="676" y="78.0" text-anchor="end" class="v">$29.0m</text>
+    </g><g
+      data-role="outcome"
+      data-recommended="false"
+      data-selected="false"
+    >
+      <line x1="222" x2="610" y1="101" y2="101" stroke="#f1f5f9" />
+      <text x="212" y="104.0" text-anchor="end" class="l"
+        >No action</text
+      >
+      
+      <circle cx="519.5" cy="101" r="5" fill="#334155" /> <text x="676" y="104.0" text-anchor="end" class="v">$23.0m</text>
+    </g><g
+      data-role="outcome"
+      data-recommended="false"
+      data-selected="true"
+    >
+      <line x1="222" x2="610" y1="127" y2="127" stroke="#f1f5f9" />
+      <text x="212" y="125.0" text-anchor="end" class="l"
+        >Delay 3 months</text
+      >
+      <text x="212" y="136.0" text-anchor="end" class="s">Client selected</text>
+      <rect
+              x="565.7"
+              y="121.5"
+              width="11"
+              height="11"
+              rx="1"
+              fill="#334155"
+            /> <text x="676" y="130.0" text-anchor="end" class="v">$27.0m</text>
+    </g>
+  </svg>
+    </div>
+    <table class="rpt-compact" data-testid="as-outcomes-table">
+      <thead>
+        <tr>
+          <th>Reference / option</th>
+          <th>Role</th>
+          <th class="num">Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-testid="as-outcome-ref-authorised">
+          <td>Authorised Value (V1)</td>
+          <td>Authorised reference</td>
+          <td class="num">$30.0m</td>
+        </tr>
+        <tr data-testid="as-outcome-ref-forecast">
+          <td>Formal Forecast (Review 2)</td>
+          <td>Current formal forecast</td>
+          <td class="num">$26.0m</td>
+        </tr>
+        <tr data-testid="as-outcome-row">
+            <td>
+              Act now 
+            </td>
+            <td data-testid="as-outcome-role">Cardaxia recommendation</td>
+            <td class="num" data-testid="as-outcome-value">$29.0m</td>
+          </tr><tr data-testid="as-outcome-row">
+            <td>
+              No action 
+            </td>
+            <td data-testid="as-outcome-role">Option · No action</td>
+            <td class="num" data-testid="as-outcome-value">$23.0m</td>
+          </tr><tr data-testid="as-outcome-row">
+            <td>
+              Delay 3 months 
+            </td>
+            <td data-testid="as-outcome-role">Client selected · Alternative</td>
+            <td class="num" data-testid="as-outcome-value">$27.0m</td>
+          </tr>
+      </tbody>
+    </table>
+  </section>
+
+    <section>
+      <h2>8. Cardaxia recommendation</h2>
+      <div class="rpt-panel" data-testid="as-recommendation">
+              <p>
+                <strong>Act now</strong> · $29.0m
+                <span class="rpt-muted rpt-small">(issued 2 Oct 2026)</span>
+              </p>
+              <p class="rpt-text">Act now to protect the plan</p>
+            </div>
+    </section>
+
+    <section>
+      <h2>9. Client decision</h2>
+      <div class="rpt-panel" data-testid="as-decision">
+                <dl class="rpt-kv">
+                  <dt>Selected option</dt>
+                  <dd><strong>Delay 3 months</strong> · $27.0m</dd>
+                  <dt>Decision maker</dt>
+                  <dd>Test VCO</dd>
+                  <dt>Decision date</dt>
+                  <dd>15 Oct 2026</dd>
+                  <dt>Rationale</dt>
+                  <dd class="rpt-text">Synthetic: delay to align with the budget cycle</dd>
+                  <dt>Economic consequence</dt>
+                  <dd class="rpt-text">Not recorded.</dd>
+                  <dt>Difference vs Cardaxia recommendation</dt>
+                  <dd data-testid="as-client-difference">
+                    <strong>-$2.0m</strong> (client-elected)
+                  </dd>
+                  
+                </dl>
+              </div>
+              <p class="rpt-small rpt-muted">
+                The Cardaxia recommendation is preserved as issued. The client decision is recorded separately and does
+                not alter it.
+              </p>
+    </section>
+
+    <section>
+      <h2>10. Value Change</h2>
+      <p class="rpt-muted"><em>No Value Change has been proposed from this review.</em></p>
+    </section>
+
+    <section>
+      <h2>11. Next actions</h2>
+      <ul class="rpt-list" data-testid="as-next-actions">
+                <li>VL-001 Vendor sequencing risk: Risk / Leakage Owner Test Delivery Lead.</li>
+              </ul>
+              <p class="rpt-small rpt-muted">Only actions recorded in the Value Record are listed.</p>
+    </section>
+    <p class="rpt-end">
+    Prepared by Cardaxia from the governed Value Record.
+    Draft preview — not an issued report.
+  </p>
+  </article>

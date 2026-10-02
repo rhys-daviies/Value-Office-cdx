@@ -3,6 +3,7 @@ import type { ReportModel } from "@/domain/reports";
 import type { ReportIssueMeta } from "./common";
 import { html, trusted, type SafeHtml } from "./html";
 import { renderAssurance } from "./assurance";
+import { renderAssuranceV3 } from "./assurance-v3";
 import { renderInformationRequest } from "./information-request";
 import { renderRequalification } from "./requalification";
 import { REPORT_CSS } from "./styles";
@@ -17,7 +18,10 @@ function body(model: ReportModel, meta: ReportIssueMeta): SafeHtml {
     case "requalification":
       return renderRequalification(model as Parameters<typeof renderRequalification>[0], meta);
     case "assurance":
-      return renderAssurance(model as Parameters<typeof renderAssurance>[0], meta);
+      // Model v3 (Phase 4D.9J) has its own layout; v1/v2 snapshots render exactly as issued.
+      return model.header.modelVersion >= 3
+        ? renderAssuranceV3(model as Parameters<typeof renderAssuranceV3>[0], meta)
+        : renderAssurance(model as Parameters<typeof renderAssurance>[0], meta);
     case "value_change_notice":
       return renderValueChangeNotice(model as Parameters<typeof renderValueChangeNotice>[0], meta);
   }

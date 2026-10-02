@@ -426,6 +426,36 @@ setup and mobilisation record. The Working picture, Formal Value Leakage block, 
 are no longer on the post-authorisation Overview (they remain in Assurance / Value Case). Before authorisation the
 setup and re-qualification record is the page, unchanged.
 
+**Attention ordering (4D.9I, confirmed 4D.9J).** `firstNeedingAttention` is an operational display rule — existing
+attention conditions in their most-pressing-first order, ties by matter code — **not** a formal materiality
+methodology, and it never ranks by amount. Materiality prioritisation is deferred for methodology review.
+
+**Value Change presentation (4D.9J).** Pending (draft/proposed) changes surface the existing reconciliation invariant
+without changing it: when the stated change equals the proposed version's movement one provisional amount is shown
+("Proposed change +$450k · Draft — not in force"); when they differ both are shown ("Stated change +$250k · Current
+draft movement $0 · Does not reconcile"). Governance/change amounts use `formatMoneyAdaptive` ($30.0m, $1.25m, $450k,
+$0) so a smaller change is never rounded into a different-looking figure; headline figures keep `formatMoneyShort`.
+
+**Report Value Trajectories (4D.9J, model v3 / renderer report-html-3).** One global model version, as before:
+`REPORT_MODEL_VERSION = 3`. v3 snapshots add, built once at preview/issue time and stored verbatim:
+
+| Report              | Snapshot                                                                                                                                                                                                                                                                                                                          | Rendered                                                                                                                                                                                                                                                                                                       |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Re-Qualification    | `plan` (V1's basis, Value Period, milestones, total, availability)                                                                                                                                                                                                                                                                | Value Basis and Authorised Plan block (no later Assurance)                                                                                                                                                                                                                                                     |
+| Value Assurance     | `trajectory` (as at the review: plan of the version it measured against; realised of finalised reviews up to and including it — cumulative, comparable, complete, in period; its own forecast milestones and anchor; the authorised Value Change that created that version) and `alternatives` (4D.9F model, phased options only) | New narrative (`renderAssuranceV3`): executive position → Value Trajectory → why the value position moved → Value Leakage → Alternative Value Trajectories (or the 4D.6 outcomes fallback) → recommendation → management decision → governance → driver position → Evolution → review record → values appendix |
+| Value Change Notice | `plans.from` / `plans.to`                                                                                                                                                                                                                                                                                                         | Plans now/as proposed (a chart only when both are phased), reconciliation wording, adaptive precision                                                                                                                                                                                                          |
+| Information Request | —                                                                                                                                                                                                                                                                                                                                 | Unchanged                                                                                                                                                                                                                                                                                                      |
+
+Charts are deterministic server-side SVG (`ui/reports/charts/trajectory-svg.ts`) drawn only from the snapshot: real
+dates, explicit observations only, joins as presentation, no "Today" (a report is as at its subject). Annual run-rate
+shows plan and formal forecast only, with "Realised run-rate is not currently recorded." Missing basis / NPV / Other /
+no period / no phasing render a short statement, never an empty chart; legacy projects remain issuable. Value
+Leakage is per matter with exact amounts and is never presented as the Value Gap. **Compatibility:** v1/v2 snapshots
+dispatch to the unchanged renderers; v3 sections in shared Re-Qualification / Value Change templates are spliced in
+with no surrounding whitespace (templates are `prettier-ignore`). Goldens: `tests/fixtures/reports/assurance-v1.*`
+(released a88cc72) and `*-v2.*` for all four report types (captured from 41275e4) must render byte-for-byte; issued
+snapshots are never rewritten.
+
 **Known limitations / backlog (not implemented).**
 
 - _Formal Assurance Evidence Snapshotting._ A finalised Formal Assurance Review should eventually preserve which evidence

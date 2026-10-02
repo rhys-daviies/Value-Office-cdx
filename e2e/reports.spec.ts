@@ -33,27 +33,29 @@ test("Horizon Value Assurance Report preview: position, unattributed realised, l
   page,
 }) => {
   await preview(page, "Value Assurance Report");
-  await expect(page.getByTestId("as-authorised")).toContainText("$15.5m");
-  await expect(page.getByTestId("as-forecast")).toContainText("$14.7m");
-  await expect(page.getByTestId("as-gap")).toContainText("$0.8m");
-  await expect(page.getByTestId("as-movement")).toContainText("-$0.8m");
-  await expect(page.getByTestId("as-realised")).toContainText("$2.8m");
+  // Model v3 (4D.9J) executive position, as at the review.
+  await expect(page.getByTestId("rpt-formal-position")).toContainText("Formal position as at");
+  await expect(page.getByTestId("rpt-exec-authorised")).toContainText("$15.5m");
+  await expect(page.getByTestId("rpt-exec-forecast")).toContainText("$14.7m");
+  await expect(page.getByTestId("rpt-exec-gap")).toContainText("$0.8m");
+  await expect(page.getByTestId("as-drivers").locator("tfoot")).toContainText("-$800,000"); // movement kept
+  await expect(page.getByTestId("rpt-exec-realised")).toContainText("$2.8m");
   // $2.8m is clearly unattributed, not allocated to drivers.
-  await expect(page.getByTestId("as-realised-unattributed")).toContainText("$2.8m");
-  await expect(page.getByTestId("as-realised-unattributed")).toContainText("Not allocated to any Value Driver");
-  await expect(page.getByTestId("as-realised-attributed")).toContainText("—");
+  await expect(page.getByTestId("rpt-exec-realised")).toContainText("All recorded as unattributed (project level)");
+  await expect(page.getByTestId("as-unattributed-note")).toContainText("$2,800,000");
+  await expect(page.getByTestId("as-unattributed-note")).toContainText("not attributed to any Value Driver");
   await expect(page.getByTestId("as-unattributed-row")).toContainText("$2,800,000");
 
   // Value Leakage: separate from Value Gap and not yet quantified — no $0, no prototype figures.
-  await expect(page.getByTestId("as-leakage-headline")).toContainText("reported separately from Value Gap");
-  await expect(page.getByTestId("as-leakage-headline")).toContainText("Not yet quantified");
+  await expect(page.getByTestId("rpt-story")).toContainText("it is not the Value Gap");
+  await expect(page.getByTestId("rpt-story-leakage")).toContainText("Value Leakage not yet quantified in this review");
   const vl = page.getByTestId("as-leakage-row").filter({ hasText: "VL-001" });
   await expect(vl).toContainText("Vendor sequencing");
   await expect(vl.getByTestId("as-leakage-unquantified")).toHaveText("Not yet quantified");
   await expect(vl).not.toContainText("$0");
   await expect(page.getByTestId("report-preview")).not.toContainText("0.70");
 
-  // Options, recommendation and decision stay separate (model v2: the Alternative Value Outcomes table).
+  // Options, recommendation and decision stay separate (unclassified basis: the Alternative Value Outcomes table).
   const options = page.getByTestId("as-outcomes-table");
   await expect(options).toContainText("$14.7m");
   await expect(options).toContainText("$15.3m");
@@ -62,7 +64,9 @@ test("Horizon Value Assurance Report preview: position, unattributed realised, l
   await expect(page.getByTestId("as-decision")).toContainText("$14.9m");
   await expect(page.getByTestId("as-client-difference")).toContainText("-$0.4m");
   await expect(page.getByTestId("as-value-change")).toContainText("VC-002");
-  await expect(page.getByTestId("as-value-change")).toContainText("Not reconciled");
+  await expect(page.getByTestId("as-value-change")).toContainText("Stated change -$600k · current draft movement");
+  await expect(page.getByTestId("as-value-change")).toContainText("does not reconcile");
+  await expect(page.getByTestId("as-value-change")).toContainText("Proposed — not in force");
 });
 
 test("Horizon VC-002 Notice: PROPOSED, NOT RECONCILED, NOT READY FOR AUTHORISATION", async ({ page }) => {
@@ -73,7 +77,7 @@ test("Horizon VC-002 Notice: PROPOSED, NOT RECONCILED, NOT READY FOR AUTHORISATI
   await expect(stamps).toContainText("Not ready for authorisation");
   await expect(page.getByTestId("vc-not-ready")).toBeVisible();
   await expect(page.getByTestId("vc-current")).toContainText("$15.5m");
-  await expect(page.getByTestId("vc-stated")).toContainText("-$0.6m");
+  await expect(page.getByTestId("vc-stated")).toContainText("-$600k"); // 4D.9J adaptive change precision
   await expect(page.getByTestId("vc-proposed")).toContainText("$14.9m");
   await expect(page.getByTestId("vc-reconciled")).toHaveText("NOT RECONCILED");
   await expect(page.getByTestId("vc-readiness")).toContainText("NOT READY FOR AUTHORISATION");
@@ -100,8 +104,8 @@ test("issue the Horizon Value Assurance Report: confirmation, immutable issue re
   const view = page.getByTestId("issued-report-view");
   await expect(view.getByTestId("report-issue-line")).toContainText("Issue 1");
   await expect(view.getByTestId("report-draft-banner")).toHaveCount(0);
-  await expect(view.getByTestId("as-forecast")).toContainText("$14.7m");
-  // Phase 4D.7: the issued (model v2) report carries both visuals from its snapshot.
+  await expect(view.getByTestId("rpt-exec-forecast")).toContainText("$14.7m");
+  // The issued (model v3) report carries its visuals from the snapshot (Horizon: Evolution + outcomes fallback).
   await expect(view.getByTestId("as-evolution-svg")).toBeVisible();
   await expect(view.getByTestId("as-outcomes-svg")).toBeVisible();
   await expect(view.getByTestId("as-outcomes-difference")).toContainText("-$0.4m");

@@ -1,0 +1,276 @@
+{
+  "header": {
+    "modelVersion": 2,
+    "type": "assurance",
+    "title": "Value Assurance Report",
+    "subjectLabel": "Assurance Review 2",
+    "subjectStatus": "finalised",
+    "clientName": "Synthetic Test Client",
+    "projectName": "Golden Trajectory Executive",
+    "projectCode": "GOLD-TX",
+    "currency": "USD",
+    "asAt": "2026-09-30",
+    "valueBasis": {
+      "description": "Synthetic: cumulative benefit over FY26–FY28",
+      "periodStart": "2026-01-01",
+      "periodEnd": "2028-12-31"
+    }
+  },
+  "review": {
+    "sequence": 2,
+    "reviewDate": "2026-09-30",
+    "trigger": "material_evidence_change",
+    "triggerEvidence": {
+      "code": "E-002",
+      "title": "Revised mobilisation plan"
+    },
+    "againstVersion": {
+      "number": 1,
+      "title": "Re-Qualified Value Case"
+    },
+    "previous": {
+      "sequence": 1,
+      "reviewDate": "2026-03-31"
+    },
+    "finalisedOn": "2026-10-02",
+    "finalisedBy": "Consultant a6a3e6b5",
+    "whatChanged": "Synthetic: the vendor's revised mobilisation plan moves procurement onboarding by two quarters.",
+    "whyItMatters": null,
+    "summary": null,
+    "evidence": [
+      {
+        "code": "E-002",
+        "title": "Revised mobilisation plan",
+        "note": null,
+        "materialChange": true
+      }
+    ]
+  },
+  "position": {
+    "financialDriverCount": 3,
+    "authorisedTotal": "30000000.00",
+    "previousTotal": "28000000.00",
+    "forecastAssessed": 3,
+    "forecastTotal": "26000000.00",
+    "valueGap": "4000000.00",
+    "movement": "-2000000.00",
+    "realisedAssessed": 3,
+    "realisedAttributedTotal": "4000000.00",
+    "unattributedRealised": null,
+    "realisedTotal": "4000000.00",
+    "forecastBlockers": [],
+    "unattributedRationale": null
+  },
+  "drivers": [
+    {
+      "code": "VD-01",
+      "name": "Procurement Savings",
+      "financial": true,
+      "authorisedValue": "15000000.00",
+      "previousForecast": "14000000.00",
+      "currentForecast": "13000000.00",
+      "forecastNotAssessed": false,
+      "forecastRationale": null,
+      "movement": "-1000000.00",
+      "valueGap": "2000000.00",
+      "realisedValue": "2500000.00",
+      "qualificationStatus": "unqualified",
+      "evidenceStatus": "unevidenced"
+    },
+    {
+      "code": "VD-02",
+      "name": "Revenue Uplift",
+      "financial": true,
+      "authorisedValue": "10000000.00",
+      "previousForecast": "9500000.00",
+      "currentForecast": "9000000.00",
+      "forecastNotAssessed": false,
+      "forecastRationale": null,
+      "movement": "-500000.00",
+      "valueGap": "1000000.00",
+      "realisedValue": "1000000.00",
+      "qualificationStatus": "unqualified",
+      "evidenceStatus": "unevidenced"
+    },
+    {
+      "code": "VD-03",
+      "name": "Working Capital",
+      "financial": true,
+      "authorisedValue": "5000000.00",
+      "previousForecast": "4500000.00",
+      "currentForecast": "4000000.00",
+      "forecastNotAssessed": false,
+      "forecastRationale": null,
+      "movement": "-500000.00",
+      "valueGap": "1000000.00",
+      "realisedValue": "500000.00",
+      "qualificationStatus": "unqualified",
+      "evidenceStatus": "unevidenced"
+    }
+  ],
+  "leakage": {
+    "items": [
+      {
+        "code": "VL-001",
+        "title": "Vendor sequencing risk",
+        "description": null,
+        "drivers": [
+          {
+            "code": "VD-01",
+            "name": "Procurement Savings"
+          }
+        ],
+        "responseOwner": "Test Delivery Lead",
+        "status": "open",
+        "requiredDecisionDate": null,
+        "consultantAssessment": null,
+        "identifiedInReview": null,
+        "identifiedOn": "2026-08-14",
+        "assessment": {
+          "total": "700000.00",
+          "unrecoverable": "250000.00",
+          "recoverable": "450000.00",
+          "unrecoverableRationale": "Synthetic: one quarter of savings is lost under the revised plan (E-002)",
+          "note": null
+        }
+      }
+    ],
+    "summary": {
+      "itemCount": 1,
+      "assessedCount": 1,
+      "total": "700000.00",
+      "recoverable": "450000.00",
+      "unrecoverable": "250000.00"
+    }
+  },
+  "scenarios": [
+    {
+      "label": "Act now",
+      "kind": "recommended",
+      "totalValue": "29000000.00",
+      "narrative": null,
+      "vsCurrent": null,
+      "vsRecommended": "0.00",
+      "isRecommendation": true,
+      "isClientSelection": false
+    },
+    {
+      "label": "Delay 3 months",
+      "kind": "alternative",
+      "totalValue": "27000000.00",
+      "narrative": null,
+      "vsCurrent": null,
+      "vsRecommended": "-2000000.00",
+      "isRecommendation": false,
+      "isClientSelection": true
+    },
+    {
+      "label": "No action",
+      "kind": "no_action",
+      "totalValue": "23000000.00",
+      "narrative": null,
+      "vsCurrent": null,
+      "vsRecommended": "-6000000.00",
+      "isRecommendation": false,
+      "isClientSelection": false
+    }
+  ],
+  "recommendation": {
+    "label": "Act now",
+    "totalValue": "29000000.00",
+    "narrative": "Act now to protect the plan",
+    "issuedOn": "2026-10-02"
+  },
+  "decision": {
+    "label": "Delay 3 months",
+    "kind": "alternative",
+    "totalValue": "27000000.00",
+    "decidedBy": "Test VCO",
+    "decidedOn": "2026-10-15",
+    "rationale": "Synthetic: delay to align with the budget cycle",
+    "economicConsequence": null,
+    "evidence": null,
+    "clientElectedDifference": "-2000000.00"
+  },
+  "valueChanges": [],
+  "nextActions": [
+    {
+      "kind": "leakage_response",
+      "code": "VL-001",
+      "title": "Vendor sequencing risk",
+      "owner": "Test Delivery Lead",
+      "requiredDecisionDate": null,
+      "quantified": true
+    }
+  ],
+  "evolution": {
+    "originalBusinessCase": null,
+    "events": [
+      {
+        "kind": "authorisation",
+        "key": "v1",
+        "versionNumber": 1,
+        "authorisedValue": "30000000.00",
+        "authorisedOn": "2026-01-15",
+        "vcoName": "Test VCO",
+        "valueChangeCode": null
+      },
+      {
+        "kind": "review",
+        "key": "r1",
+        "sequence": 1,
+        "reviewDate": "2026-03-31",
+        "againstVersionNumber": 1,
+        "currentForecast": "28000000.00",
+        "realisedValue": "1000000.00",
+        "valueGap": "2000000.00",
+        "inForceValue": "30000000.00",
+        "isThisReview": false
+      },
+      {
+        "kind": "review",
+        "key": "r2",
+        "sequence": 2,
+        "reviewDate": "2026-09-30",
+        "againstVersionNumber": 1,
+        "currentForecast": "26000000.00",
+        "realisedValue": "4000000.00",
+        "valueGap": "4000000.00",
+        "inForceValue": "30000000.00",
+        "isThisReview": true
+      }
+    ]
+  },
+  "outcomes": {
+    "againstVersionNumber": 1,
+    "authorisedValue": "30000000.00",
+    "currentFormalForecast": "26000000.00",
+    "outcomes": [
+      {
+        "label": "Act now",
+        "kind": "recommended",
+        "totalValue": "29000000.00",
+        "narrative": null,
+        "recommended": true,
+        "selected": false
+      },
+      {
+        "label": "No action",
+        "kind": "no_action",
+        "totalValue": "23000000.00",
+        "narrative": null,
+        "recommended": false,
+        "selected": false
+      },
+      {
+        "label": "Delay 3 months",
+        "kind": "alternative",
+        "totalValue": "27000000.00",
+        "narrative": null,
+        "recommended": false,
+        "selected": true
+      }
+    ],
+    "differenceFromRecommendation": "-2000000.00"
+  }
+}

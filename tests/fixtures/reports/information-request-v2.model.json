@@ -1,0 +1,53 @@
+{
+  "header": {
+    "modelVersion": 2,
+    "type": "information_request",
+    "title": "Information Request",
+    "subjectLabel": "Request IR-01",
+    "subjectStatus": "draft",
+    "clientName": "Synthetic Test Client",
+    "projectName": "Golden Information Request",
+    "projectCode": "GOLD-IR",
+    "currency": "USD",
+    "asAt": null,
+    "valueBasis": {
+      "description": "Synthetic test basis",
+      "periodStart": null,
+      "periodEnd": null
+    }
+  },
+  "request": {
+    "reference": "IR-01",
+    "title": "Baseline data",
+    "status": "draft",
+    "issuedOn": null,
+    "closedOn": null
+  },
+  "summary": {
+    "open": 2,
+    "partially_received": 0,
+    "received": 0,
+    "not_available": 0,
+    "total": 2
+  },
+  "items": [
+    {
+      "sequence": 1,
+      "description": "Baseline tickets",
+      "requestedFrom": null,
+      "dueOn": null,
+      "status": "open",
+      "driver": null,
+      "notes": null
+    },
+    {
+      "sequence": 2,
+      "description": "Org chart",
+      "requestedFrom": null,
+      "dueOn": null,
+      "status": "open",
+      "driver": null,
+      "notes": null
+    }
+  ]
+}

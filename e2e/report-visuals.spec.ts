@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Phase 4D.7: Value Assurance Report visuals — server-side SVG from the report snapshot (model v2).
+// Phase 4D.7: Value Assurance Report visuals — server-side SVG from the report snapshot (now in the model-v3 layout,
+// Phase 4D.9J: section numbers follow the v3 narrative, so headings are matched by title).
 // Assertions are on report DOM and data, not pixels.
 
 async function previewAssurance(page: Page, project: string, subject: string) {
@@ -21,7 +22,7 @@ test("Horizon Assurance Report: Value Case Evolution and Alternative Value Outco
   page,
 }) => {
   const report = await previewAssurance(page, "Project Horizon", "Assurance Review 1");
-  await expect(report.getByRole("heading", { name: "2. Value Case Evolution" })).toBeVisible();
+  await expect(report.getByRole("heading", { name: /^\d+\. Value Case Evolution$/ })).toBeVisible();
   await expect(report.getByTestId("as-evolution-svg")).toBeVisible();
   await expect(report.getByTestId("as-evolution-original-original")).toHaveText("$18.0m");
   await expect(report.getByTestId("as-evolution-v1-authorised")).toHaveText("$15.5m");
@@ -31,7 +32,11 @@ test("Horizon Assurance Report: Value Case Evolution and Alternative Value Outco
   await expect(report.getByTestId("as-evolution-row-original")).toContainText("Not dated");
 
   const outcomes = report.getByTestId("as-outcomes");
-  await expect(outcomes.getByRole("heading", { name: "7. Alternative Value Outcomes" })).toBeVisible();
+  await expect(outcomes.getByRole("heading", { name: /^\d+\. Alternative Value Outcomes$/ })).toBeVisible();
+  // Horizon is unclassified: no trajectory charts, only the endpoint-only outcomes.
+  await expect(report.getByTestId("rpt-trajectory-unavailable")).toHaveText(
+    "Value Basis not classified — no Value Trajectory is shown.",
+  );
   await expect(outcomes.getByTestId("as-outcomes-svg")).toBeVisible();
   await expect(outcomes.getByTestId("as-outcomes-forecast")).toContainText("$14.7m");
   await expect(outcomes.getByTestId("as-outcomes-recommendation")).toContainText("$15.3m");
@@ -59,7 +64,7 @@ test("a review without options: Evolution renders, Alternative Value Outcomes is
   await expect(report.getByTestId("as-evolution-v2-basis")).toContainText("via VC-001");
   await expect(report.getByTestId("as-outcomes")).toHaveCount(0);
   await expect(report.getByRole("heading", { name: /Alternative Value Outcomes/ })).toHaveCount(0);
-  await expect(report.getByRole("heading", { name: "7. Cardaxia recommendation" })).toBeVisible();
+  await expect(report.getByRole("heading", { name: /^\d+\. Cardaxia recommendation$/ })).toBeVisible();
   // Pending VC-002 (draft V3) and working values never reach the governed history.
   await expect(report.getByTestId("as-evolution")).not.toContainText("VC-002");
   await expect(report.getByTestId("as-evolution")).not.toContainText("V3");

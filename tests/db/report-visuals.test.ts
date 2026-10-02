@@ -70,7 +70,7 @@ describe("Assurance report model v2 snapshots", () => {
 
     const m = (await buildAssuranceReport(project.id, reviews[2]!.id))!.model;
     expect(m.header.modelVersion).toBe(REPORT_MODEL_VERSION);
-    expect(REPORT_MODEL_VERSION).toBe(2);
+    expect(REPORT_MODEL_VERSION).toBe(3); // 4D.9J: v3 keeps the v2 evolution/outcomes snapshots and adds trajectories
     const ev = m.evolution!;
     expect(ev.originalBusinessCase).toEqual({ title: "Original Business Case", value: "2000000.00" });
     expect(ev.events.map((e) => e.key)).toEqual(["original", "v1", "r1", "r2", "v2", "r3"]); // no draft r4, no V3
@@ -150,17 +150,18 @@ describe("Assurance report model v2 snapshots", () => {
     expect(html).not.toContain('data-testid="as-outcomes"');
     expect(html).toContain('data-testid="as-evolution"');
     const headings = [...html.matchAll(/<h2>([^<]+)<\/h2>/g)].map((h) => h[1]);
+    // Model v3 (4D.9J) narrative; the options section is omitted when the review has none.
     expect(headings).toEqual([
       "1. Executive value position",
-      "2. Value Case Evolution",
-      "3. Review context",
-      "4. What changed",
-      "5. Value Driver position",
-      "6. Value Leakage",
-      "7. Cardaxia recommendation",
-      "8. Client decision",
-      "9. Value Change",
-      "10. Next actions",
+      "2. Value Trajectory",
+      "3. Why the value position moved",
+      "4. Value Leakage",
+      "5. Cardaxia recommendation",
+      "6. Management decision",
+      "7. Governance and Value Change",
+      "8. Value Driver position",
+      "9. Value Case Evolution",
+      "10. Review record",
     ]);
   });
 
@@ -192,9 +193,10 @@ describe("Assurance report model v2 snapshots", () => {
     // v2 uses the Phase 4D.1 terminology (v1 snapshots keep "Response owner (AVO)").
     expect(text).toContain("Risk / Leakage Owner");
     expect(text).not.toContain("Response owner (AVO)");
-    const ev = text.slice(text.indexOf("2. Value Case Evolution"), text.indexOf("3. Review context"));
+    const ev = text.slice(text.indexOf(". Value Case Evolution"), text.indexOf(". Review record"));
     for (const v of ["$18.0m", "$15.5m", "$14.7m", "$2.8m", "$0.8m", "Not dated"]) expect(ev).toContain(v);
-    const out = text.slice(text.indexOf("7. Alternative Value Outcomes"), text.indexOf("8. Cardaxia recommendation"));
+    const start = text.indexOf(". Alternative Value Outcomes");
+    const out = text.slice(start, text.indexOf(". Cardaxia recommendation", start));
     for (const v of ["$15.5m", "$14.7m", "$15.3m", "$14.9m", "-$0.4m"]) expect(out).toContain(v);
     expect(out).not.toContain("VC-002");
   });
