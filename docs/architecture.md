@@ -518,6 +518,9 @@ against), with an aligned strip of event values. Report charts are unchanged (a 
 - _Pre-4D.1 matter state._ Reviews finalised before matters were captured at finalisation (`matter_snapshot_at` null)
   show current matter details rather than the matter as it stood then. No retrospective reconstruction or backfill.
 
+**Phase 4D.9N is ACCEPTED AND FROZEN** (release lineage, DEMO-TRAJ2, accepted visual semantics, methodology principle
+and recorded backlog: `docs/release/4d9n-freeze.md`).
+
 ## Client reports (Phase 4A)
 
 ```
