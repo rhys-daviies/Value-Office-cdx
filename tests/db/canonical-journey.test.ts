@@ -24,11 +24,13 @@ import { getAlternativeValueTrajectories, getValueTrajectoryChart } from "@/serv
 import { getValueCaseSummary } from "@/server/queries/value-case-summary";
 import { issueReport } from "@/server/reports/issue";
 import { getDocument } from "@/server/reports/storage";
-import { formatDate } from "@/ui/format";
+import { formatDate, formatMoneyShort } from "@/ui/format";
 import { LatestValueDecision } from "@/ui/overview/decision";
 import { renderReportDocument } from "@/ui/reports/render";
+import { buildTrajectoryPresentation, epoch } from "@/ui/trajectory/model";
 
 import { newActor, uid } from "../support/fixtures";
+import { atDateWithoutObservation, untraced } from "../support/tooltip-trace";
 
 // Phase 4D.9K: the canonical end-to-end Value Office journey, validated through commands and every governed surface.
 // One synthetic project (src/fixtures/canonical.ts): V0 $32.0m → Authorised V1 $30.0m with plan → Reviews #1/#2 →
@@ -371,7 +373,43 @@ describe("canonical Value Office journey (4D.9K)", () => {
       [2, "4000000.00"],
       [3, "4600000.00"],
     ]);
-    expect(chart.forecast!.points.map((p) => p.value)).toEqual(["15500000.00", "25000000.00"]);
+    // 4D.9N.1B.1: Review #3's explicit formal milestones carry the timing of the variance — aligned with V2 at Dec 2026,
+    // $1.0m below at Dec 2027, $2.0m below at the period end. Chart joins never carry it.
+    expect(chart.forecast!.points.map((p) => [p.asOf, p.value])).toEqual([
+      ["2026-12-31", "5000000.00"],
+      ["2027-12-31", "15500000.00"],
+      ["2028-12-31", "25000000.00"],
+    ]);
+    const plan = new Map(chart.plan.map((p) => [p.asOf, p.value]));
+    expect(
+      chart.forecast!.points.map((p) => [p.asOf, toDbMoney(money(p.value).minus(money(plan.get(p.asOf)!)))]),
+    ).toEqual([
+      ["2026-12-31", "0.00"],
+      ["2027-12-31", "-1000000.00"],
+      ["2028-12-31", "-2000000.00"],
+    ]);
+    const p3 = buildTrajectoryPresentation(chart, "USD")!;
+    const dec26 = p3.rows.find((r) => r.t === epoch("2026-12-31"))!;
+    expect([dec26.plan, dec26.forecast, dec26.forecastAnchor, dec26.month]).toEqual([5000000, 5000000, false, false]);
+    expect(p3.gap).toMatchObject({ plan: 27000000, forecast: 25000000, label: "Value Gap · $2.0m" });
+    const governed = new Set(
+      [
+        ...chart.plan.map((x) => x.value),
+        "0.00",
+        ...chart.realised!.checkpoints.map((x) => x.value),
+        ...chart.forecast!.points.map((x) => x.value),
+        chart.version!.total,
+        chart.latestFormal!.forecastTotal!,
+        "2000000.00", // Value Gap at Value Period end = $27.0m − $25.0m
+      ].map((v) => formatMoneyShort(v, "USD")),
+    );
+    expect(
+      untraced(
+        p3.rows.map((r) => r.cursor),
+        governed,
+      ),
+    ).toEqual([]);
+    expect(atDateWithoutObservation(p3.rows)).toEqual([]);
     expect(chart.notes).toEqual([]);
     expect(chart.today).toEqual({ asOf: j.today, inPeriod: true });
     expect(chart.latestFormal!.reviewDate).toBe(j.today); // same calendar day → one combined marker in the web chart
@@ -438,9 +476,25 @@ describe("canonical Value Office journey (4D.9K)", () => {
       expect(terminalReconciliation(op, C.valuePeriod.end, sc.totalValue).state).toBe("reconciled");
       expect(op.every((p) => p.asOf > C.review2.date)).toBe(true);
     }
-    // Only explicitly entered milestones exist: 4 (V1) + 4 (V2) + 2 + 2 (forecasts) + options 2 (Act now) + 3 (No action)
-    // + 3 (Delay 3 months) — the two 30 Dec 2026 scenario milestones are the stored delayed-action pivot (4D.9N.1A).
-    expect(rows).toHaveLength(4 + 4 + 2 + 2 + 2 + 3 + 3);
+    // Only explicitly entered milestones exist: 4 (V1) + 4 (V2) + 2 (Review #2 forecast) + 3 (Review #3 forecast, incl. the
+    // 31 Dec 2026 $5.0m milestone, 4D.9N.1B.1) + options 2 (Act now) + 3 (No action) + 3 (Delay 3 months) — the two
+    // 30 Dec 2026 scenario milestones are the stored delayed-action pivot (4D.9N.1A).
+    expect(rows).toHaveLength(4 + 4 + 2 + 3 + 2 + 3 + 3);
+    expect(rows.filter((r) => r.assuranceReviewId === s.review2.id)).toHaveLength(2);
+    expect(
+      rows
+        .filter((r) => r.asOf === "2026-12-31" && !r.scenarioId)
+        .map((r) => [
+          r.valueCaseVersionId === s.v1.id ? "V1 plan" : r.valueCaseVersionId === s.v2.id ? "V2 plan" : "",
+          r.assuranceReviewId === s.review3.id ? "Review #3 forecast" : r.assuranceReviewId ? "other review" : "",
+          r.value,
+        ])
+        .sort(),
+    ).toEqual([
+      ["", "Review #3 forecast", "5000000.00"], // the only added point (4D.9N.1B.1)
+      ["V1 plan", "", "6000000.00"],
+      ["V2 plan", "", "5000000.00"],
+    ]);
     const pivot = rows.filter((r) => r.scenarioId && r.asOf === "2026-12-30");
     expect(pivot.map((r) => [r.value, r.note]).sort((x, y) => String(x[1]).localeCompare(String(y[1])))).toEqual([
       ["5000000.00", "Management acts — delayed action"],

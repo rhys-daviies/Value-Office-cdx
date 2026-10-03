@@ -134,13 +134,17 @@ export const CANONICAL = {
    * Review #3 against V2 ($27.0m). Realised $4.6m is unchanged (realised value is independent of the authorised total).
    * The re-baselined Procurement Savings is forecast on plan ($12.0m); Revenue Uplift and Working Capital continue the
    * shortfalls already formally recorded at Review #2 ($9.0m vs $10.0m, $4.0m vs $5.0m), which VC-001 did not re-baseline.
-   * Formal Forecast $25.0m → Value Gap $2.0m, explained entirely by those two drivers. Path: $15.5m at 31 Dec 2027
-   * (V2 plan $16.5m less the $1.0m of the shortfall expected by then), $25.0m at the Value Period end.
+   * Formal Forecast $25.0m → Value Gap $2.0m, explained entirely by those two drivers. Path (4D.9N.1B.1): $5.0m at
+   * 31 Dec 2026 — near-term formal forecast remains aligned with the V2 authorised milestone of $5.0m; the remaining
+   * $2.0m period-end shortfall emerges later through the continuing Revenue Uplift and Working Capital underperformance
+   * — then $15.5m at 31 Dec 2027 (V2 plan $16.5m less the $1.0m of the shortfall expected by then), $25.0m at the Value
+   * Period end. A deliberate synthetic forecast assumption.
    */
   review3: {
     forecast: ["12000000.00", "9000000.00", "4000000.00"], // $25.0m → Value Gap $2.0m against V2 $27.0m
     realised: ["2800000.00", "1200000.00", "600000.00"], // $4.6m
     forecastPath: [
+      ["2026-12-31", "5000000.00"],
       ["2027-12-31", "15500000.00"],
       ["2028-12-31", "25000000.00"],
     ],

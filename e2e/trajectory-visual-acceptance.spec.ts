@@ -67,7 +67,15 @@ for (const width of [1366, 1024]) {
     await hoverAt(page, chart, 172, 2027, 5, 20);
     await expect(tip.locator('[data-series-label="Authorised Plan (V2)"]')).toContainText("Previous31 Dec 2026 ·$5.0m");
     await expect(tip.locator('[data-series-label="Formal Forecast"]')).toContainText("Next31 Dec 2027 ·$15.5m");
+    // 4D.9N.1B.1: Review #3's explicit 31 Dec 2026 milestone is the forecast's previous stored value.
+    await expect(tip.locator('[data-series-label="Formal Forecast"]')).toContainText("Previous31 Dec 2026 ·$5.0m");
     await shot(t, `${width}-2-overview-tooltip-value-free-month`);
+    // At 31 Dec 2026 both are stored values on that date: Authorised Plan $5.0m and Formal Forecast $5.0m (aligned).
+    await hoverAt(page, chart, 172, 2026, 11, 29);
+    await expect(tip.getByTestId("tip-heading")).toHaveText("31 Dec 2026");
+    await expect(tip.locator('[data-series-label="Authorised Plan (V2)"] [data-tag="Entered"]')).toContainText("$5.0m");
+    await expect(tip.locator('[data-series-label="Formal Forecast"] [data-tag="Formal"]')).toContainText("$5.0m");
+    await shot(t, `${width}-2b-overview-tooltip-dec-2026`);
 
     // Value Case: trajectory facts + the E1 Evolution commitment story with event cards.
     await page
