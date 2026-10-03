@@ -483,17 +483,18 @@ in the browser.
 | Options at Review #2                               | Act now $29.0m (Cardaxia recommendation), Delay 3 months $27.0m (management selected), No action $23.0m; difference −$2.0m                                            |
 | Option paths (explicit scenario milestones)        | Act now $18.0m / $29.0m; No action $5.0m (30 Dec 2026) / $15.0m / $23.0m; Delay $5.0m (30 Dec 2026, note "Management acts — delayed action") / $16.5m / $27.0m        |
 | VC-001 (from Review #2 and its decision)           | formalises the adopted Delay path: stated −$3.0m = VD-01 $15.0m → $12.0m; V2 plan $0 / $5.0m / $16.5m / $27.0m                                                        |
-| Authorised V2 (journey date)                       | $27.0m; V1 superseded and unchanged                                                                                                                                   |
-| Review #3 (journey date, V2)                       | forecast $25.0m (VD-01 $12.0m on plan; VD-02 $9.0m, VD-03 $4.0m continue Review #2's shortfalls; milestones $5.0m / $15.5m / $25.0m), realised $4.6m, Value Gap $2.0m |
+| Authorised V2 (3 Oct 2026)                         | $27.0m; V1 superseded and unchanged                                                                                                                                   |
+| Review #3 (3 Oct 2026, V2)                         | forecast $25.0m (VD-01 $12.0m on plan; VD-02 $9.0m, VD-03 $4.0m continue Review #2's shortfalls; milestones $5.0m / $15.5m / $25.0m), realised $4.6m, Value Gap $2.0m |
 
 Rules the journey proves: the management decision does not itself change the commitment — VC-001, an authorised,
-reconciled Value Change with its own rationale, later formalises the adopted path; the Review #2 Formal Forecast is the
-expected outcome under the existing operating response at Review #2 (not the No action scenario); the 30 Dec 2026
+reconciled Value Change with its own rationale, later formalises the adopted path; the Review #2 Formal Forecast ($26.0m) is the
+"Current expected outcome before the assessed management interventions." (not the No action scenario); the 30 Dec 2026
 $5.0m pivot is consultant scenario data (not realised, forecast or interpolated); a historical review keeps the version it measured against (its live rebuild differs from its issued
 record only in that version's lifecycle status); issued reports keep their snapshot, rendering and PDF; Value Gap and
-Value Leakage are separate numbers; draft and proposed versions are never the current plan. Recommendation issue and
-finalisation are timestamped "now", so the decision, the Value Change authorisation and Review #3 fall on the day the
-journey runs.
+Value Leakage are separate numbers; draft and proposed versions are never the current plan. Every governance date is fixed
+(4D.9N.1C): the decision, the VC-001 authorisation and Review #3 fall on 3 Oct 2026 (`CANONICAL.journeyDate`) whatever
+day the journey runs, so forecast milestones always follow their review. Only the domain's own record timestamps
+(recommendation issue, finalisation) use the clock; the canonical tests pin it to the journey date.
 
 **Trajectory interaction and Evolution (4D.9N.1A, web only).** The primary and alternative trajectory charts add one
 value-free cursor row per month without an explicit date, so the crosshair rests on every month while lines still join

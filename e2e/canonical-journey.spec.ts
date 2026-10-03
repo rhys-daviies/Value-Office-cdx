@@ -41,14 +41,20 @@ test("Overview and Value Case after V2: one consistent governed story", async ({
     "records no Cardaxia recommendation or management decision.",
   );
   await expect(page.getByTestId("latest-value-recommendation")).toHaveCount(0);
-  // Trajectory on V2's plan, with the authorised Value Change marker; realised #1–#3; Today = formal position.
+  // Trajectory on V2's plan, with the authorised Value Change marker; realised #1–#3. Review #3 is fixed on 3 Oct 2026
+  // (4D.9N.1C): on that day Today and the formal position share one marker; on any other day they are two markers.
   const t = page.getByTestId("value-trajectory");
   await expect(t.getByTestId("trajectory-legend")).toContainText("Authorised Plan (V2)");
   await expect(t.getByTestId("trajectory-legend")).toContainText("Authorised Value Change");
   await expect(t.getByTestId("trajectory-chart").locator('[data-series="realised"]')).toHaveCount(4);
-  await expect(t.getByTestId("trajectory-chart")).toContainText("Today · formal position");
-  await expect(t.getByTestId("trajectory-legend")).toContainText("Today · formal position");
-  await expect(t.getByTestId("trajectory-legend")).not.toContainText(/Formal position(?!\w)/); // one marker, one key
+  if (new Date().toISOString().slice(0, 10) === "2026-10-03") {
+    await expect(t.getByTestId("trajectory-chart")).toContainText("Today · formal position");
+    await expect(t.getByTestId("trajectory-legend")).toContainText("Today · formal position");
+    await expect(t.getByTestId("trajectory-legend")).not.toContainText(/Formal position(?!\w)/); // one marker, one key
+  } else {
+    await expect(t.getByTestId("trajectory-chart")).toContainText("Formal position 3 Oct 2026");
+    await expect(t.getByTestId("trajectory-legend")).not.toContainText("Today · formal position");
+  }
 
   // Value Case: commitment V2, history V1 → V2, the governed action that produced it.
   await tab(page, "Value Case").click();

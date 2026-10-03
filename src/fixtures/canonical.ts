@@ -1,6 +1,5 @@
 import { and, eq } from "drizzle-orm";
 
-import { todayIso } from "@/domain/attention";
 import {
   createReview,
   finaliseReview,
@@ -32,12 +31,15 @@ import { db, schema } from "@/server/db/client";
 // Canonical end-to-end Value Office journey (Phase 4D.9K). ONE synthetic engagement, built only through commands, in
 // the order the methodology requires — so every lifecycle invariant is exercised, not seeded around. Stages can be run
 // one at a time (tests issue client reports between them). "Trajectory Executive" is this journey up to Review #2.
-// Synthetic only: no client data. Dates are fixed historical dates, except the events that the domain timestamps
-// "now" (recommendation issue, finalisation) and the ones that must follow them: the management decision, the Value
-// Change authorisation and the post-V2 review all fall on the day the journey runs.
+// Synthetic only: no client data. Every governance date is fixed on the synthetic 2026 timeline (4D.9N.1C): the story
+// never depends on the day the journey runs. The management decision, the VC-001 authorisation and Review #3 fall on
+// CANONICAL.journeyDate (3 Oct 2026). Only the domain's own record timestamps (recommendation issue, finalisation) use
+// the clock; tests pin it to the journey date so that chronology is checked deterministically.
 
 /** The canonical economic story (synthetic). Money is exact decimal strings. */
 export const CANONICAL = {
+  /** Management decision, VC-001 authorisation (V2) and Review #3: fixed, after Review #2, before 31 Dec 2026. */
+  journeyDate: "2026-10-03",
   valuePeriod: { start: "2026-01-01", end: "2028-12-31" },
   originalBusinessCase: "32000000.00",
   v1: {
@@ -152,7 +154,7 @@ export const CANONICAL = {
 } as const;
 
 export function canonicalJourney(actor: Actor, opts: { code: string; name: string }) {
-  const today = todayIso();
+  const { journeyDate } = CANONICAL;
   type Row<F extends (...a: never[]) => unknown> = Awaited<ReturnType<F>>;
   const s = {} as {
     project: Row<typeof createProject>["project"];
@@ -175,7 +177,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
 
   return {
     state: s,
-    today,
+    journeyDate,
 
     /** 1–7: project, V0, drivers (qualified), Value Basis and Period, V1 plan, proposal, VCO authorisation. */
     async establish(o: { inherited?: boolean } = {}) {
@@ -337,7 +339,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
         reviewId: r2.id,
         selectedScenarioId: s.scenarios["Delay 3 months"]!.id,
         decidedByPersonId: s.vco.id,
-        decidedOn: today,
+        decidedOn: journeyDate,
         rationale: "Synthetic: delay to align with the budget cycle",
       });
       return s;
@@ -386,7 +388,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
       await authoriseValueChange(actor, {
         changeId: s.change.id,
         authorisedByPersonId: s.vco.id,
-        authorisedOn: today,
+        authorisedOn: journeyDate,
         authorisationEvidenceId: ev.id,
       });
       return s;
@@ -394,7 +396,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
 
     /** 35: Assurance continues against V2 (Review #3, on the day V2 was authorised). */
     async continueAssurance() {
-      const r3 = await createReview(actor, { projectId: s.project.id, trigger: "ad_hoc", reviewDate: today });
+      const r3 = await createReview(actor, { projectId: s.project.id, trigger: "ad_hoc", reviewDate: journeyDate });
       s.review3 = r3;
       await upsertValuePositions(actor, {
         reviewId: r3.id,

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { todayIso } from "@/domain/attention";
 import { money, sumMoney, toDbMoney } from "@/domain/money";
@@ -39,6 +39,12 @@ import { atDateWithoutObservation, untraced } from "../support/tooltip-trace";
 // never change afterwards. The steps run in order and share state.
 
 const sha = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
+/**
+ * 4D.9N.1C: the domain stamps a few records with the clock (recommendation issue, finalisation). Pin that clock — Date
+ * only, still advancing — so the canonical chronology is checked the same way whatever the actual system date is.
+ */
+const pinClock = (iso: string) =>
+  vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true, now: new Date(`${iso}T09:00:00Z`) });
 const preview = { state: "preview" } as const;
 const C = CANONICAL;
 const sum = (xs: readonly string[]) => toDbMoney(sumMoney(xs));
@@ -104,9 +110,13 @@ async function v1State() {
 
 describe("canonical Value Office journey (4D.9K)", () => {
   beforeAll(async () => {
+    pinClock(C.journeyDate);
     actor = await newActor();
     j = canonicalJourney(actor, { code: `CANON-${uid()}`, name: "Canonical Value Journey" });
     s = j.state;
+  });
+  afterAll(() => {
+    vi.useRealTimers();
   });
 
   it("1–4. V0 → Re-Qualification → Authorised V1 with a reconciled plan; Re-Qualification Report issued", async () => {
@@ -167,7 +177,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
     expect(story.decision).toMatchObject({
       label: "Delay 3 months",
       totalValue: "27000000.00",
-      decidedOn: j.today,
+      decidedOn: j.journeyDate,
       differenceFromRecommendation: "-2000000.00",
     });
     expect(story.valueChanges).toEqual([]);
@@ -179,10 +189,10 @@ describe("canonical Value Office journey (4D.9K)", () => {
   }, 120_000);
 
   it("34 (stage B). cross-surface reconciliation at Review #2 (V1 in force); Value Assurance Report issued", async () => {
-    const o = await getExecutiveOverview(s.project.id, j.today);
+    const o = await getExecutiveOverview(s.project.id, j.journeyDate);
     const alt = (await getAlternativeValueTrajectories(s.project.id, s.review2.id))!;
     const story = (await getReviewStory(s.project.id, s.review2.id))!;
-    const chart = await getValueTrajectoryChart(s.project.id, { today: j.today });
+    const chart = await getValueTrajectoryChart(s.project.id, { today: j.journeyDate });
     const va = (await issue("assurance-r2", "assurance", s.review2.id)) as AssuranceReport;
 
     // The matrix: one expected value per governed concept, read from every surface that shows it.
@@ -293,19 +303,24 @@ describe("canonical Value Office journey (4D.9K)", () => {
     const [v1] = await db().select().from(schema.valueCaseVersion).where(eq(schema.valueCaseVersion.id, s.v1.id));
     expect(v1!.status).toBe("superseded");
 
-    const o = await getExecutiveOverview(s.project.id, j.today);
+    const o = await getExecutiveOverview(s.project.id, j.journeyDate);
     expect(o.authorised).toEqual({ versionNumber: 2, total: "27000000.00" });
     expect(o.valueCase).toMatchObject({
-      current: { versionNumber: 2, authorisedValue: "27000000.00", authorisedOn: j.today },
+      current: { versionNumber: 2, authorisedValue: "27000000.00", authorisedOn: j.journeyDate },
       authorisedChangeCount: 1,
-      latestAuthorisedChange: { code: "VC-001", versionNumber: 2, authorisedOn: j.today },
+      latestAuthorisedChange: { code: "VC-001", versionNumber: 2, authorisedOn: j.journeyDate },
       pending: [],
     });
-    const chart = await getValueTrajectoryChart(s.project.id, { today: j.today });
+    const chart = await getValueTrajectoryChart(s.project.id, { today: j.journeyDate });
     expect(chart.version).toEqual({ versionNumber: 2, total: "27000000.00" });
     expect(chart.plan.map((p) => [p.asOf, p.value])).toEqual(C.valueChange.v2Plan.map(([a, v]) => [a, v]));
     expect(terminalReconciliation(chart.plan, C.valuePeriod.end, "27000000.00").state).toBe("reconciled");
-    expect(chart.versionChange).toEqual({ code: "VC-001", versionNumber: 2, authorisedOn: j.today, inPeriod: true });
+    expect(chart.versionChange).toEqual({
+      code: "VC-001",
+      versionNumber: 2,
+      authorisedOn: j.journeyDate,
+      inPeriod: true,
+    });
     expect(chart.notes).toContain("formal_measured_against_earlier_version"); // Review #2 was against V1
 
     const evolution = await getValueCaseEvolution(s.project.id);
@@ -320,7 +335,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
     // The authorised notice is a second issue; the proposed one stays as issued.
     const vcn2 = (await issue("vcn-authorised", "value_change_notice", s.change.id)) as ValueChangeNotice;
     expect(vcn2.change.status).toBe("authorised");
-    expect(vcn2.authorisation).toMatchObject({ authorisedOn: j.today });
+    expect(vcn2.authorisation).toMatchObject({ authorisedOn: j.journeyDate });
     await expectReportsUnchanged();
   }, 120_000);
 
@@ -367,7 +382,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
       realisedTotal: "4600000.00",
       valueGap: "2000000.00",
     });
-    const chart = await getValueTrajectoryChart(s.project.id, { today: j.today });
+    const chart = await getValueTrajectoryChart(s.project.id, { today: j.journeyDate });
     expect(chart.realised!.checkpoints.map((c) => [c.sequence, c.value])).toEqual([
       [1, "1000000.00"],
       [2, "4000000.00"],
@@ -411,15 +426,15 @@ describe("canonical Value Office journey (4D.9K)", () => {
     ).toEqual([]);
     expect(atDateWithoutObservation(p3.rows)).toEqual([]);
     expect(chart.notes).toEqual([]);
-    expect(chart.today).toEqual({ asOf: j.today, inPeriod: true });
-    expect(chart.latestFormal!.reviewDate).toBe(j.today); // same calendar day → one combined marker in the web chart
+    expect(chart.today).toEqual({ asOf: j.journeyDate, inPeriod: true });
+    expect(chart.latestFormal!.reviewDate).toBe(j.journeyDate); // same calendar day → one combined marker in the web chart
     // 4D.9L: the latest formal position (Review #3) and the latest recorded value decision (Review #2) are distinct.
-    const o = await getExecutiveOverview(s.project.id, j.today);
-    expect(o.formal).toMatchObject({ sequence: 3, date: j.today, againstVersionNumber: 2 });
+    const o = await getExecutiveOverview(s.project.id, j.journeyDate);
+    expect(o.formal).toMatchObject({ sequence: 3, date: j.journeyDate, againstVersionNumber: 2 });
     expect(o.decision.awaiting).toBeNull(); // Review #3 made no recommendation
     const rd = o.decision.recorded!;
     expect(rd.review).toMatchObject({ id: s.review2.id, sequence: 2, date: C.review2.date, againstVersionNumber: 1 });
-    expect(rd.decision!.decidedOn).toBe(j.today);
+    expect(rd.decision!.decidedOn).toBe(j.journeyDate);
     expect(rd.outcomes.find((x) => x.recommended)).toMatchObject({ label: "Act now", totalValue: "29000000.00" });
     expect(rd.outcomes.find((x) => x.selected)).toMatchObject({ label: "Delay 3 months", totalValue: "27000000.00" });
     expect(rd.differenceFromRecommendation).toBe("-2000000.00");
@@ -428,9 +443,9 @@ describe("canonical Value Office journey (4D.9K)", () => {
       .replace(/\s+/g, " ");
     expect(html).toContain("Latest recorded value decision");
     expect(html).toContain("Source: Review #2 · formal position as at 30 Sept 2026 · against V1");
-    expect(html).toContain(`Decision ${formatDate(j.today)}`);
+    expect(html).toContain(`Decision ${formatDate(j.journeyDate)}`);
     expect(html).toContain(
-      `Recorded at Review #2. The latest formal position (Review #3 · ${formatDate(j.today)}) records no Cardaxia recommendation or management decision.`,
+      `Recorded at Review #2. The latest formal position (Review #3 · ${formatDate(j.journeyDate)}) records no Cardaxia recommendation or management decision.`,
     );
     expect(html).not.toMatch(/Source: Review #3/);
     await expectReportsUnchanged();
@@ -553,7 +568,7 @@ describe("canonical governance gates (separate projects)", () => {
     await authoriseValueChange(a, {
       changeId: change.id,
       authorisedByPersonId: st.vco.id,
-      authorisedOn: k.today,
+      authorisedOn: k.journeyDate,
       authorisationEvidenceId: ev.id,
     });
     const chart = await getValueTrajectoryChart(st.project.id);
@@ -586,4 +601,80 @@ describe("canonical governance gates (separate projects)", () => {
     const [after] = await db().select().from(schema.valueChange).where(eq(schema.valueChange.id, vc!.id));
     expect(after!.status).not.toBe("authorised");
   });
+});
+
+describe("canonical journey is deterministic (4D.9N.1C)", () => {
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
+  it("the canonical story does not depend on the system date: same governance dates, points and economics in 2031", async () => {
+    // A system date long after the Value Period: every governance date and stored point is still the fixed 2026 story.
+    pinClock("2031-06-30");
+    const a = await newActor();
+    const k = canonicalJourney(a, { code: `DET-${uid()}`, name: "Deterministic canonical journey" });
+    expect(k.journeyDate).toBe("2026-10-03");
+    await k.establish({ inherited: true });
+    await k.assure();
+    await k.change();
+    await k.proposeChange();
+    await k.authoriseChange();
+    await k.continueAssurance();
+    const st = k.state;
+    const [vc] = await db().select().from(schema.valueChange).where(eq(schema.valueChange.id, st.change.id));
+    const [matter] = await db().select().from(schema.valueLeakage).where(eq(schema.valueLeakage.id, st.matter.id));
+    const governance = [
+      ["Value Period start", C.valuePeriod.start],
+      ["V1 authorised", C.v1.authorisedOn],
+      ["Review #1", st.review1.reviewDate],
+      ["VL-001 identified", matter!.identifiedOn!],
+      ["Review #2", st.review2.reviewDate],
+      ["decision", st.decision.decidedOn],
+      ["VC-001 authorised", vc!.authorisedOn!],
+      ["Review #3", st.review3.reviewDate],
+    ] as const;
+    expect(governance.map(([, d]) => d)).toEqual([
+      "2026-01-01",
+      "2026-01-15",
+      "2026-03-31",
+      "2026-08-14",
+      "2026-09-30",
+      "2026-10-03",
+      "2026-10-03",
+      "2026-10-03",
+    ]);
+    for (let i = 1; i < governance.length; i++)
+      expect(governance[i]![1] >= governance[i - 1]![1], `${governance[i - 1]![0]} ≤ ${governance[i]![0]}`).toBe(true);
+
+    // Forecast and option milestones follow the formal review they belong to (the invariant is not relaxed).
+    const rows = await db()
+      .select()
+      .from(schema.valueTrajectoryPoint)
+      .where(eq(schema.valueTrajectoryPoint.projectId, st.project.id));
+    expect(rows).toHaveLength(21);
+    const reviewDate = new Map([st.review1, st.review2, st.review3].map((r) => [r.id, r.reviewDate]));
+    const scenarioIds = new Set(Object.values(st.scenarios).map((x) => x.id));
+    for (const r of rows) {
+      if (r.assuranceReviewId) expect(r.asOf > reviewDate.get(r.assuranceReviewId)!, r.asOf).toBe(true);
+      if (r.scenarioId) expect(scenarioIds.has(r.scenarioId) && r.asOf > st.review2.reviewDate, r.asOf).toBe(true);
+    }
+    expect(
+      rows
+        .filter((r) => r.assuranceReviewId === st.review3.id)
+        .map((r) => [r.asOf, r.value])
+        .sort(),
+    ).toEqual([
+      ["2026-12-31", "5000000.00"],
+      ["2027-12-31", "15500000.00"],
+      ["2028-12-31", "25000000.00"],
+    ]);
+    const r3 = (await getAssuranceWorkspace(st.project.id, st.review3.id))!;
+    expect(r3.againstVersion.versionNumber).toBe(2);
+    expect(r3.totals).toMatchObject({
+      authorisedTotal: "27000000.00",
+      forecastTotal: "25000000.00",
+      realisedTotal: "4600000.00",
+      valueGap: "2000000.00",
+    });
+  }, 120_000);
 });
