@@ -153,8 +153,13 @@ export const CANONICAL = {
   },
 } as const;
 
-export function canonicalJourney(actor: Actor, opts: { code: string; name: string }) {
-  const { journeyDate } = CANONICAL;
+/**
+ * `governanceDate` (4D.9N.1C.2) overrides the business dates of the post-Review #2 events — the decision's decidedOn,
+ * VC-001's authorisedOn (and so V2's) and Review #3's reviewDate — for a production demo created on another day.
+ * Defaults to CANONICAL.journeyDate. System timestamps (issue, finalisation, recording) are never parameterised.
+ */
+export function canonicalJourney(actor: Actor, opts: { code: string; name: string; governanceDate?: string }) {
+  const journeyDate = opts.governanceDate ?? CANONICAL.journeyDate;
   type Row<F extends (...a: never[]) => unknown> = Awaited<ReturnType<F>>;
   const s = {} as {
     project: Row<typeof createProject>["project"];

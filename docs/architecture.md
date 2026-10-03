@@ -632,3 +632,9 @@ When added: `src/ai/` produces suggestions into its own table; consultants accep
 Value Leakage (recoverable/unrecoverable), scenarios/alternative trajectories, Cardaxia recommendations, client
 decisions, Value Changes (V2+), reports/PDF, charts, AI, automated scheduling/notifications, client portal,
 production auth, binary document storage.
+
+Domain-hardening candidates recorded in 4D.9N.1C.2 (not fixed): (1) a decision's `decidedOn` is not checked against
+the recommendation's issue time (the database enforces only record order: no decision before issue); (2) forecast and
+option milestones following their review date is documented and tested but not enforced by commands or the database;
+(3) `reviewDate` is both the review's date and its formal "as at" date. Synthetic demo creation
+(`src/fixtures/demo.ts`) takes its governance date from the database's `current_date` and keeps system timestamps real.
