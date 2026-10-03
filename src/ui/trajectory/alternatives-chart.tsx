@@ -18,12 +18,15 @@ import {
   type AlternativeRow,
   type AlternativeSeries,
   type OptionMarker,
+  type PivotMarker,
   type TerminalLabel,
 } from "./alternatives-model";
+import { CursorTipCard } from "./cursor-tip";
 
 // Alternative Value Trajectories chart (Phase 4D.9F). Client-only drawing of a model the server has composed and
-// formatted. Rows exist ONLY at explicit governed dates, so a tooltip can only appear at a stored observation. Option
-// lines join explicit milestones (presentation only); endpoint-only options are a single mark with no line.
+// formatted. Option lines join explicit milestones (presentation only); endpoint-only options are a single mark with no
+// line. 4D.9N.1A: value-free month rows let the crosshair rest on every month; the tooltip states stored values or
+// Previous / Next only. Stored milestone notes (e.g. a delayed-action pivot) are drawn as event markers.
 
 const HEIGHT = 360;
 const MARGIN = { top: 34, right: 184, bottom: 4, left: 8 };
@@ -32,20 +35,29 @@ const LINE_HEIGHT = 13;
 
 function TipContent({ active, payload }: TooltipContentProps<ValueType, NameType>) {
   const row = payload?.[0]?.payload as AlternativeRow | undefined;
-  if (!active || !row || row.tip.length < 2) return null;
-  return (
-    <div
-      className="rounded border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm"
-      data-testid="alternatives-tooltip"
-    >
-      <p className="mb-1 font-semibold text-slate-900">{row.tip[0]}</p>
-      {row.tip.slice(1).map((line) => (
-        <p key={line} className="text-slate-700">
-          {line}
-        </p>
-      ))}
-    </div>
-  );
+  if (!active || !row) return null;
+  return <CursorTipCard tip={row.cursor} testId="alternatives-tooltip" />;
+}
+
+function pivotLabel(p: PivotMarker) {
+  function PivotLabel({ viewBox }: { viewBox?: { x?: number; y?: number; height?: number } }) {
+    const x = viewBox?.x ?? 0;
+    const y = (viewBox?.y ?? 0) + (viewBox?.height ?? 0) - 8;
+    return (
+      <text
+        x={x + 5}
+        y={y}
+        fontSize={11}
+        fontWeight={600}
+        fill={p.color}
+        data-testid="alternatives-pivot-marker"
+        data-pivot-option={p.option}
+      >
+        {p.label}
+      </text>
+    );
+  }
+  return PivotLabel;
 }
 
 export function OptionMark({
@@ -132,6 +144,7 @@ export function AlternativeTrajectoriesChart({
   yTicks,
   review,
   labels,
+  pivots = [],
   ariaLabel,
 }: {
   series: AlternativeSeries[];
@@ -141,6 +154,7 @@ export function AlternativeTrajectoriesChart({
   yTicks: [number, string][];
   review: { t: number; label: string };
   labels: TerminalLabel[];
+  pivots?: PivotMarker[];
   ariaLabel: string;
 }) {
   const xLabel = new Map(xTicks);
@@ -182,11 +196,24 @@ export function AlternativeTrajectoriesChart({
             axisLine={false}
             width={56}
           />
+          {/* Month rows carry no plotted values; keep their (null) payload so the card can read the row's governed tooltip
+              model. The card never derives a value from the payload. */}
           <Tooltip
             content={TipContent}
-            cursor={{ stroke: "#94a3b8", strokeDasharray: "2 3" }}
+            filterNull={false}
+            cursor={{ stroke: "#64748b", strokeWidth: 1 }}
             isAnimationActive={false}
           />
+          {pivots.map((p) => (
+            <ReferenceLine
+              key={`${p.t}-${p.option}`}
+              x={p.t}
+              stroke={p.color}
+              strokeDasharray="5 3"
+              strokeWidth={1.5}
+              label={pivotLabel(p)}
+            />
+          ))}
           <ReferenceLine
             x={review.t}
             stroke="#334155"

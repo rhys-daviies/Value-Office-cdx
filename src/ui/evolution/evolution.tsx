@@ -2,10 +2,10 @@ import Decimal from "decimal.js";
 
 import type { EvolutionEvent, ValueCaseEvolution } from "@/server/queries/evolution";
 import { GovernedTag } from "@/ui/components/badges";
-import { formatDate, formatMoneyShort } from "@/ui/format";
+import { formatDate, formatMoneyChange, formatMoneyShort } from "@/ui/format";
 import { TRIGGER_LABELS } from "@/ui/labels";
 
-import { type ChartPoint, EvolutionChart } from "./chart";
+import { EVOLUTION_MARGIN_FRACTIONS, EvolutionChart, type EvolutionStep } from "./chart";
 import { SERIES } from "./series";
 
 // Value Case Evolution (Phase 4D.5): one component, used on Overview and the Value Case page.
@@ -25,81 +25,79 @@ function eventDate(e: EvolutionEvent): string {
   return formatDate(e.position.date);
 }
 
-function toPoint(e: EvolutionEvent, currency: string): ChartPoint {
-  const m = (v: string | null) => formatMoneyShort(v, currency);
-  const date = eventDate(e);
-  if (e.kind === "original") {
-    const o = e.original;
+/** Event chart steps (4D.9N.1A E1): commitment values, review checkpoints and movement between commitments. */
+function toSteps(evolution: ValueCaseEvolution): EvolutionStep[] {
+  const m = (v: string | null) => formatMoneyShort(v, evolution.currency);
+  const n = (v: string | null) => (v === null ? null : Number(v)); // placement only
+  let previous: string | null = null;
+  return evolution.events.map((e): EvolutionStep => {
+    if (e.kind === "original") {
+      previous = e.original.value;
+      return {
+        kind: "original",
+        key: e.key,
+        axis: "Original BC",
+        sub: "Not dated",
+        value: Number(e.original.value),
+        text: m(e.original.value),
+      };
+    }
+    if (e.kind === "authorisation") {
+      const a = e.authorisation;
+      const delta =
+        previous === null
+          ? null
+          : formatMoneyChange(new Decimal(a.authorisedValue).minus(previous).toFixed(2), evolution.currency);
+      previous = a.authorisedValue;
+      return {
+        kind: "authorisation",
+        key: e.key,
+        axis: a.valueChangeCode ? `${a.valueChangeCode} · V${a.versionNumber}` : `V${a.versionNumber}`,
+        sub: a.date ? formatDate(a.date) : "Date not recorded",
+        version: `V${a.versionNumber}`,
+        value: Number(a.authorisedValue),
+        text: m(a.authorisedValue),
+        delta,
+      };
+    }
+    const p = e.position;
     return {
+      kind: "review",
       key: e.key,
-      kind: "original",
-      label: "Business Case",
-      sub: NOT_DATED,
-      original: o.value,
-      authorised: null,
-      forecast: null,
-      againstVersionNumber: null,
-      realised: null,
-      display: { original: m(o.value) },
-      tooltip: ["Original Business Case", m(o.value), "Inherited starting position · no governed date"],
+      axis: `Review #${p.sequence}`,
+      sub: formatDate(p.date),
+      against: n(p.againstAuthorisedValue),
+      forecast: n(p.currentForecast),
+      realised: n(p.realisedValue),
+      text: {
+        against: m(p.againstAuthorisedValue),
+        forecast: p.currentForecast === null ? null : m(p.currentForecast),
+        realised: p.realisedValue === null ? null : m(p.realisedValue),
+        gap: p.valueGap === null ? null : m(p.valueGap),
+      },
     };
-  }
-  if (e.kind === "authorisation") {
-    const a = e.authorisation;
-    return {
-      key: e.key,
-      kind: "authorisation",
-      label: `V${a.versionNumber}`,
-      sub: date,
-      original: null,
-      authorised: a.authorisedValue,
-      forecast: null,
-      againstVersionNumber: null,
-      realised: null,
-      display: { authorised: m(a.authorisedValue) },
-      tooltip: [
-        `Authorised V${a.versionNumber}`,
-        m(a.authorisedValue),
-        a.date ? `Authorised ${formatDate(a.date)}` : "Authorisation date not recorded",
-        ...(a.vcoName ? [`VCO: ${a.vcoName}`] : []),
-        ...(a.valueChangeCode ? [`Value Change ${a.valueChangeCode}`] : []),
-      ],
-    };
-  }
-  const p = e.position;
-  return {
-    key: e.key,
-    kind: "review",
-    label: `Review #${p.sequence}`,
-    sub: date,
-    original: null,
-    authorised: e.inForceValue,
-    forecast: p.currentForecast,
-    againstVersionNumber: p.againstVersionNumber,
-    realised: p.realisedValue,
-    display: { forecast: m(p.currentForecast), realised: m(p.realisedValue) },
-    tooltip: [
-      `Formal Assurance · Review #${p.sequence}`,
-      `${formatDate(p.date)} · ${TRIGGER_LABELS[p.trigger]}`,
-      `Measured against V${p.againstVersionNumber}`,
-      `Forecast: ${p.currentForecast === null ? "not complete" : m(p.currentForecast)}`,
-      `Realised: ${p.realisedValue === null ? "not recorded" : m(p.realisedValue)}`,
-      ...(p.valueGap !== null ? [`Value Gap: ${m(p.valueGap)}`] : []),
-    ],
-  };
+  });
 }
 
 /** Y-axis ticks from zero to a round ceiling above the largest plotted value (decimal-safe). */
-function axisTicks(points: ChartPoint[], currency: string): [string, string][] {
-  const values = points.flatMap((p) => [p.original, p.authorised, p.forecast, p.realised]).filter((v) => v !== null);
+function axisTicks(evolution: ValueCaseEvolution): [number, string][] {
+  const values = evolution.events
+    .flatMap((e) =>
+      e.kind === "original"
+        ? [e.original.value]
+        : e.kind === "authorisation"
+          ? [e.authorisation.authorisedValue]
+          : [e.position.againstAuthorisedValue, e.position.currentForecast, e.position.realisedValue],
+    )
+    .filter((v): v is string => v !== null);
   const max = values.reduce((acc, v) => Decimal.max(acc, new Decimal(v)), new Decimal(0));
-  if (max.isZero()) return [["0", formatMoneyShort("0", currency)]];
+  if (max.isZero()) return [[0, formatMoneyShort("0", evolution.currency)]];
   const rough = max.dividedBy(4);
   const magnitude = new Decimal(10).pow(rough.log(10).floor());
   const step = [1, 2, 2.5, 5, 10].map((f) => magnitude.times(f)).find((s) => s.gte(rough)) ?? magnitude.times(10);
-  const ticks: [string, string][] = [];
+  const ticks: [number, string][] = [];
   for (let t = new Decimal(0); ; t = t.plus(step)) {
-    ticks.push([t.toFixed(2), formatMoneyShort(t.toFixed(2), currency)]);
+    ticks.push([t.toNumber(), formatMoneyShort(t.toFixed(2), evolution.currency)]);
     if (t.gte(max)) break;
   }
   return ticks;
@@ -118,34 +116,95 @@ function Legend() {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-1 text-xs" aria-label="Chart legend" data-testid="evolution-legend">
       {item(
-        <path d="M11,1 L17,6 L11,11 L5,6 Z" fill={SERIES.original.color} />,
+        <path d="M0,4 H11 V9 H22" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 3" fill="none" />,
         SERIES.original.label,
-        "inherited starting point",
+        "the original promise",
       )}
       {item(
-        <>
-          <path d="M0,9 H8 V3 H22" stroke={SERIES.authorised.color} strokeWidth="2" fill="none" />
-        </>,
-        SERIES.authorised.label,
-        "step: in force until superseded",
+        <path d="M0,9 H8 V3 H22" stroke={SERIES.authorised.color} strokeWidth="3" fill="none" />,
+        "Authorised Commitment",
+        "in force until a Value Change is authorised",
       )}
       {item(
-        <>
-          <line x1="0" y1="6" x2="22" y2="6" stroke={SERIES.forecast.color} strokeWidth="1.5" strokeDasharray="2 3" />
-          <circle cx="11" cy="6" r="4" fill={SERIES.forecast.color} />
-        </>,
+        <circle cx="11" cy="6" r="4.5" fill={SERIES.forecast.color} />,
         SERIES.forecast.label,
-        "at each finalised review",
+        "at each formal review",
       )}
       {item(
-        <>
-          <line x1="0" y1="6" x2="22" y2="6" stroke={SERIES.realised.color} strokeWidth="1.5" strokeDasharray="2 3" />
-          <rect x="7" y="2" width="8" height="8" rx="1" fill={SERIES.realised.color} />
-        </>,
+        <rect x="7" y="1" width="8" height="10" rx="1" fill={SERIES.realised.color} />,
         SERIES.realised.label,
-        "recorded at each finalised review",
+        "recorded at each formal review",
+      )}
+      {item(
+        <path d="M7,1 H11 V11 H7" stroke="#b91c1c" strokeWidth="1.5" fill="none" />,
+        "Value Gap",
+        "commitment measured against − forecast",
       )}
     </ul>
+  );
+}
+
+/** E2 event strip: compact governed values under each event, aligned with the chart's event columns. */
+function EventStrip({ evolution, steps }: { evolution: ValueCaseEvolution; steps: EvolutionStep[] }) {
+  const m = (v: string | null) => formatMoneyShort(v, evolution.currency);
+  return (
+    <ol
+      className="grid gap-1.5 text-xs"
+      style={{
+        gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))`,
+        paddingLeft: `${EVOLUTION_MARGIN_FRACTIONS.left * 100}%`,
+        paddingRight: `${EVOLUTION_MARGIN_FRACTIONS.right * 100}%`,
+      }}
+      data-testid="evolution-strip"
+    >
+      {evolution.events.map((e, i) => {
+        const s = steps[i]!;
+        const line = (k: string, v: string | null, id: string) => (
+          <div className="flex justify-between gap-1">
+            <dt className="text-slate-500">{k}</dt>
+            <dd className="font-semibold text-slate-900 tabular-nums" data-testid={`evolution-card-${e.key}-${id}`}>
+              {v ?? "—"}
+            </dd>
+          </div>
+        );
+        return (
+          <li
+            key={e.key}
+            className={`rounded border px-2 py-1.5 ${e.kind === "review" ? "border-slate-200 bg-slate-50" : e.kind === "authorisation" ? "border-blue-200 bg-blue-50/60" : "border-orange-200 bg-orange-50/60"}`}
+            data-testid={`evolution-card-${e.key}`}
+          >
+            <p className="truncate font-semibold text-slate-900" title={eventLabel(e)}>
+              {s.axis}
+            </p>
+            <dl>
+              {e.kind === "original" && line("Business Case", m(e.original.value), "value")}
+              {e.kind === "authorisation" && (
+                <>
+                  {line(`Authorised V${e.authorisation.versionNumber}`, m(e.authorisation.authorisedValue), "value")}
+                  {s.kind === "authorisation" && s.delta && line("Change", s.delta, "delta")}
+                </>
+              )}
+              {e.kind === "review" && (
+                <>
+                  {line(`Against V${e.position.againstVersionNumber}`, m(e.position.againstAuthorisedValue), "against")}
+                  {line(
+                    "Forecast",
+                    e.position.currentForecast === null ? "Not complete" : m(e.position.currentForecast),
+                    "forecast",
+                  )}
+                  {line(
+                    "Realised",
+                    e.position.realisedValue === null ? "Not recorded" : m(e.position.realisedValue),
+                    "realised",
+                  )}
+                  {line("Gap", e.position.valueGap === null ? null : m(e.position.valueGap), "gap")}
+                </>
+              )}
+            </dl>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -269,7 +328,7 @@ export function ValueCaseEvolution({
   /** The companion table is always present; on Overview it starts collapsed to keep the page scannable. */
   tableOpen?: boolean;
 }) {
-  const points = evolution.events.map((e) => toPoint(e, evolution.currency));
+  const steps = toSteps(evolution);
   const hasAuthorised = evolution.authorisedVersions.length > 0;
   const summary = evolution.events.map((e) => `${eventLabel(e)} (${eventDate(e)})`).join("; ");
   return (
@@ -304,15 +363,20 @@ export function ValueCaseEvolution({
       ) : (
         <>
           <Legend />
-          <EvolutionChart
-            points={points}
-            currencyTicks={axisTicks(points, evolution.currency)}
-            ariaLabel={`Value Case Evolution chart. Events in order: ${summary}. The table below lists every value.`}
-          />
-          <p className="mb-3 text-xs text-slate-500">
-            Events are shown in governed order; spacing is by event, not elapsed time. Forecast and realised points are
-            formal checkpoint observations — dotted connectors show sequence only; the forecast connector breaks where
-            the version measured against changes.
+          <div className="mt-2 overflow-x-auto">
+            <div className="min-w-[720px]">
+              <EvolutionChart
+                steps={steps}
+                ticks={axisTicks(evolution)}
+                ariaLabel={`Value Case Evolution chart. Events in order: ${summary}. The table below lists every value.`}
+              />
+              <EventStrip evolution={evolution} steps={steps} />
+            </div>
+          </div>
+          <p className="mt-2 mb-3 text-xs text-slate-500">
+            Events are shown in governed order; spacing is by event, not elapsed time. The commitment changes only when
+            the Value Case Owner authorises a version; each formal review shows the Formal Forecast and Realised Value
+            against the commitment it was measured against.
           </p>
           {evolution.formalPositions.length === 0 && (
             <p className="mb-3 text-sm text-slate-600" data-testid="evolution-no-positions">

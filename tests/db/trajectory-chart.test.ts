@@ -12,10 +12,12 @@ import { authoriseInitialVersion, proposeVersion } from "@/server/commands/value
 import { authoriseValueChange, createValueChange, proposeValueChange } from "@/server/commands/value-change";
 import { db, schema } from "@/server/db/client";
 import { getValueTrajectoryChart } from "@/server/queries/trajectory";
+import { formatMoneyShort } from "@/ui/format";
 import { buildTrajectoryPresentation, epoch, placeMarkerLabels, timeTicks } from "@/ui/trajectory/model";
 import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 
 import { newActor, proposedV1, uid } from "../support/fixtures";
+import { atDateWithoutObservation, untraced } from "../support/tooltip-trace";
 
 // Phase 4D.9E: primary Value Trajectory read model and presentation. Today is injected for determinism.
 
@@ -208,13 +210,28 @@ describe("primary Value Trajectory read model", () => {
     expect(stored!.unattributedRealisedValue).toBe("2800000.00");
   });
 
-  it("20. rows exist only at explicit dates; tooltips name only stored observations; the anchor is not a forecast", async () => {
+  it("20 / 4D.9N.1A. values only at explicit dates; monthly value-free cursor rows; tooltips trace to governed values", async () => {
     const x = await executive();
-    const p = buildTrajectoryPresentation(await getValueTrajectoryChart(x.project.id, { today: TODAY }), "USD")!;
-    expect(p.rows.map((r) => r.t)).toEqual(
+    const c = await getValueTrajectoryChart(x.project.id, { today: TODAY });
+    const p = buildTrajectoryPresentation(c, "USD")!;
+    const valued = p.rows.filter((r) => r.plan !== null || r.realised !== null || r.forecast !== null);
+    expect(valued.map((r) => r.t)).toEqual(
       ["2026-01-01", "2026-03-31", "2026-09-30", "2026-12-31", "2027-12-31", "2028-12-31"].map(epoch),
     );
+    // Monthly cursor: every month of the Value Period has a row; month rows carry no money and no table lines.
+    const months = new Set(p.rows.map((r) => new Date(r.t).toISOString().slice(0, 7)));
+    expect(months.size).toBe(36);
+    const monthRows = p.rows.filter((r) => r.month);
+    expect(monthRows.length).toBeGreaterThan(25);
+    expect(
+      monthRows.every((r) => r.plan === null && r.realised === null && r.forecast === null && r.tip.length === 1),
+    ).toBe(true);
+    // Event rows exist for Today (no values of their own).
     const at = (d: string) => p.rows.find((r) => r.t === epoch(d))!;
+    expect(at(TODAY)).toMatchObject({ plan: null, realised: null, forecast: null, month: false });
+    expect(at(TODAY).cursor.events).toEqual(["Today"]);
+
+    // Stored observations: unchanged table lines.
     expect(at("2026-09-30")).toMatchObject({ forecast: 4000000, forecastAnchor: true, plan: null });
     expect(at("2026-09-30").tip).toEqual(["30 Sept 2026", "Realised · Review #2: $4.0m"]);
     expect(at("2027-12-31").tip).toEqual([
@@ -222,14 +239,64 @@ describe("primary Value Trajectory read model", () => {
       "Authorised Plan (V1): $18.0m",
       "Formal Forecast: $16.0m — formal position as at 30 Sept 2026",
     ]);
-    expect(at("2028-12-31").endLabel).toEqual({ plan: "$30.0m", forecast: "$26.0m" });
-    expect(at("2026-01-01").tip).toEqual([
-      "1 Jan 2026",
-      "Authorised Plan (V1): $0",
-      "Realised: $0 at Value Period start (cumulative basis)",
-    ]);
-    // Every tooltip line is one stored point (plus the definitional origin) — none are derived.
     expect(p.rows.flatMap((r) => r.tip.slice(1))).toHaveLength(4 + 3 + 2);
+
+    // Tooltip at the review date: the formal realised value, the event; plan and forecast as Previous / Next only.
+    const block = (d: string, series: string) => at(d).cursor.blocks.find((b) => b.series.startsWith(series))!;
+    expect(at("2026-09-30").cursor.events).toEqual(["Formal review · Review #2"]);
+    expect(block("2026-09-30", "Realised").entries).toEqual([{ tag: "Formal", value: "$4.0m", detail: "Review #2" }]);
+    expect(block("2026-09-30", "Authorised Plan").entries.map((e) => [e.tag, e.date, e.value])).toEqual([
+      ["Previous", "1 Jan 2026", "$0"],
+      ["Next", "31 Dec 2026", "$6.0m"],
+    ]);
+    expect(block("2026-09-30", "Formal Forecast").note).toBe(
+      "Formal Forecast milestones begin after the review date (30 Sept 2026)",
+    );
+    // A month with nothing stored: Previous / Next / Latest formal, never a value AT the month.
+    const jun = p.rows.find((r) => r.month && r.cursor.heading === "Jun 2027")!;
+    expect(jun.cursor.blocks.map((b) => [b.series, b.entries.map((e) => `${e.tag} ${e.date} ${e.value}`)])).toEqual([
+      ["Authorised Plan (V1)", ["Previous 31 Dec 2026 $6.0m", "Next 31 Dec 2027 $18.0m"]],
+      ["Realised", ["Latest formal 30 Sept 2026 $4.0m"]],
+      ["Formal Forecast", ["Next 31 Dec 2027 $16.0m"]],
+    ]);
+    // Before the first formal realised checkpoint: said explicitly, with the next checkpoint.
+    const feb = p.rows.find((r) => r.month && r.cursor.heading === "Feb 2026")!;
+    const realisedFeb = feb.cursor.blocks.find((b) => b.series === "Realised")!;
+    expect(realisedFeb.note).toBe("No formal realised checkpoint yet at this date");
+    expect(realisedFeb.entries.map((e) => `${e.tag} ${e.value}`)).toEqual(["Latest formal $0", "Next $1.0m"]);
+    // Value Gap only as the period-end measure.
+    expect(jun.cursor.footer).toEqual([
+      "Value Gap at Value Period end: $4.0m (Authorised V1 $30.0m − Formal Forecast $26.0m)",
+    ]);
+
+    // Proof: no tooltip money that is not a governed value; no at-date money on a value-free month.
+    const governed = new Set(
+      [
+        ...c.plan.map((x) => x.value),
+        "0.00",
+        ...c.realised!.checkpoints.map((x) => x.value),
+        ...c.forecast!.points.map((x) => x.value),
+        c.version!.total,
+        c.latestFormal!.forecastTotal!,
+        "4000000.00", // Value Gap at Value Period end = $30.0m − $26.0m (the governed position's gap)
+      ].map((v) => formatMoneyShort(v, "USD")),
+    );
+    expect(
+      untraced(
+        p.rows.map((r) => r.cursor),
+        governed,
+      ),
+    ).toEqual([]);
+    expect(atDateWithoutObservation(p.rows)).toEqual([]);
+
+    // End labels name the series; the period-end bracket carries the Value Gap.
+    expect(at("2028-12-31").endLabel).toEqual({ plan: "Authorised V1 · $30.0m", forecast: "Formal Forecast · $26.0m" });
+    expect(p.gap).toMatchObject({
+      t: epoch("2028-12-31"),
+      plan: 30000000,
+      forecast: 26000000,
+      label: "Value Gap · $4.0m",
+    });
     expect(timeTicks("2026-01-01", "2028-12-31").map(([, l]) => l)).toEqual([
       "Jan 26",
       "Jul 26",

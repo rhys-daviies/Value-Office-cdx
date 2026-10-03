@@ -1,235 +1,224 @@
-"use client";
-
-import {
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-  type TooltipContentProps,
-} from "recharts";
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
-
-import { forecastConnectorRuns } from "./segments";
 import { SERIES } from "./series";
 
-// Value Case Evolution chart (Phase 4D.5). Client-only presentation of a governed history that the
-// server has already derived and formatted. Amounts arrive as decimal strings; they are converted to
-// numbers here only to place marks, and every value a person reads is the server-formatted string.
-// Nothing is recalculated, interpolated or predicted.
+// Value Case Evolution chart (Phase 4D.5; E1 redesign 4D.9N.1A). Server-rendered SVG on GOVERNANCE-EVENT spacing (not
+// elapsed time): a strong stepped Authorised Commitment line that starts from the Original Business Case, explicit
+// steps where a version is authorised (with its Value Change), and at each formal review a checkpoint — realised
+// column, formal forecast marker and a Value Gap bracket up to the commitment measured against. Every value a person
+// reads is a server-formatted string; decimal strings become numbers only to place marks. Nothing is interpolated.
 
-export type ChartPoint = {
-  key: string;
-  kind: "original" | "authorisation" | "review";
-  /** Axis label, e.g. "V1", "Review #2", "Business Case". */
-  label: string;
-  /** Axis sub-label: the governed date, or a statement that none exists. */
-  sub: string;
-  original: string | null;
-  /** Authorised Value in force at this point (the step line). */
-  authorised: string | null;
-  forecast: string | null;
-  /** Review events: the version the forecast was measured against (breaks the forecast connector). */
-  againstVersionNumber: number | null;
-  realised: string | null;
-  /** Pre-formatted tooltip lines; first is the heading. */
-  tooltip: string[];
-  /** Pre-formatted values for mark labels. */
-  display: { original?: string; authorised?: string; forecast?: string; realised?: string };
-};
+export type EvolutionStep =
+  | { kind: "original"; key: string; axis: string; sub: string; value: number; text: string }
+  | {
+      kind: "authorisation";
+      key: string;
+      axis: string;
+      sub: string;
+      /** e.g. "V2". */
+      version: string;
+      value: number;
+      text: string;
+      /** Movement from the commitment before it (formatted), when there was one. */
+      delta: string | null;
+    }
+  | {
+      kind: "review";
+      key: string;
+      axis: string;
+      sub: string;
+      against: number | null;
+      forecast: number | null;
+      realised: number | null;
+      text: { against: string | null; forecast: string | null; realised: string | null; gap: string | null };
+    };
 
-type Row = Omit<ChartPoint, "original" | "authorised" | "forecast" | "realised"> & {
-  original: number | null;
-  authorised: number | null;
-  forecast: number | null;
-  realised: number | null;
-  /** Connector values, one key per run of same-version forecasts (fc0, fc1, …). */
-  [connector: `fc${number}`]: number | null;
-};
-
-// Presentation boundary: the only place a decimal string becomes a number, for mark position only.
-const y = (v: string | null) => (v === null ? null : Number(v));
-
-type DotProps = { cx?: number; cy?: number; payload?: Row; value?: number | null };
-
-function marker(series: keyof typeof SERIES, shape: "diamond" | "bar" | "circle" | "square") {
-  function Marker({ cx, cy, payload, value }: DotProps) {
-    if (cx === undefined || cy === undefined || !payload || value === null || value === undefined) return <g />;
-    if (series === "authorised" && payload.kind !== "authorisation") return <g />;
-    const color = SERIES[series].color;
-    const name = `${SERIES[series].label}, ${payload.label}: ${payload.display[series] ?? ""}`;
-    const ring = { stroke: "#ffffff", strokeWidth: 2 };
-    return (
-      <g role="img" aria-label={name} data-series={series} data-event={payload.key}>
-        {shape === "diamond" && (
-          <path d={`M${cx},${cy - 7} L${cx + 7},${cy} L${cx},${cy + 7} L${cx - 7},${cy} Z`} fill={color} {...ring} />
-        )}
-        {shape === "bar" && <rect x={cx - 7} y={cy - 2.5} width={14} height={5} rx={1} fill={color} {...ring} />}
-        {shape === "circle" && <circle cx={cx} cy={cy} r={5.5} fill={color} {...ring} />}
-        {shape === "square" && <rect x={cx - 5} y={cy - 5} width={10} height={10} rx={1} fill={color} {...ring} />}
-      </g>
-    );
-  }
-  return Marker;
-}
-
-const OriginalDot = marker("original", "diamond");
-const AuthorisedDot = marker("authorised", "bar");
-const ForecastDot = marker("forecast", "circle");
-const RealisedDot = marker("realised", "square");
-
-function Tick({ x, y: ty, payload, rows }: { x?: number; y?: number; payload?: { value: string }; rows: Row[] }) {
-  const row = rows.find((r) => r.key === payload?.value);
-  if (!row || x === undefined || ty === undefined) return null;
-  return (
-    <g transform={`translate(${x},${ty})`}>
-      <text dy={14} textAnchor="middle" className="fill-slate-700 text-[11px] font-medium">
-        {row.label}
-      </text>
-      <text dy={28} textAnchor="middle" className="fill-slate-500 text-[10px]">
-        {row.sub}
-      </text>
-    </g>
-  );
-}
-
-function EventTooltip({ active, payload }: TooltipContentProps<ValueType, NameType>) {
-  const row = active ? (payload?.[0]?.payload as Row | undefined) : undefined;
-  if (!row) return null;
-  const [heading, ...lines] = row.tooltip;
-  return (
-    <div className="max-w-64 rounded border border-slate-300 bg-white px-3 py-2 text-xs shadow-sm">
-      <div className="font-semibold text-slate-900">{heading}</div>
-      {lines.map((l) => (
-        <div key={l} className="text-slate-700">
-          {l}
-        </div>
-      ))}
-    </div>
-  );
-}
+const W = 960;
+const H = 360;
+const M = { top: 34, right: 24, bottom: 52, left: 64 };
+export const EVOLUTION_MARGIN_FRACTIONS = { left: M.left / W, right: M.right / W };
 
 export function EvolutionChart({
-  points,
-  currencyTicks,
+  steps,
+  ticks,
   ariaLabel,
 }: {
-  points: ChartPoint[];
-  /** Server-formatted y-axis ticks: [value, label]. */
-  currencyTicks: [string, string][];
+  steps: EvolutionStep[];
+  ticks: [number, string][];
   ariaLabel: string;
 }) {
-  const runs = forecastConnectorRuns(points);
-  const rows: Row[] = points.map((p) => {
-    const row: Row = {
-      ...p,
-      original: y(p.original),
-      authorised: y(p.authorised),
-      forecast: y(p.forecast),
-      realised: y(p.realised),
-    };
-    runs.forEach((keys, i) => (row[`fc${i}`] = keys.includes(p.key) ? y(p.forecast) : null));
-    return row;
-  });
-  const ticks = currencyTicks.map(([v]) => Number(v));
-  const tickLabel = new Map(currencyTicks.map(([v, l]) => [Number(v), l]));
-  const top = ticks.at(-1) ?? 0;
+  const n = steps.length;
+  const band = (W - M.left - M.right) / Math.max(n, 1);
+  const cx = (i: number) => M.left + band * (i + 0.5);
+  const yMax = ticks.at(-1)?.[0] || 1;
+  const y = (v: number) => M.top + (1 - v / yMax) * (H - M.top - M.bottom);
+  const auths = steps.map((s, i) => [s, i] as const).filter(([s]) => s.kind === "authorisation");
+  const original = steps.findIndex((s) => s.kind === "original");
+  const firstAuth = auths[0];
+
+  // Commitment staircase: Original (grey, dashed) → V1 → … (blue, solid), held to the right edge.
+  let promise = "";
+  if (original >= 0 && firstAuth) {
+    const o = steps[original] as Extract<EvolutionStep, { kind: "original" }>;
+    promise = `M${cx(original)},${y(o.value)} H${cx(firstAuth[1])} V${y((firstAuth[0] as { value: number }).value)}`;
+  }
+  let commitment = "";
+  if (firstAuth) {
+    commitment = `M${cx(firstAuth[1])},${y((firstAuth[0] as { value: number }).value)}`;
+    for (const [s, i] of auths.slice(1)) commitment += ` H${cx(i)} V${y((s as { value: number }).value)}`;
+    commitment += ` H${W - M.right}`;
+  }
 
   return (
-    <div
-      className="h-72 w-full"
-      role="figure"
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-auto w-full"
+      role="group"
       aria-label={ariaLabel}
       data-testid="evolution-chart"
-      data-forecast-connectors={runs.map((keys) => keys.join(">")).join("|")}
     >
-      <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows} margin={{ top: 12, right: 24, bottom: 20, left: 8 }}>
-          <CartesianGrid vertical={false} stroke="#e2e8f0" />
-          <XAxis
-            dataKey="key"
-            interval={0}
-            tickLine={false}
-            axisLine={{ stroke: "#cbd5e1" }}
-            tick={<Tick rows={rows} />}
-            height={36}
-            padding={{ left: 24, right: 24 }}
-          />
-          <YAxis
-            domain={[0, top]}
-            ticks={ticks}
-            tickFormatter={(v: number) => tickLabel.get(v) ?? ""}
-            tickLine={false}
-            axisLine={false}
-            width={64}
-            tick={{ fontSize: 11, fill: "#64748b" }}
-          />
-          {rows
-            .filter((r) => r.kind === "authorisation")
-            .map((r) => (
-              <ReferenceLine key={r.key} x={r.key} stroke="#cbd5e1" strokeDasharray="3 3" />
-            ))}
-          <Tooltip content={EventTooltip} cursor={{ stroke: "#94a3b8", strokeDasharray: "2 2" }} />
-          <Line
-            dataKey="authorised"
-            name={SERIES.authorised.label}
-            type="stepAfter"
-            stroke={SERIES.authorised.color}
-            strokeWidth={2}
-            dot={AuthorisedDot}
-            activeDot={false}
-            connectNulls={false}
-            isAnimationActive={false}
-          />
-          {runs.map((keys, i) => (
-            <Line
-              key={keys.join(">")}
-              dataKey={`fc${i}`}
-              legendType="none"
-              tooltipType="none"
-              type="linear"
-              stroke={SERIES.forecast.color}
-              strokeWidth={1.5}
-              strokeDasharray="2 4"
-              dot={false}
-              activeDot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-          ))}
-          <Line
-            dataKey="forecast"
-            name={SERIES.forecast.label}
-            stroke="none"
-            dot={ForecastDot}
-            activeDot={false}
-            isAnimationActive={false}
-          />
-          <Line
-            dataKey="realised"
-            name={SERIES.realised.label}
-            type="linear"
-            stroke={SERIES.realised.color}
-            strokeWidth={1.5}
-            strokeDasharray="2 4"
-            dot={RealisedDot}
-            activeDot={false}
-            connectNulls
-            isAnimationActive={false}
-          />
-          <Line
-            dataKey="original"
-            name={SERIES.original.label}
-            stroke="none"
-            dot={OriginalDot}
-            activeDot={false}
-            isAnimationActive={false}
-          />
-        </ComposedChart>
-      </ResponsiveContainer>
-    </div>
+      {ticks.map(([v, label]) => (
+        <g key={v}>
+          <line x1={M.left} x2={W - M.right} y1={y(v)} y2={y(v)} stroke="#e2e8f0" />
+          <text x={M.left - 8} y={y(v) + 4} textAnchor="end" fontSize={11} fill="#475569">
+            {label}
+          </text>
+        </g>
+      ))}
+      {steps.map((s, i) => (
+        <g key={`axis-${s.key}`}>
+          {i > 0 && (
+            <line x1={M.left + band * i} x2={M.left + band * i} y1={M.top} y2={H - M.bottom} stroke="#f1f5f9" />
+          )}
+          <text x={cx(i)} y={H - M.bottom + 18} textAnchor="middle" fontSize={12} fontWeight={600} fill="#0f172a">
+            {s.axis}
+          </text>
+          <text x={cx(i)} y={H - M.bottom + 33} textAnchor="middle" fontSize={11} fill="#64748b">
+            {s.sub}
+          </text>
+        </g>
+      ))}
+      <line x1={M.left} x2={W - M.right} y1={y(0)} y2={y(0)} stroke="#94a3b8" />
+
+      {promise && (
+        <path
+          d={promise}
+          fill="none"
+          stroke="#94a3b8"
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          data-testid="evolution-promise"
+        />
+      )}
+      {commitment && (
+        <path
+          d={commitment}
+          fill="none"
+          stroke={SERIES.authorised.color}
+          strokeWidth={3}
+          data-testid="evolution-commitment"
+        />
+      )}
+
+      {steps.map((s, i) => {
+        const c = cx(i);
+        if (s.kind === "original")
+          return (
+            <g
+              key={s.key}
+              role="img"
+              aria-label={`${SERIES.original.label}: ${s.text}`}
+              data-testid="evolution-mark-original"
+            >
+              <path
+                d={`M${c},${y(s.value) - 7} L${c + 7},${y(s.value)} L${c},${y(s.value) + 7} L${c - 7},${y(s.value)} Z`}
+                fill="#fff"
+                stroke={SERIES.original.color}
+                strokeWidth={2}
+              />
+              <text x={c} y={y(s.value) - 13} textAnchor="middle" fontSize={12} fontWeight={600} fill="#7c2d12">
+                Original · {s.text}
+              </text>
+            </g>
+          );
+        if (s.kind === "authorisation") {
+          const before = steps
+            .slice(0, i)
+            .reverse()
+            .find((x): x is Extract<EvolutionStep, { value: number }> => x.kind !== "review");
+          const labelY = Math.min(y(s.value), before ? y(before.value) : y(s.value)) - 12;
+          return (
+            <g
+              key={s.key}
+              role="img"
+              aria-label={`${SERIES.authorised.label}, ${s.version}: ${s.text}`}
+              data-testid={`evolution-mark-${s.key}`}
+            >
+              <circle cx={c} cy={y(s.value)} r={6} fill={SERIES.authorised.color} stroke="#fff" strokeWidth={2} />
+              <text x={c} y={labelY} textAnchor="middle" fontSize={12} fontWeight={700} fill="#1e3a8a">
+                {`${s.version} · ${s.text}`}
+              </text>
+              {s.delta && (
+                <text x={c + 10} y={y(s.value) + 17} textAnchor="start" fontSize={11} fontWeight={600} fill="#1d4ed8">
+                  {s.delta}
+                </text>
+              )}
+            </g>
+          );
+        }
+        // Review checkpoint: realised column, forecast marker, Value Gap bracket up to the commitment measured against.
+        const colX = c - 30;
+        const bx = c + 6;
+        const yF = s.forecast !== null ? y(s.forecast) : null;
+        const yA = s.against !== null ? y(s.against) : null;
+        const gapPx = yF !== null && yA !== null ? Math.abs(yF - yA) : 0;
+        return (
+          <g key={s.key} data-testid={`evolution-checkpoint-${s.key}`}>
+            {s.realised !== null && (
+              <g role="img" aria-label={`${SERIES.realised.label}, ${s.axis}: ${s.text.realised}`}>
+                <rect
+                  x={colX}
+                  y={y(s.realised)}
+                  width={18}
+                  height={Math.max(y(0) - y(s.realised), 1)}
+                  fill={SERIES.realised.color}
+                  rx={2}
+                />
+                <text
+                  x={colX + 9}
+                  y={y(s.realised) - 5}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="#3f6212"
+                >
+                  {s.text.realised}
+                </text>
+              </g>
+            )}
+            {yF !== null && yA !== null && s.text.gap && (
+              <g role="img" aria-label={`Value Gap, ${s.axis}: ${s.text.gap}`}>
+                <path d={`M${bx - 4},${yA} H${bx} V${yF} H${bx - 4}`} fill="none" stroke="#b91c1c" strokeWidth={1.5} />
+                <text
+                  x={bx + 6}
+                  y={gapPx >= 14 ? (yA + yF) / 2 + 4 : Math.min(yA, yF) - 5}
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="#b91c1c"
+                >
+                  Gap {s.text.gap}
+                </text>
+              </g>
+            )}
+            {yF !== null && (
+              <g role="img" aria-label={`${SERIES.forecast.label}, ${s.axis}: ${s.text.forecast}`}>
+                <circle cx={bx} cy={yF} r={5.5} fill={SERIES.forecast.color} stroke="#fff" strokeWidth={1.5} />
+                <text x={bx} y={yF + 19} textAnchor="middle" fontSize={11} fontWeight={600} fill="#155e75">
+                  {s.text.forecast}
+                </text>
+              </g>
+            )}
+          </g>
+        );
+      })}
+    </svg>
   );
 }

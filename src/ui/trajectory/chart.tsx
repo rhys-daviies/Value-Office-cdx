@@ -13,12 +13,15 @@ import {
 } from "recharts";
 import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 
+import type { CursorTip } from "./cursor";
+import { CursorTipCard } from "./cursor-tip";
+import type { GapBracket } from "./model";
 import { TRAJECTORY_SERIES } from "./series";
 
 // Primary Value Trajectory chart (Phase 4D.9E). Client-only drawing of a model the server has composed and formatted.
-// Rows exist ONLY at explicit governed dates, so the tooltip can only ever appear at a stored observation — never at an
-// interpolated position between points. Straight segments between points are presentation joins. Values arrive as
-// numbers for placement only; every value a person reads is a server-formatted string.
+// Straight segments between points are presentation joins. Values arrive as numbers for placement only; every value a
+// person reads is a server-formatted string. 4D.9N.1A: value-free month rows let the crosshair rest on every month; the
+// tooltip then states only governed values (on the date, or Previous / Next with dates) — never a value on a join.
 
 export type TrajectoryRow = {
   /** Epoch milliseconds (UTC midnight) of the explicit date. */
@@ -28,10 +31,16 @@ export type TrajectoryRow = {
   forecast: number | null;
   /** The forecast value on this row is the visual anchor (the review's realised checkpoint), not a forecast point. */
   forecastAnchor: boolean;
-  /** Pre-formatted tooltip lines: heading first, then one line per explicit observation on this date. */
+  /** A value-free cursor position for a month with no explicit date of its own (4D.9N.1A). */
+  month: boolean;
+  /** Pre-formatted lines: heading first, then one line per explicit observation on this date (the values table). */
   tip: string[];
+  /** The crosshair tooltip at this row: governed values on the date, or Previous / Next. */
+  cursor: CursorTip;
   /** Pre-formatted end labels for terminal points. */
   endLabel: { plan?: string; forecast?: string; realised?: string };
+  /** Vertical placement of end labels relative to their point (set where the Value Gap bracket sits). */
+  endPlace: { plan?: "centre" | "above" | "below"; forecast?: "centre" | "above" | "below" };
 };
 
 type Marker = { t: number; label: string; align: "start" | "end"; row: 0 | 1 };
@@ -61,19 +70,34 @@ export function markerLabel(m: Marker, fill: string, weight = 400) {
 function TipContent({ active, payload }: TooltipContentProps<ValueType, NameType>) {
   const row = payload?.[0]?.payload as TrajectoryRow | undefined;
   if (!active || !row) return null;
-  return (
-    <div
-      className="rounded border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm"
-      data-testid="trajectory-tooltip"
-    >
-      <p className="mb-1 font-semibold text-slate-900">{row.tip[0]}</p>
-      {row.tip.slice(1).map((line) => (
-        <p key={line} className="text-slate-700">
-          {line}
-        </p>
-      ))}
-    </div>
-  );
+  return <CursorTipCard tip={row.cursor} testId="trajectory-tooltip" />;
+}
+
+/** Period-end Value Gap bracket, drawn just right of the end points with its label (4D.9N.1A). */
+function gapShape(g: GapBracket) {
+  function GapShape({ x1, y1, y2 }: { x1?: number; y1?: number; x2?: number; y2?: number }) {
+    if (x1 === undefined || y1 === undefined || y2 === undefined) return <g />;
+    const x = x1 + 9;
+    const [top, bottom] = y1 < y2 ? [y1, y2] : [y2, y1];
+    const mid = (top + bottom) / 2;
+    return (
+      <g data-testid="trajectory-gap-bracket" data-label={g.label}>
+        <path d={`M${x - 4},${top} H${x} V${bottom} H${x - 4}`} fill="none" stroke="#b91c1c" strokeWidth={1.5} />
+        {/* Roomy: between the two end labels. Otherwise below the lower end label, in the gutter (never on a line). */}
+        <text
+          x={g.roomy ? x + 7 : x1 + 20}
+          y={g.roomy ? mid + 4 : bottom + 30}
+          textAnchor="start"
+          fontSize={11}
+          fontWeight={600}
+          fill="#b91c1c"
+        >
+          {g.label}
+        </text>
+      </g>
+    );
+  }
+  return GapShape;
 }
 
 type DotProps = { cx?: number; cy?: number; payload?: TrajectoryRow; value?: number | null };
@@ -84,6 +108,8 @@ function dot(series: "plan" | "realised" | "forecast") {
     if (cx === undefined || cy === undefined || !payload || value === null || value === undefined) return <g />;
     if (series === "forecast" && payload.forecastAnchor) return <g />; // anchor is the realised mark, not a forecast
     const label = payload.endLabel[series];
+    const place = series === "realised" ? undefined : payload.endPlace[series];
+    const dy = place === "above" ? -6 : place === "below" ? 14 : 4;
     const mark =
       series === "plan" ? (
         <circle cx={cx} cy={cy} r={4} fill="#fff" stroke={color} strokeWidth={2} />
@@ -99,10 +125,11 @@ function dot(series: "plan" | "realised" | "forecast") {
           // Plan and forecast end on the Value Period end: label to the right of the point (the margin holds it), so
           // it never sits on a line. The realised label ends mid-chart and stays above-left of its point.
           <text
-            x={series === "realised" ? cx - 6 : cx + 8}
-            y={series === "realised" ? cy - 9 : cy + 4}
+            x={series === "realised" ? cx - 6 : cx + 20}
+            y={series === "realised" ? cy - 9 : cy + dy}
             textAnchor={series === "realised" ? "end" : "start"}
             className="fill-slate-800 text-[11px] font-semibold"
+            data-testid={`trajectory-end-label-${series}`}
           >
             {label}
           </text>
@@ -121,6 +148,7 @@ export function ValueTrajectoryChart({
   today,
   checkpoint,
   versionChange = null,
+  gap = null,
   ariaLabel,
 }: {
   rows: TrajectoryRow[];
@@ -130,6 +158,7 @@ export function ValueTrajectoryChart({
   today: Marker | null;
   checkpoint: Marker | null;
   versionChange?: Marker | null;
+  gap?: GapBracket | null;
   ariaLabel: string;
 }) {
   const xLabel = new Map(xTicks);
@@ -138,7 +167,7 @@ export function ValueTrajectoryChart({
   return (
     <div className="h-[340px] w-full" role="img" aria-label={ariaLabel} data-testid="trajectory-chart">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={rows} margin={{ top: 34, right: 60, bottom: 4, left: 8 }}>
+        <ComposedChart data={rows} margin={{ top: 34, right: 172, bottom: 4, left: 8 }}>
           <CartesianGrid stroke="#e2e8f0" vertical={false} />
           <XAxis
             dataKey="t"
@@ -162,11 +191,24 @@ export function ValueTrajectoryChart({
             axisLine={false}
             width={56}
           />
+          {/* Month rows carry no plotted values; keep their (null) payload so the card can read the row's governed tooltip
+              model. The card never derives a value from the payload. */}
           <Tooltip
             content={TipContent}
-            cursor={{ stroke: "#94a3b8", strokeDasharray: "2 3" }}
+            filterNull={false}
+            cursor={{ stroke: "#64748b", strokeWidth: 1 }}
             isAnimationActive={false}
           />
+          {gap && (
+            <ReferenceLine
+              segment={[
+                { x: gap.t, y: gap.forecast },
+                { x: gap.t, y: gap.plan },
+              ]}
+              shape={gapShape(gap)}
+              ifOverflow="visible"
+            />
+          )}
           {checkpoint && (
             <ReferenceLine
               x={checkpoint.t}

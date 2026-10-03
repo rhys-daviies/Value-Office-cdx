@@ -1,7 +1,9 @@
+import Decimal from "decimal.js";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { seedCanonicalJourney } from "@/fixtures/canonical";
 import { seedCompactEvolution } from "@/fixtures/compact";
 import { seedHorizon } from "@/fixtures/horizon";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
@@ -243,8 +245,73 @@ describe("Value Case Evolution component", () => {
     }
     expect(html).not.toContain("VC-002");
     expect(html).not.toContain("$1.8m"); // draft V3 total (1.75m)
-    // 4D.6 refinement: the forecast connector breaks at the V1 → V2 change; the table is unaffected.
-    expect(html).toContain('data-forecast-connectors="r1&gt;r2|r3"');
     expect((html.match(/data-testid="evolution-row-/g) ?? []).length).toBe(6);
+
+    // 4D.9N.1A E1: the commitment story — Original promise → V1 step → VC-001 step to V2 — on event spacing.
+    expect(html).toContain('data-testid="evolution-promise"');
+    expect(html).toContain('data-testid="evolution-commitment"');
+    for (const name of [
+      "Original Business Case: $2.0m",
+      "Authorised Value, V1: $1.5m",
+      "Authorised Value, V2: $1.3m",
+      "Formal Forecast, Review #2: $1.3m",
+      "Realised Value, Review #2: $0.3m",
+      "Value Gap, Review #2: $0.2m",
+      "Formal Forecast, Review #3: $1.2m",
+    ])
+      expect(html).toContain(`aria-label="${name}"`);
+    // Each formal review is a checkpoint; the E2 strip states the same governed values beneath each event.
+    for (const key of ["r1", "r2", "r3"]) expect(html).toContain(`data-testid="evolution-checkpoint-${key}"`);
+    const card = (id: string) => html.match(new RegExp(`data-testid="evolution-card-${id}">([^<]*)<`))?.[1];
+    expect([card("r2-against"), card("r2-forecast"), card("r2-realised"), card("r2-gap")]).toEqual([
+      "$1.5m",
+      "$1.3m",
+      "$0.3m",
+      "$0.2m",
+    ]);
+    expect([card("v1-value"), card("v1-delta"), card("v2-value"), card("v2-delta")]).toEqual([
+      "$1.5m",
+      "-$0.5m",
+      "$1.3m",
+      "-$0.2m",
+    ]);
+    expect(html).toContain("VC-001 · V2"); // the governance event that moved the commitment
+    expect(html).not.toContain("data-forecast-connectors"); // no dotted sequence connectors any more
+  });
+
+  it("4D.9N.1A canonical: Original $32.0m → V1 $30.0m → Reviews #1/#2 → VC-001 −$3.0m → V2 $27.0m → Review #3", async () => {
+    const actor = await newActor();
+    const s = await seedCanonicalJourney(actor, { code: `CE-${uid()}`, name: "Canonical evolution" });
+    const e = await getValueCaseEvolution(s.project.id);
+    const html = render(e);
+    const card = (id: string) => html.match(new RegExp(`data-testid="evolution-card-${id}">([^<]*)<`))?.[1];
+    expect(e.events.map((x) => x.key)).toEqual(["original", "v1", "r1", "r2", "v2", "r3"]);
+    expect(card("original-value")).toBe("$32.0m");
+    expect([card("v1-value"), card("v1-delta")]).toEqual(["$30.0m", "-$2.0m"]);
+    expect([card("r1-against"), card("r1-forecast"), card("r1-realised"), card("r1-gap")]).toEqual([
+      "$30.0m",
+      "$28.0m",
+      "$1.0m",
+      "$2.0m",
+    ]);
+    expect([card("r2-against"), card("r2-forecast"), card("r2-realised"), card("r2-gap")]).toEqual([
+      "$30.0m",
+      "$26.0m",
+      "$4.0m",
+      "$4.0m",
+    ]);
+    expect([card("v2-value"), card("v2-delta")]).toEqual(["$27.0m", "-$3.0m"]);
+    expect([card("r3-against"), card("r3-forecast"), card("r3-realised"), card("r3-gap")]).toEqual([
+      "$27.0m",
+      "$25.0m",
+      "$4.6m",
+      "$2.0m",
+    ]);
+    // Gap = commitment measured against − Formal Forecast, at every checkpoint.
+    for (const x of e.events)
+      if (x.kind === "review")
+        expect(new Decimal(x.position.againstAuthorisedValue).minus(x.position.currentForecast!).toFixed(2)).toBe(
+          x.position.valueGap,
+        );
   });
 });

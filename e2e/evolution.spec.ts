@@ -75,14 +75,20 @@ test("Value Case Evolution: compact governance summary on Overview; full governe
   await expect(section).toContainText("History of the governed value commitment");
   await expect(section).toContainText("Governed history");
   const legend = section.getByTestId("evolution-legend");
-  for (const label of ["Original Business Case", "Authorised Value", "Formal Forecast", "Realised Value"]) {
+  for (const label of [
+    "Original Business Case",
+    "Authorised Commitment",
+    "Formal Forecast",
+    "Realised Value",
+    "Value Gap",
+  ]) {
     await expect(legend).toContainText(label);
   }
 
   // Plotted governed events, by their accessible labels.
   const chart = section.getByTestId("evolution-chart");
   for (const name of [
-    "Original Business Case, Business Case: $2.0m",
+    "Original Business Case: $2.0m",
     "Authorised Value, V1: $1.5m",
     "Authorised Value, V2: $1.3m",
     "Formal Forecast, Review #1: $1.4m",
@@ -92,12 +98,19 @@ test("Value Case Evolution: compact governance summary on Overview; full governe
   ]) {
     await expect(chart.getByRole("img", { name, exact: true })).toHaveCount(1);
   }
-  await expect(chart.getByRole("img")).toHaveCount(9);
-  // 4D.6 refinement: forecast connectors run only within one measured-against version.
-  await expect(chart).toHaveAttribute("data-forecast-connectors", "r1>r2|r3");
+  // 4D.9N.1A E1: Original + V1 + V2 commitment marks; each review a checkpoint (realised, forecast, Value Gap).
+  await expect(chart.getByRole("img")).toHaveCount(1 + 2 + 3 * 3);
   await expect(chart.getByRole("img", { name: /^Formal Forecast, Review #\d/ })).toHaveCount(3);
+  await expect(chart.getByRole("img", { name: "Value Gap, Review #2: $0.2m", exact: true })).toHaveCount(1);
+  await expect(chart.getByTestId("evolution-commitment")).toHaveCount(1);
+  await expect(chart.getByTestId("evolution-promise")).toHaveCount(1);
+  await expect(chart).toContainText("VC-001 · V2");
+  await expect(section.getByTestId("evolution-card-r2-gap")).toHaveText("$0.2m");
+  await expect(section.getByTestId("evolution-card-v2-delta")).toHaveText("-$0.2m");
   // Not plotted: pending VC-002 / draft V3, the emerging driver's working estimate, working leakage.
-  await expect(chart.getByRole("img", { name: /V3|\$1\.8m|\$0\.2m|\$0\.5m/ })).toHaveCount(0);
+  // ($0.2m is also Review #2's governed Value Gap: only that named mark may carry it.)
+  await expect(chart.getByRole("img", { name: /V3|\$1\.8m|\$0\.5m/ })).toHaveCount(0);
+  await expect(chart.getByRole("img", { name: /^(?!Value Gap, Review #2:).*\$0\.2m/ })).toHaveCount(0);
   await expect(section).not.toContainText("VC-002");
   await expect(section.getByTestId("evolution-table")).toBeVisible(); // open by default here
   await expectGovernedHistory(section);

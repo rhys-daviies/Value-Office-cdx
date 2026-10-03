@@ -69,33 +69,80 @@ export const CANONICAL = {
       ["2028-12-31", "26000000.00"],
     ],
     leakage: { total: "700000.00", unrecoverable: "250000.00" }, // recoverable $450,000
+    /**
+     * Options assessed at Review #2 (branch point: 30 Sept 2026, formal realised $4.0m). Every dated milestone is
+     * explicit scenario data entered by the consultant; nothing is inferred from an option's name (4D.9N.1A, PMO).
+     * No action and Delay 3 months share the 30 Dec 2026 scenario assessment ($5.0m): Delay follows the no-action path
+     * to that decision point, where management acts (the stored note), then recovers to its $27.0m outcome.
+     */
     options: [
-      // [label, kind, total, 31 Dec 2027 milestone]
-      ["Act now", "recommended", "29000000.00", "18000000.00"],
-      ["Delay 3 months", "alternative", "27000000.00", "16500000.00"],
-      ["No action", "no_action", "23000000.00", "15000000.00"],
+      {
+        label: "Act now",
+        kind: "recommended",
+        total: "29000000.00",
+        narrative: null,
+        points: [
+          ["2027-12-31", "18000000.00", null],
+          ["2028-12-31", "29000000.00", null],
+        ],
+      },
+      {
+        label: "Delay 3 months",
+        kind: "alternative",
+        total: "27000000.00",
+        narrative:
+          "Synthetic: follows the no-action path to the 30 Dec 2026 decision point, then management acts; recovery to $27.0m.",
+        points: [
+          ["2026-12-30", "5000000.00", "Management acts — delayed action"],
+          ["2027-12-31", "16500000.00", null],
+          ["2028-12-31", "27000000.00", null],
+        ],
+      },
+      {
+        label: "No action",
+        kind: "no_action",
+        total: "23000000.00",
+        narrative:
+          "Consultant scenario assessment: if no corrective action is taken during the next three months, cumulative value progression is expected to reach approximately $5.0m by the delayed decision point.",
+        points: [
+          ["2026-12-30", "5000000.00", null],
+          ["2027-12-31", "15000000.00", null],
+          ["2028-12-31", "23000000.00", null],
+        ],
+      },
     ],
   },
-  /** Governed Value Change: its own rationale and amount — NOT the $27.0m management selection. */
+  /**
+   * Governed Value Change (4D.9N.1A, PMO): VC-001 formalises the ADOPTED management path (Delay 3 months) as its own
+   * governed act — the decision alone never changes the Authorised Value Case. V2 = $27.0m with the Delay path's
+   * phasing; only Procurement Savings (VD-01, the driver affected by VL-001) is re-baselined.
+   */
   valueChange: {
     code: "VC-001",
-    stated: "-1000000.00",
-    vd01To: "14000000.00", // VD-01 $15.0m → $14.0m: V2 total $29.0m, reconciles with the stated −$1.0m
+    stated: "-3000000.00",
+    vd01To: "12000000.00", // VD-01 $15.0m → $12.0m: V2 total $27.0m, reconciles with the stated −$3.0m
     reason:
-      "Synthetic: vendor sequencing (VL-001) defers procurement onboarding; the VCO re-baselines Procurement Savings to $14.0m and re-phases the plan to the delayed path.",
+      "Synthetic: formalises the adopted Delay 3 months path. Vendor sequencing (VL-001) defers procurement onboarding; the VCO re-baselines Procurement Savings to $12.0m and re-phases the plan to the delayed-action path.",
     v2Plan: [
       ["2026-01-01", "0.00"],
       ["2026-12-31", "5000000.00"],
       ["2027-12-31", "16500000.00"],
-      ["2028-12-31", "29000000.00"],
+      ["2028-12-31", "27000000.00"],
     ],
   },
+  /**
+   * Review #3 against V2 ($27.0m). Realised $4.6m is unchanged (realised value is independent of the authorised total).
+   * The re-baselined Procurement Savings is forecast on plan ($12.0m); Revenue Uplift and Working Capital continue the
+   * shortfalls already formally recorded at Review #2 ($9.0m vs $10.0m, $4.0m vs $5.0m), which VC-001 did not re-baseline.
+   * Formal Forecast $25.0m → Value Gap $2.0m, explained entirely by those two drivers. Path: $15.5m at 31 Dec 2027
+   * (V2 plan $16.5m less the $1.0m of the shortfall expected by then), $25.0m at the Value Period end.
+   */
   review3: {
-    forecast: ["13500000.00", "9000000.00", "4000000.00"], // $26.5m → Value Gap $2.5m against V2 $29.0m
+    forecast: ["12000000.00", "9000000.00", "4000000.00"], // $25.0m → Value Gap $2.0m against V2 $27.0m
     realised: ["2800000.00", "1200000.00", "600000.00"], // $4.6m
     forecastPath: [
-      ["2027-12-31", "16000000.00"],
-      ["2028-12-31", "26500000.00"],
+      ["2027-12-31", "15500000.00"],
+      ["2028-12-31", "25000000.00"],
     ],
   },
 } as const;
@@ -241,11 +288,18 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
       for (const [asOf, value] of CANONICAL.review2.forecastPath)
         await setForecastPoint(actor, { reviewId: r2.id, asOf, value });
       s.scenarios = {};
-      for (const [i, [label, kind, total, mid]] of CANONICAL.review2.options.entries()) {
-        const sc = await upsertScenario(actor, { reviewId: r2.id, label, kind, totalValue: total, sortOrder: i + 1 });
-        await setScenarioPoint(actor, { scenarioId: sc.id, asOf: "2027-12-31", value: mid });
-        await setScenarioPoint(actor, { scenarioId: sc.id, asOf: CANONICAL.valuePeriod.end, value: total });
-        s.scenarios[label] = sc;
+      for (const [i, o] of CANONICAL.review2.options.entries()) {
+        const sc = await upsertScenario(actor, {
+          reviewId: r2.id,
+          label: o.label,
+          kind: o.kind,
+          totalValue: o.total,
+          sortOrder: i + 1,
+          ...(o.narrative ? { narrative: o.narrative } : {}),
+        });
+        for (const [asOf, value, note] of o.points)
+          await setScenarioPoint(actor, { scenarioId: sc.id, asOf, value, ...(note ? { note } : {}) });
+        s.scenarios[o.label] = sc;
       }
       await saveRecommendation(actor, {
         reviewId: r2.id,

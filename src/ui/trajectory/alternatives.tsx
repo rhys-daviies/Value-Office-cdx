@@ -166,6 +166,12 @@ function Legend({
             {s.label}
             {s.roles && <span className="text-slate-500"> · {s.roles}</span>}
             {s.endpointOnly && <span className="text-slate-500"> · phasing not entered</span>}
+            {s.shared && (
+              <span className="text-slate-500" data-testid="alternatives-shared-note">
+                {" "}
+                · same path as {s.shared.with} until {formatDate(s.shared.until)}
+              </span>
+            )}
           </span>
         </li>
       ))}
@@ -231,6 +237,7 @@ function AlternativeTrajectories({ a, currency }: { a: Data; currency: string })
         yTicks={p.yTicks}
         review={p.review}
         labels={p.labels}
+        pivots={p.pivots}
         ariaLabel={summary}
       />
       {notes.length > 0 && (

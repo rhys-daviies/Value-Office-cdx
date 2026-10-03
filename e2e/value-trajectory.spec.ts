@@ -77,11 +77,43 @@ test("Value Trajectory is the primary Overview visual: plan, realised, formal ch
     /Formal Forecast\s*\$26\.0m — formal position as at 30 Sept 2026/,
   ]);
 
-  // Tooltip at an explicit point shows only stored observations for that date.
-  const forecastEnd = chart.locator('[data-series="forecast"]').last().locator("circle");
-  await forecastEnd.hover();
-  await expect(page.getByTestId("trajectory-tooltip")).toContainText("31 Dec 2028");
-  await expect(page.getByTestId("trajectory-tooltip")).toContainText("Formal Forecast: $26.0m");
+  // 4D.9N.1A: definitions, named end labels and the period-end Value Gap bracket.
+  await expect(t.getByTestId("trajectory-definitions")).toContainText(
+    "Authorised Plan = what we committed to, and when.",
+  );
+  await expect(t.getByTestId("trajectory-definitions")).toContainText(
+    "Value Gap = Authorised minus Formal Forecast at the Value Period end.",
+  );
+  await expect(chart.getByTestId("trajectory-end-label-plan")).toHaveText("Authorised V1 · $30.0m");
+  await expect(chart.getByTestId("trajectory-end-label-forecast")).toHaveText("Formal Forecast · $26.0m");
+  await expect(chart.getByTestId("trajectory-gap-bracket")).toHaveAttribute("data-label", "Value Gap · $4.0m");
+  await expect(chart.getByTestId("trajectory-gap-bracket")).toContainText("Value Gap · $4.0m");
+
+  // Tooltip at an explicit point: the stored observation, tagged Formal.
+  const tip = page.getByTestId("trajectory-tooltip");
+  await chart.locator('[data-series="forecast"]').last().locator("circle").hover();
+  await expect(tip.getByTestId("tip-heading")).toHaveText("31 Dec 2028");
+  await expect(tip.locator('[data-series-label="Formal Forecast"] [data-tag="Formal"]')).toContainText("$26.0m");
+
+  // Monthly cursor: a month with nothing stored shows Previous / Next only — never a value read off a line.
+  const box = (await chart.boundingBox())!;
+  const [t0, t1] = [Date.UTC(2026, 0, 1), Date.UTC(2028, 11, 31)];
+  const plotLeft = box.x + 8 + 56;
+  const plotWidth = box.width - 8 - 56 - 172;
+  const hoverDate = async (y: number, m: number, d: number) =>
+    page.mouse.move(plotLeft + ((Date.UTC(y, m, d) - t0) / (t1 - t0)) * plotWidth, box.y + box.height / 2);
+  await hoverDate(2027, 5, 28);
+  await expect(tip.getByTestId("tip-heading")).toHaveText("Jun 2027");
+  await expect(tip.locator('[data-tag="Entered"], [data-tag="Formal"], [data-tag="Scenario"]')).toHaveCount(0);
+  await expect(tip.locator('[data-series-label="Authorised Plan (V1)"]')).toContainText("Previous31 Dec 2026 ·$6.0m");
+  await expect(tip.locator('[data-series-label="Authorised Plan (V1)"]')).toContainText("Next31 Dec 2027 ·$18.0m");
+  await expect(tip.locator('[data-series-label="Realised"]')).toContainText("Latest formal30 Sept 2026 ·$4.0m");
+  await expect(tip.getByTestId("tip-footer")).toHaveText(
+    "Value Gap at Value Period end: $4.0m (Authorised V1 $30.0m − Formal Forecast $26.0m)",
+  );
+  await hoverDate(2026, 1, 25);
+  await expect(tip.getByTestId("tip-heading")).toHaveText("Feb 2026");
+  await expect(tip.locator('[data-series-label="Realised"]')).toContainText("No formal realised checkpoint yet");
 
   // Laptop widths: no page-level horizontal overflow.
   for (const width of [1366, 1024]) {

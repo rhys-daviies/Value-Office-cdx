@@ -233,8 +233,8 @@ describe("C/D. forecast and option-path authoring", () => {
       a.options.map((o) => [o.label, o.totalValue, o.points.map((p) => p.value), o.reconciliation?.state]),
     ).toEqual([
       ["Act now", "29000000.00", ["18000000.00", "29000000.00"], "reconciled"],
-      ["Delay 3 months", "27000000.00", ["16500000.00", "27000000.00"], "reconciled"],
-      ["No action", "23000000.00", ["15000000.00", "23000000.00"], "reconciled"],
+      ["Delay 3 months", "27000000.00", ["5000000.00", "16500000.00", "27000000.00"], "reconciled"],
+      ["No action", "23000000.00", ["5000000.00", "15000000.00", "23000000.00"], "reconciled"],
     ]);
 
     err(await r.point("review", r.review.id, { asOf: "2026-09-30", value: "1m" }), /after the review date/);
@@ -248,7 +248,7 @@ describe("C/D. forecast and option-path authoring", () => {
     const none = a.options.find((o) => o.label === "No action")!;
     ok(await r.point("scenario", none.scenarioId, { asOf: "2027-06-30", value: "12m" }));
     a = await r.authoring();
-    expect(a.options.find((o) => o.label === "No action")!.points).toHaveLength(3);
+    expect(a.options.find((o) => o.label === "No action")!.points).toHaveLength(4); // 3 canonical (incl. the 30 Dec 2026 pivot) + 1
     expect(a.options.find((o) => o.label === "Act now")!.points).toHaveLength(2);
   });
 

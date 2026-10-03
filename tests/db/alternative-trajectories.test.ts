@@ -12,11 +12,13 @@ import { setPlanPoint, setScenarioPoint, setVersionBasis } from "@/server/comman
 import { authoriseInitialVersion, proposeVersion } from "@/server/commands/value-case";
 import { db, schema } from "@/server/db/client";
 import { getAlternativeValueTrajectories } from "@/server/queries/trajectory";
+import { formatMoneyShort } from "@/ui/format";
 import { ReviewOptionsVisual } from "@/ui/trajectory/alternatives";
 import { buildAlternativePresentation } from "@/ui/trajectory/alternatives-model";
 import { epoch } from "@/ui/trajectory/model";
 
 import { newActor, uid } from "../support/fixtures";
+import { atDateWithoutObservation, untraced } from "../support/tooltip-trace";
 
 // Phase 4D.9F: Alternative Value Trajectories read model and presentation (one review's assessed option paths).
 
@@ -198,7 +200,33 @@ describe("Alternative Value Trajectories read model", () => {
       selected: { label: "Delay 3 months", totalValue: "27000000.00" },
       difference: "-2000000.00",
     });
-    expect(a.options.map((o) => o.points.map((p) => p.asOf))).toEqual(Array(3).fill(["2027-12-31", "2028-12-31"]));
+    // 4D.9N.1A: explicit stored milestones only. No action and Delay share the 30 Dec 2026 scenario assessment ($5.0m);
+    // the delayed-action pivot is the note stored on Delay's milestone — never inferred from the name.
+    expect(a.options.map((o) => [o.label, o.points.map((p) => [p.asOf, p.value, p.note])])).toEqual([
+      [
+        "Act now",
+        [
+          ["2027-12-31", "18000000.00", null],
+          ["2028-12-31", "29000000.00", null],
+        ],
+      ],
+      [
+        "No action",
+        [
+          ["2026-12-30", "5000000.00", null],
+          ["2027-12-31", "15000000.00", null],
+          ["2028-12-31", "23000000.00", null],
+        ],
+      ],
+      [
+        "Delay 3 months",
+        [
+          ["2026-12-30", "5000000.00", "Management acts — delayed action"],
+          ["2027-12-31", "16500000.00", null],
+          ["2028-12-31", "27000000.00", null],
+        ],
+      ],
+    ]);
     expect(a.options.every((o) => o.reconciliation.state === "reconciled")).toBe(true);
     // The anchor is composition only: no scenario point exists at the review date.
     const stored = await db()
@@ -208,27 +236,90 @@ describe("Alternative Value Trajectories read model", () => {
     expect(stored.filter((p) => p.scenarioId && p.asOf <= "2026-09-30")).toEqual([]);
 
     const p = buildAlternativePresentation(a, "USD")!;
-    expect(p.rows.map((r) => r.t)).toEqual(
-      ["2026-01-01", "2026-03-31", "2026-09-30", "2027-12-31", "2028-12-31"].map(epoch),
+    const valued = p.rows.filter((r) => Object.keys(r.values).length > 0 || r.history !== null);
+    expect(valued.map((r) => r.t)).toEqual(
+      ["2026-01-01", "2026-03-31", "2026-09-30", "2026-12-30", "2027-12-31", "2028-12-31"].map(epoch),
     );
     expect(p.domain).toEqual([epoch("2026-01-01"), epoch("2028-12-31")]);
     const at = (d: string) => p.rows.find((r) => r.t === epoch(d))!;
     // Options never reach back into history.
     expect(at("2026-03-31").values).toEqual({});
+    // Act now and No action leave the branch point; Delay shares No action's stored opening, drawn once, and its own
+    // line starts at the stored pivot (it diverges only after 30 Dec 2026).
     expect(at("2026-09-30")).toMatchObject({
       anchor: true,
       history: 4000000,
-      values: { o0: 4000000, o1: 4000000, o2: 4000000 },
+      values: { o0: 4000000, o1: 4000000 },
       tip: ["30 Sept 2026", "Formal realised position · Review #2: $4.0m"],
     });
+    expect(at("2026-12-30").values).toEqual({ o1: 5000000, o2: 5000000 });
+    expect(p.series.map((s) => [s.label, s.shared])).toEqual([
+      ["Act now", null],
+      ["No action", null],
+      ["Delay 3 months", { with: "No action", until: "2026-12-30" }],
+    ]);
+    expect(p.pivots).toEqual([
+      {
+        t: epoch("2026-12-30"),
+        label: "Management acts — delayed action",
+        option: "Delay 3 months",
+        color: p.series[2]!.color,
+      },
+    ]);
+    expect(at("2027-12-31").values).toEqual({ o0: 18000000, o1: 15000000, o2: 16500000 }); // diverged after the pivot
     expect(at("2027-12-31").tip).toEqual([
       "31 Dec 2027",
       "Act now: $18.0m · Cardaxia recommendation",
       "No action: $15.0m",
       "Delay 3 months: $16.5m · Client selected",
     ]);
-    // 24. Every tooltip line is one stored observation (origin, Review #1, anchor, 6 option milestones).
-    expect(p.rows.flatMap((r) => r.tip.slice(1))).toHaveLength(1 + 1 + 1 + 6);
+    // 24. Every table line is one stored observation (origin, Review #1, anchor, 8 option milestones).
+    expect(p.rows.flatMap((r) => r.tip.slice(1))).toHaveLength(1 + 1 + 1 + 8);
+
+    // Monthly cursor: between the review and the pivot, Delay is stated as sharing No action's path; values are only
+    // Previous / Next stored milestones; the pivot row names the stored note as an event.
+    const nov = p.rows.find((r) => r.month && r.cursor.heading === "Nov 2026")!;
+    const blk = (r: typeof nov, label: string) => r.cursor.blocks.find((b) => b.series === label)!;
+    expect(blk(nov, "Delay 3 months")).toMatchObject({
+      badges: ["Client selected"],
+      note: "Same path as No action until 30 Dec 2026",
+      entries: [{ tag: "Next", date: "30 Dec 2026", value: "$5.0m", detail: "Management acts — delayed action" }],
+    });
+    expect(blk(nov, "Act now")).toMatchObject({
+      badges: ["Cardaxia recommendation"],
+      entries: [{ tag: "Next", date: "31 Dec 2027", value: "$18.0m" }],
+    });
+    expect(blk(nov, "Realised (formal)").entries).toEqual([
+      { tag: "Latest formal", date: "30 Sept 2026", value: "$4.0m", detail: "Review #2 · branch point" },
+    ]);
+    expect(nov.cursor.footer).toEqual([
+      "Option totals at Value Period end: Act now $29.0m · No action $23.0m · Delay 3 months $27.0m",
+      "Client selected − Cardaxia recommendation = -$2.0m",
+    ]);
+    const pivot = at("2026-12-30");
+    expect(pivot.cursor.events).toEqual(["Delay 3 months: Management acts — delayed action"]);
+    expect(blk(pivot, "Delay 3 months").entries).toEqual([
+      { tag: "Scenario", value: "$5.0m", detail: "Management acts — delayed action" },
+    ]);
+    expect(blk(pivot, "No action").entries).toEqual([{ tag: "Scenario", value: "$5.0m", detail: undefined }]);
+    // Proof: every tooltip money string is a stored scenario value or total, a formal realised value or the stored
+    // selected − recommended difference; no value AT a value-free month.
+    const governed = new Set(
+      [
+        ...a.options.flatMap((o) => [o.totalValue, ...o.points.map((x) => x.value)]),
+        "0.00",
+        ...a.history!.checkpoints.map((k) => k.value),
+        a.anchor!.value,
+      ].map((v) => formatMoneyShort(v, "USD")),
+    );
+    governed.add("-$2.0m");
+    expect(
+      untraced(
+        p.rows.map((r) => r.cursor),
+        governed,
+      ),
+    ).toEqual([]);
+    expect(atDateWithoutObservation(p.rows)).toEqual([]);
     expect(p.labels.map((l) => [l.key, l.lines])).toEqual([
       ["o0", ["$29.0m Act now", "Cardaxia recommendation"]],
       ["o1", ["$23.0m No action"]],
@@ -245,6 +336,7 @@ describe("Alternative Value Trajectories read model", () => {
     expect(html).toContain("Alternative Value Trajectories");
     expect(html).toContain("All options share the history to the review and differ only after it.");
     expect(html).toContain("Realised (shared history)");
+    expect(html).toContain("same path as No action until 30 Dec 2026");
     expect(html).not.toContain("Difference from Cardaxia recommendation"); // no per-option difference metric
     expect(html).not.toMatch(/best|optimal|cost of delay/i);
     expect(html).not.toContain("Alternative Value Outcomes"); // no second, redundant endpoint chart
@@ -283,7 +375,10 @@ describe("Alternative Value Trajectories read model", () => {
     });
     expect(a).toMatchObject({ anchor: null, history: null, notes: ["no_valid_anchor"] });
     const p = buildAlternativePresentation(a, "USD")!;
-    expect(p.rows.map((r) => r.t)).toEqual(["2027-12-31", "2028-12-31"].map(epoch));
+    // Values only at stored milestones (the review row is an event row; month rows are value-free cursor positions).
+    expect(p.rows.filter((r) => Object.keys(r.values).length > 0 || r.history !== null).map((r) => r.t)).toEqual(
+      ["2027-12-31", "2028-12-31"].map(epoch),
+    );
     expect(p.domain[0]).toBe(epoch("2026-09-30")); // axis starts at the review, not at invented history
     expect(text(a)).toContain(
       "Review #2 does not establish a complete realised position, so each path begins at its first entered milestone.",

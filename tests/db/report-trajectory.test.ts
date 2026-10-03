@@ -228,8 +228,8 @@ describe("model v3 report trajectories", () => {
     const a = m.alternatives!;
     expect(a.options.map((o) => [o.label, o.totalValue, o.recommended, o.selected, o.milestones.length])).toEqual([
       ["Act now", "29000000.00", true, false, 2],
-      ["No action", "23000000.00", false, false, 2],
-      ["Delay 3 months", "27000000.00", false, true, 2],
+      ["No action", "23000000.00", false, false, 3],
+      ["Delay 3 months", "27000000.00", false, true, 3],
     ]);
     expect(a.decisionComparison!.difference).toBe("-2000000.00");
     // Nothing generated: every snapshotted value is a stored milestone, a realised position or a stored total.

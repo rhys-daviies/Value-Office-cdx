@@ -42,7 +42,9 @@ try {
     } else {
       if (code === "CANON") {
         await seedCanonicalJourney(actor, { code, name });
-        console.log(`Seeded ${name}: V0 $32.0m → V1 $30.0m → Reviews #1–#2 → VC-001 −$1.0m → V2 $29.0m → Review #3`);
+        console.log(
+          `Seeded ${name}: V0 $32.0m → V1 $30.0m → Reviews #1–#2 → VC-001 −$3.0m (adopted Delay path) → V2 $27.0m → Review #3`,
+        );
       } else if (code === "TRAJX") {
         await seedCompactTrajectory(actor, { code, name, formal: true });
         console.log(

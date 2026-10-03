@@ -32,8 +32,8 @@ import { newActor, uid } from "../support/fixtures";
 
 // Phase 4D.9K: the canonical end-to-end Value Office journey, validated through commands and every governed surface.
 // One synthetic project (src/fixtures/canonical.ts): V0 $32.0m → Authorised V1 $30.0m with plan → Reviews #1/#2 →
-// VL-001 → options → recommendation (Act now $29.0m) → decision (Delay 3 months $27.0m) → VC-001 −$1.0m → Authorised
-// V2 $29.0m with a re-phased plan → Review #3 against V2. Client reports are issued at their lifecycle points and must
+// VL-001 → options → recommendation (Act now $29.0m) → decision (Delay 3 months $27.0m) → VC-001 −$3.0m (adopted Delay path) → Authorised
+// V2 $27.0m with the Delay path's phasing → Review #3 against V2 (4D.9N.1A story). Client reports are issued at their lifecycle points and must
 // never change afterwards. The steps run in order and share state.
 
 const sha = (s: string | Buffer) => createHash("sha256").update(s).digest("hex");
@@ -251,7 +251,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
         status: "draft",
         toVersionNumber: 2,
         statedChange: C.valueChange.stated,
-        proposedChange: C.valueChange.stated, // VD-01 $15.0m → $14.0m: −$1.0m, reconciles
+        proposedChange: C.valueChange.stated, // VD-01 $15.0m → $12.0m: −$3.0m, reconciles
         reconciled: true,
       }),
     ]);
@@ -272,7 +272,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
     expect(vcn).toMatchObject({
       change: { status: "proposed", statedChange: C.valueChange.stated },
       current: { versionNumber: 1, total: C.v1.total },
-      proposed: { versionNumber: 2, total: "29000000.00" },
+      proposed: { versionNumber: 2, total: "27000000.00" },
       actualChange: C.valueChange.stated,
       reconciled: true,
       readyForAuthorisation: true,
@@ -281,7 +281,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
     expect(vcn.plans!.to.milestones.map((p) => [p.asOf, p.value])).toEqual(
       C.valueChange.v2Plan.map(([a, v]) => [a, v]),
     );
-    expect(renderReportDocument(vcn, preview)).toContain("Proposed change -$1.0m — not in force.");
+    expect(renderReportDocument(vcn, preview)).toContain("Proposed change -$3.0m — not in force.");
     expect(await v1State()).toBe(v1Frozen);
   }, 120_000);
 
@@ -292,17 +292,17 @@ describe("canonical Value Office journey (4D.9K)", () => {
     expect(v1!.status).toBe("superseded");
 
     const o = await getExecutiveOverview(s.project.id, j.today);
-    expect(o.authorised).toEqual({ versionNumber: 2, total: "29000000.00" });
+    expect(o.authorised).toEqual({ versionNumber: 2, total: "27000000.00" });
     expect(o.valueCase).toMatchObject({
-      current: { versionNumber: 2, authorisedValue: "29000000.00", authorisedOn: j.today },
+      current: { versionNumber: 2, authorisedValue: "27000000.00", authorisedOn: j.today },
       authorisedChangeCount: 1,
       latestAuthorisedChange: { code: "VC-001", versionNumber: 2, authorisedOn: j.today },
       pending: [],
     });
     const chart = await getValueTrajectoryChart(s.project.id, { today: j.today });
-    expect(chart.version).toEqual({ versionNumber: 2, total: "29000000.00" });
+    expect(chart.version).toEqual({ versionNumber: 2, total: "27000000.00" });
     expect(chart.plan.map((p) => [p.asOf, p.value])).toEqual(C.valueChange.v2Plan.map(([a, v]) => [a, v]));
-    expect(terminalReconciliation(chart.plan, C.valuePeriod.end, "29000000.00").state).toBe("reconciled");
+    expect(terminalReconciliation(chart.plan, C.valuePeriod.end, "27000000.00").state).toBe("reconciled");
     expect(chart.versionChange).toEqual({ code: "VC-001", versionNumber: 2, authorisedOn: j.today, inPeriod: true });
     expect(chart.notes).toContain("formal_measured_against_earlier_version"); // Review #2 was against V1
 
@@ -312,7 +312,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
       evolution.authorisedVersions.map((v) => [v.versionNumber, v.status, v.authorisedValue, v.valueChangeCode]),
     ).toEqual([
       [1, "superseded", C.v1.total, null],
-      [2, "authorised", "29000000.00", "VC-001"],
+      [2, "authorised", "27000000.00", "VC-001"],
     ]);
 
     // The authorised notice is a second issue; the proposed one stays as issued.
@@ -360,10 +360,10 @@ describe("canonical Value Office journey (4D.9K)", () => {
     const r3 = (await getAssuranceWorkspace(s.project.id, s.review3.id))!;
     expect(r3.againstVersion.versionNumber).toBe(2);
     expect(r3.totals).toMatchObject({
-      authorisedTotal: "29000000.00",
-      forecastTotal: "26500000.00",
+      authorisedTotal: "27000000.00",
+      forecastTotal: "25000000.00",
       realisedTotal: "4600000.00",
-      valueGap: "2500000.00",
+      valueGap: "2000000.00",
     });
     const chart = await getValueTrajectoryChart(s.project.id, { today: j.today });
     expect(chart.realised!.checkpoints.map((c) => [c.sequence, c.value])).toEqual([
@@ -371,7 +371,7 @@ describe("canonical Value Office journey (4D.9K)", () => {
       [2, "4000000.00"],
       [3, "4600000.00"],
     ]);
-    expect(chart.forecast!.points.map((p) => p.value)).toEqual(["16000000.00", "26500000.00"]);
+    expect(chart.forecast!.points.map((p) => p.value)).toEqual(["15500000.00", "25000000.00"]);
     expect(chart.notes).toEqual([]);
     expect(chart.today).toEqual({ asOf: j.today, inPeriod: true });
     expect(chart.latestFormal!.reviewDate).toBe(j.today); // same calendar day → one combined marker in the web chart
@@ -415,10 +415,10 @@ describe("canonical Value Office journey (4D.9K)", () => {
     }
     const ofVersion = (id: string) => rows.filter((r) => r.valueCaseVersionId === id);
     expect(terminalReconciliation(ofVersion(s.v1.id), C.valuePeriod.end, C.v1.total).state).toBe("reconciled");
-    expect(terminalReconciliation(ofVersion(s.v2.id), C.valuePeriod.end, "29000000.00").state).toBe("reconciled");
+    expect(terminalReconciliation(ofVersion(s.v2.id), C.valuePeriod.end, "27000000.00").state).toBe("reconciled");
     for (const [review, forecast] of [
       [s.review2, "26000000.00"],
-      [s.review3, "26500000.00"],
+      [s.review3, "25000000.00"],
     ] as const) {
       const fp = rows.filter((r) => r.assuranceReviewId === review.id);
       expect(terminalReconciliation(fp, C.valuePeriod.end, forecast).state).toBe("reconciled");
@@ -438,8 +438,14 @@ describe("canonical Value Office journey (4D.9K)", () => {
       expect(terminalReconciliation(op, C.valuePeriod.end, sc.totalValue).state).toBe("reconciled");
       expect(op.every((p) => p.asOf > C.review2.date)).toBe(true);
     }
-    // Only explicitly entered milestones exist: 4 (V1) + 4 (V2) + 2 + 2 (forecasts) + 3 × 2 (options).
-    expect(rows).toHaveLength(4 + 4 + 2 + 2 + 6);
+    // Only explicitly entered milestones exist: 4 (V1) + 4 (V2) + 2 + 2 (forecasts) + options 2 (Act now) + 3 (No action)
+    // + 3 (Delay 3 months) — the two 30 Dec 2026 scenario milestones are the stored delayed-action pivot (4D.9N.1A).
+    expect(rows).toHaveLength(4 + 4 + 2 + 2 + 2 + 3 + 3);
+    const pivot = rows.filter((r) => r.scenarioId && r.asOf === "2026-12-30");
+    expect(pivot.map((r) => [r.value, r.note]).sort((x, y) => String(x[1]).localeCompare(String(y[1])))).toEqual([
+      ["5000000.00", "Management acts — delayed action"],
+      ["5000000.00", null],
+    ]);
   });
 
   it("H. temporal order: nothing happens before the event that enables it", async () => {

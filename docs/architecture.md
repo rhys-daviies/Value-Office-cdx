@@ -464,30 +464,46 @@ with no surrounding whitespace (templates are `prettier-ignore`). Goldens: `test
 (released a88cc72) and `*-v2.*` for all four report types (captured from 41275e4) must render byte-for-byte; issued
 snapshots are never rewritten.
 
-**Canonical end-to-end journey (4D.9K).** `src/fixtures/canonical.ts` builds ONE synthetic engagement through commands
+**Canonical end-to-end journey (4D.9K; story revised 4D.9N.1A).** `src/fixtures/canonical.ts` builds ONE synthetic engagement through commands
 only, in stages a test can pause between (`establish` → `assure` → `change` → `proposeChange` → `authoriseChange` →
 `continueAssurance`). "Trajectory Executive" is the journey through Review #2; "Canonical Value Journey" (seed `CANON`)
 runs it to the end. `tests/db/canonical-journey.test.ts` validates it across every surface and `e2e/canonical-journey.spec.ts`
 in the browser.
 
-| Stage                                              | Synthetic values                                                                                                           |
-| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Original Business Case (V0)                        | $32.0m, headline only                                                                                                      |
-| Authorised V1 (15 Jan 2026)                        | $30.0m (VD-01 $15.0m, VD-02 $10.0m, VD-03 $5.0m); Value Period 1 Jan 2026 – 31 Dec 2028; plan $0 / $6.0m / $18.0m / $30.0m |
-| Review #1 (31 Mar 2026, V1)                        | forecast $28.0m, realised $1.0m                                                                                            |
-| VL-001 Vendor sequencing risk (14 Aug 2026, VD-01) | working evidence E-003; formal leakage in Review #2 $700,000 = $450,000 + $250,000                                         |
-| Review #2 (30 Sep 2026, V1)                        | forecast $26.0m (milestones $16.0m / $26.0m), realised $4.0m, Value Gap $4.0m                                              |
-| Options at Review #2                               | Act now $29.0m (Cardaxia recommendation), Delay 3 months $27.0m (management selected), No action $23.0m; difference −$2.0m |
-| VC-001 (from Review #2 and its decision)           | stated −$1.0m = VD-01 $15.0m → $14.0m; own rationale; V2 plan $0 / $5.0m / $16.5m / $29.0m                                 |
-| Authorised V2 (journey date)                       | $29.0m; V1 superseded and unchanged                                                                                        |
-| Review #3 (journey date, V2)                       | forecast $26.5m, realised $4.6m, Value Gap $2.5m                                                                           |
+| Stage                                              | Synthetic values                                                                                                                                               |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Original Business Case (V0)                        | $32.0m, headline only                                                                                                                                          |
+| Authorised V1 (15 Jan 2026)                        | $30.0m (VD-01 $15.0m, VD-02 $10.0m, VD-03 $5.0m); Value Period 1 Jan 2026 – 31 Dec 2028; plan $0 / $6.0m / $18.0m / $30.0m                                     |
+| Review #1 (31 Mar 2026, V1)                        | forecast $28.0m, realised $1.0m                                                                                                                                |
+| VL-001 Vendor sequencing risk (14 Aug 2026, VD-01) | working evidence E-003; formal leakage in Review #2 $700,000 = $450,000 + $250,000                                                                             |
+| Review #2 (30 Sep 2026, V1)                        | forecast $26.0m (milestones $16.0m / $26.0m), realised $4.0m, Value Gap $4.0m                                                                                  |
+| Options at Review #2                               | Act now $29.0m (Cardaxia recommendation), Delay 3 months $27.0m (management selected), No action $23.0m; difference −$2.0m                                     |
+| Option paths (explicit scenario milestones)        | Act now $18.0m / $29.0m; No action $5.0m (30 Dec 2026) / $15.0m / $23.0m; Delay $5.0m (30 Dec 2026, note "Management acts — delayed action") / $16.5m / $27.0m |
+| VC-001 (from Review #2 and its decision)           | formalises the adopted Delay path: stated −$3.0m = VD-01 $15.0m → $12.0m; V2 plan $0 / $5.0m / $16.5m / $27.0m                                                 |
+| Authorised V2 (journey date)                       | $27.0m; V1 superseded and unchanged                                                                                                                            |
+| Review #3 (journey date, V2)                       | forecast $25.0m (VD-01 $12.0m on plan; VD-02 $9.0m, VD-03 $4.0m continue Review #2's shortfalls), realised $4.6m, Value Gap $2.0m                              |
 
-Rules the journey proves: the selection ($27.0m) does not become the commitment — only an authorised, reconciled Value
-Change moves it; a historical review keeps the version it measured against (its live rebuild differs from its issued
+Rules the journey proves: the management decision does not itself change the commitment — VC-001, an authorised,
+reconciled Value Change with its own rationale, later formalises the adopted path; the Review #2 Formal Forecast is the
+expected outcome under the existing operating response at Review #2 (not the No action scenario); the 30 Dec 2026
+$5.0m pivot is consultant scenario data (not realised, forecast or interpolated); a historical review keeps the version it measured against (its live rebuild differs from its issued
 record only in that version's lifecycle status); issued reports keep their snapshot, rendering and PDF; Value Gap and
 Value Leakage are separate numbers; draft and proposed versions are never the current plan. Recommendation issue and
 finalisation are timestamped "now", so the decision, the Value Change authorisation and Review #3 fall on the day the
 journey runs.
+
+**Trajectory interaction and Evolution (4D.9N.1A, web only).** The primary and alternative trajectory charts add one
+value-free cursor row per month without an explicit date, so the crosshair rests on every month while lines still join
+only stored points. Tooltips (`src/ui/trajectory/cursor.ts`) state only governed values: the value on that date tagged
+Entered / Formal / Scenario, otherwise Previous / Next stored values with their dates (Realised: the latest formal
+checkpoint, or "no formal realised checkpoint yet"); the Value Gap appears only as "Value Gap at Value Period end". No
+money is ever read off a visual join (tests trace every tooltip money string to a governed value). The primary chart
+names its end labels and draws a period-end Value Gap bracket. Alternative paths that share their first stored
+milestones with an earlier option are drawn once and branch at the last shared milestone; pivot / action markers come
+only from notes stored on milestones, never from option names. Value Case Evolution is a server-rendered event chart:
+a stepped Authorised Commitment from the Original Business Case, explicit version steps (with their Value Change), and
+at each formal review a checkpoint (realised column, forecast marker, Value Gap bracket to the commitment measured
+against), with an aligned strip of event values. Report charts are unchanged (a later, versioned phase).
 
 **Known limitations / backlog (not implemented).**
 

@@ -1,8 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// Phase 4D.9K: the canonical Value Office journey, seeded through commands (src/fixtures/canonical.ts) as
-// "Canonical Value Journey": V0 $32.0m → V1 $30.0m → Reviews #1/#2 (V1) → VC-001 −$1.0m → Authorised V2 $29.0m →
-// Review #3 (V2). Every surface must tell the same story; history keeps its own version.
+// Phase 4D.9K (story revised 4D.9N.1A): the canonical Value Office journey, seeded through commands
+// (src/fixtures/canonical.ts) as "Canonical Value Journey": V0 $32.0m → V1 $30.0m → Reviews #1/#2 (V1) → VC-001 −$3.0m
+// (the adopted Delay path) → Authorised V2 $27.0m → Review #3 (V2: forecast $25.0m, realised $4.6m, gap $2.0m).
+// Every surface must tell the same story; history keeps its own version.
 
 const tab = (page: Page, name: string) =>
   page.getByRole("navigation", { name: "Project" }).getByRole("link", { name, exact: true });
@@ -16,13 +17,13 @@ async function open(page: Page) {
 test("Overview and Value Case after V2: one consistent governed story", async ({ page }) => {
   await open(page);
   // Overview: V2 in force; the latest formal position is Review #3 against V2.
-  await expect(page.getByTestId("overview-authorised-value")).toHaveText("$29.0m");
-  await expect(page.getByTestId("overview-forecast")).toHaveText("$26.5m");
+  await expect(page.getByTestId("overview-authorised-value")).toHaveText("$27.0m");
+  await expect(page.getByTestId("overview-forecast")).toHaveText("$25.0m");
   await expect(page.getByTestId("overview-realised")).toHaveText("$4.6m");
-  await expect(page.getByTestId("overview-gap")).toHaveText("$2.5m");
+  await expect(page.getByTestId("overview-gap")).toHaveText("$2.0m");
   await expect(page.getByTestId("overview-formal-position")).toContainText("Review #3");
   const summary = page.getByTestId("value-case-summary");
-  await expect(summary.getByTestId("summary-current")).toHaveText("$29.0m");
+  await expect(summary.getByTestId("summary-current")).toHaveText("$27.0m");
   await expect(summary.getByTestId("summary-original")).toHaveText("$32.0m");
   await expect(summary.getByTestId("summary-changes")).toHaveText("1");
   await expect(summary).toContainText("Latest VC-001 → V2");
@@ -51,13 +52,13 @@ test("Overview and Value Case after V2: one consistent governed story", async ({
 
   // Value Case: commitment V2, history V1 → V2, the governed action that produced it.
   await tab(page, "Value Case").click();
-  await expect(page.getByTestId("commitment-total")).toHaveText("$29.0m");
+  await expect(page.getByTestId("commitment-total")).toHaveText("$27.0m");
   await expect(page.getByTestId("current-commitment")).toContainText("Authorised V2");
   await expect(page.getByTestId("commitment-pending")).toHaveCount(0);
   await expect(page.getByTestId("evolution-v1-authorised")).toHaveText("$30.0m");
-  await expect(page.getByTestId("evolution-v2-authorised")).toHaveText("$29.0m");
+  await expect(page.getByTestId("evolution-v2-authorised")).toHaveText("$27.0m");
   await expect(page.getByTestId("evolution-v2-basis")).toContainText("via VC-001");
-  await expect(page.getByTestId("value-change-row")).toHaveText([/VC-001.*V1 → V2.*Authorised.*-\$1\.0m/]);
+  await expect(page.getByTestId("value-change-row")).toHaveText([/VC-001.*V1 → V2.*Authorised.*-\$3\.0m/]);
 
   for (const width of [1366, 1024]) {
     await page.setViewportSize({ width, height: 900 });
@@ -83,7 +84,7 @@ test("historical Review #2 keeps its V1 meaning after V2 was authorised", async 
   await expect(alt.getByTestId("comparison-recommended")).toHaveText("$29.0m");
   await expect(alt.getByTestId("comparison-selected")).toHaveText("$27.0m");
   await expect(alt.getByTestId("comparison-difference")).toHaveText("-$2.0m");
-  // The management selection ($27.0m) did not become the commitment; VC-001 set $29.0m on its own rationale.
+  // The decision alone did not change the commitment; VC-001 later formalised the adopted Delay path ($27.0m).
   await tab(page, "Assurance").click();
   await page.getByTestId("review-row").getByRole("link", { name: "#3" }).click();
   await expect(page.getByTestId("review-story").getByTestId("story-position")).toContainText("against V2");

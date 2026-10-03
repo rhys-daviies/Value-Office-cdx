@@ -144,7 +144,7 @@ test("Formal forecast and option-path milestones on a draft review; recommendati
   const noAction = options.filter({ hasText: "No action" });
   await expect(noAction).toContainText("option total $23.0m");
   await addAndWait(noAction.getByTestId("option-milestones"), "2027-06-30", "12m");
-  await expect(noAction.getByTestId("milestone")).toHaveCount(3);
+  await expect(noAction.getByTestId("milestone")).toHaveCount(4); // 3 canonical (incl. the 30 Dec 2026 pivot) + 1
   await expect(options.filter({ hasText: "Act now" }).getByTestId("milestone")).toHaveCount(2);
   await expect(noAction.getByTestId("option-reconciliation")).toContainText("Reconciled");
 

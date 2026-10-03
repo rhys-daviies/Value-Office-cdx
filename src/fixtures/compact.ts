@@ -484,11 +484,18 @@ export async function seedCompactTrajectory(
   await setForecastPoint(actor, { reviewId: review.id, asOf: "2027-12-31", value: "16000000.00" });
   await setForecastPoint(actor, { reviewId: review.id, asOf: "2028-12-31", value: "26000000.00" });
   let act: { id: string } | null = null;
-  for (const [n, [label, kind, total, mid]] of CANONICAL.review2.options.entries()) {
-    const sc = await upsertScenario(actor, { reviewId: review.id, label, kind, totalValue: total, sortOrder: n + 1 });
-    await setScenarioPoint(actor, { scenarioId: sc.id, asOf: "2027-12-31", value: mid });
-    await setScenarioPoint(actor, { scenarioId: sc.id, asOf: "2028-12-31", value: total });
-    if (label === "Act now") act = sc;
+  for (const [n, o] of CANONICAL.review2.options.entries()) {
+    const sc = await upsertScenario(actor, {
+      reviewId: review.id,
+      label: o.label,
+      kind: o.kind,
+      totalValue: o.total,
+      sortOrder: n + 1,
+      ...(o.narrative ? { narrative: o.narrative } : {}),
+    });
+    for (const [asOf, value, note] of o.points)
+      await setScenarioPoint(actor, { scenarioId: sc.id, asOf, value, ...(note ? { note } : {}) });
+    if (o.label === "Act now") act = sc;
   }
   await saveRecommendation(actor, {
     reviewId: review.id,

@@ -54,25 +54,47 @@ test("Alternative Value Trajectories: shared history → review → three explic
     "Review #2 · 30 Sept 2026 · options assessed",
   );
   await expect(chart.locator('[data-series="history"]')).toHaveCount(3); // origin, Review #1, the review anchor
-  await expect(chart.locator("[data-option]")).toHaveCount(6); // 2 explicit milestones per option; anchor not repeated
+  // Stored milestones: Act now 2; No action 3 and Delay 3 (both incl. the 30 Dec 2026 $5.0m scenario assessment).
+  await expect(chart.locator("[data-option]")).toHaveCount(8);
+  await expect(chart.locator('[data-option="Delay 3 months"]')).toHaveCount(3);
+  // 4D.9N.1A: the delayed-action pivot comes from the stored milestone note, not from the option name.
+  await expect(chart.getByTestId("alternatives-pivot-marker")).toHaveText("Management acts — delayed action");
+  await expect(chart.getByTestId("alternatives-pivot-marker")).toHaveAttribute("data-pivot-option", "Delay 3 months");
+  await expect(s.getByTestId("alternatives-shared-note")).toContainText("same path as No action until 30 Dec 2026");
   await expect(chart.getByTestId("alternatives-end-label")).toHaveText([
     /\$29\.0m Act now\s*Cardaxia recommendation/,
     /\$27\.0m Delay 3 months\s*Client selected/,
     /\$23\.0m No action/,
   ]);
 
-  // Tooltip at an explicit milestone only shows stored values.
+  // Tooltip at an explicit milestone: stored scenario values, roles, totals and the fixed decision difference.
   await chart.locator('[data-option="Act now"]').last().hover();
   const tip = page.getByTestId("alternatives-tooltip");
-  await expect(tip).toContainText("31 Dec 2028");
-  await expect(tip).toContainText("Act now: $29.0m · Cardaxia recommendation");
-  await expect(tip).toContainText("Delay 3 months: $27.0m · Client selected");
+  await expect(tip.getByTestId("tip-heading")).toHaveText("31 Dec 2028");
+  await expect(tip.locator('[data-series-label="Act now"]')).toContainText("Cardaxia recommendation");
+  await expect(tip.locator('[data-series-label="Act now"] [data-tag="Scenario"]')).toContainText("$29.0m");
+  await expect(tip.locator('[data-series-label="Delay 3 months"]')).toContainText("Client selected");
+  await expect(tip.locator('[data-series-label="Delay 3 months"] [data-tag="Scenario"]')).toContainText("$27.0m");
+  await expect(tip.getByTestId("tip-footer")).toContainText("Client selected − Cardaxia recommendation = -$2.0m");
+
+  // Monthly cursor between the review and the pivot: Delay is stated as sharing No action's path; Next values only.
+  const box = (await chart.boundingBox())!;
+  const [t0, t1] = [Date.UTC(2026, 0, 1), Date.UTC(2028, 11, 31)];
+  const plotLeft = box.x + 8 + 56;
+  const plotWidth = box.width - 8 - 56 - 184;
+  await page.mouse.move(plotLeft + ((Date.UTC(2026, 10, 28) - t0) / (t1 - t0)) * plotWidth, box.y + box.height / 2);
+  await expect(tip.getByTestId("tip-heading")).toHaveText("Nov 2026");
+  await expect(tip.locator('[data-tag="Entered"], [data-tag="Formal"], [data-tag="Scenario"]')).toHaveCount(0);
+  await expect(tip.locator('[data-series-label="Delay 3 months"]')).toContainText(
+    "Same path as No action until 30 Dec 2026",
+  );
+  await expect(tip.locator('[data-series-label="Delay 3 months"]')).toContainText("Next30 Dec 2026 ·$5.0m");
 
   // Accessible economics without the chart.
   await expect(s.getByTestId("alternatives-row")).toHaveCount(3);
   await expect(s.getByTestId("alternatives-total")).toHaveText(["$29.0m", "$23.0m", "$27.0m"]);
   await s.getByTestId("alternatives-values").locator("summary").click();
-  await expect(s.getByTestId("alternatives-value-row")).toHaveCount(9);
+  await expect(s.getByTestId("alternatives-value-row")).toHaveCount(11);
 
   // Laptop widths: no page overflow; terminal labels stay inside the section.
   for (const width of [1366, 1024]) {

@@ -106,7 +106,7 @@ describe("review story", () => {
     expect(s.decision).toMatchObject({
       label: "Delay 3 months",
       totalValue: "27000000.00",
-      milestones: 2,
+      milestones: 3,
       deciderName: "Test VCO",
       decidedOn: todayIso(), // after the recommendation was issued (4D.9K temporal order)
       rationale: "Synthetic: delay to align with the budget cycle",

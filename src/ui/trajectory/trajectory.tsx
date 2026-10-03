@@ -205,6 +205,21 @@ export function ValueTrajectory({
         </dl>
       )}
       <Legend c={c} />
+      <dl
+        className="mt-1.5 grid grid-cols-1 gap-x-6 gap-y-0.5 text-xs text-slate-600 sm:grid-cols-2"
+        data-testid="trajectory-definitions"
+      >
+        {[
+          ["Authorised Plan", "what we committed to, and when."],
+          ["Formal Forecast", "what we formally expect."],
+          ["Realised", "what has been formally recorded."],
+          ["Value Gap", "Authorised minus Formal Forecast at the Value Period end."],
+        ].map(([k, v]) => (
+          <div key={k}>
+            <dt className="inline font-semibold text-slate-800">{k}</dt> <dd className="inline">= {v}</dd>
+          </div>
+        ))}
+      </dl>
       <Chart
         rows={p.rows}
         domain={p.domain}
@@ -213,6 +228,7 @@ export function ValueTrajectory({
         today={p.today}
         checkpoint={p.checkpoint}
         versionChange={p.versionChange}
+        gap={p.gap}
         ariaLabel={summary}
       />
       {allNotes.length > 0 && (
