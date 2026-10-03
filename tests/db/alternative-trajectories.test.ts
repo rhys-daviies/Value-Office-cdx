@@ -340,6 +340,20 @@ describe("Alternative Value Trajectories read model", () => {
     expect(html).not.toContain("Difference from Cardaxia recommendation"); // no per-option difference metric
     expect(html).not.toMatch(/best|optimal|cost of delay/i);
     expect(html).not.toContain("Alternative Value Outcomes"); // no second, redundant endpoint chart
+    // 4D.9N.1B: the review's Formal Forecast is stated once, with its meaning, distinct from every assessed option.
+    expect(a.outcomes.currentFormalForecast).toBe("26000000.00");
+    const ff = renderToStaticMarkup(createElement(ReviewOptionsVisual, { data: a })).match(
+      /<p[^>]*data-testid="alternatives-formal-forecast"[^>]*>(.*?)<\/p>/,
+    );
+    const context = ff![1]!
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    expect(context).toBe(
+      "Formal Forecast · $26.0m Current expected outcome before the assessed management interventions.",
+    );
+    for (const o of a.options) expect(context).not.toContain(o.label);
+    expect(context).not.toMatch(/no action|status quo|scenario|option/i);
   });
 
   it("13. recommendation and client selection on the same option carry both labels", async () => {

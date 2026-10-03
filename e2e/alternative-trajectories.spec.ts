@@ -47,6 +47,11 @@ test("Alternative Value Trajectories: shared history → review → three explic
   await expect(s.getByTestId("comparison-recommended")).toHaveText("$29.0m");
   await expect(s.getByTestId("comparison-selected")).toHaveText("$27.0m");
   await expect(s.getByTestId("comparison-difference")).toHaveText("-$2.0m");
+  // 4D.9N.1B: the review's Formal Forecast, with its meaning, distinct from the assessed options.
+  await expect(s.getByTestId("alternatives-formal-forecast-value")).toHaveText("Formal Forecast · $26.0m");
+  await expect(s.getByTestId("alternatives-formal-forecast-meaning")).toHaveText(
+    "Current expected outcome before the assessed management interventions.",
+  );
   await expect(s.getByTestId("alternatives-difference")).toHaveCount(0);
 
   const chart = s.getByTestId("alternatives-chart");

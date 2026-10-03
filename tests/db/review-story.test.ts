@@ -274,6 +274,8 @@ describe("draft trajectory preview", () => {
     expect(html).toContain("Not a formal value position");
     expect(html).not.toContain("🔒");
     expect(html).not.toContain("Cardaxia recommendation");
+    // 4D.9N.1B: a draft has no formal forecast, so no Formal Forecast context line.
+    expect(html).not.toContain("Current expected outcome before the assessed management interventions.");
     expect(renderToStaticMarkup(createElement(DraftTrajectoryPreview, { data: a }))).toContain('data-governed="false"');
     // The governed visual refuses a draft.
     expect(() => renderToStaticMarkup(createElement(ReviewOptionsVisual, { data: a }))).toThrow();

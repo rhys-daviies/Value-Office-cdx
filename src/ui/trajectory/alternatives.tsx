@@ -94,6 +94,28 @@ function DecisionComparison({ a, currency }: { a: Data; currency: string }) {
   );
 }
 
+/** The review's Formal Forecast meaning (PMO, 4D.9N.1B): the formal position the options are assessed from — not an option. */
+export const FORMAL_FORECAST_MEANING = "Current expected outcome before the assessed management interventions.";
+
+/**
+ * Formal Forecast context (4D.9N.1B): one line distinguishing the review's formal expectation from the assessed options.
+ * Finalised reviews only (a draft has no formal forecast); omitted when the forecast is incomplete.
+ */
+function FormalForecastContext({ a, currency }: { a: Data; currency: string }) {
+  const f = a.outcomes.currentFormalForecast;
+  if (f === null) return null;
+  return (
+    <p className="mb-3 text-xs text-slate-600" data-testid="alternatives-formal-forecast">
+      <span className="font-semibold text-slate-900" data-testid="alternatives-formal-forecast-value">
+        Formal Forecast · {formatMoneyShort(f, currency)}
+      </span>
+      <span className="ml-2" data-testid="alternatives-formal-forecast-meaning">
+        {FORMAL_FORECAST_MEANING}
+      </span>
+    </p>
+  );
+}
+
 /** Draft preview header line: the recommendation state as it stands, never presented as issued unless it is. */
 function DraftRecommendationState({ a }: { a: Data }) {
   const issued = a.options.find((o) => o.recommended);
@@ -228,6 +250,7 @@ function AlternativeTrajectories({ a, currency }: { a: Data; currency: string })
         )}
       </div>
       {governed ? <DecisionComparison a={a} currency={currency} /> : <DraftRecommendationState a={a} />}
+      {governed && <FormalForecastContext a={a} currency={currency} />}
       <Legend series={p.series} history={a.history !== null} draftForecast={a.draftForecast !== null} />
       <AlternativeTrajectoriesChart
         series={p.series}
