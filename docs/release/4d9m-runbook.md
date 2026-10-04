@@ -1,5 +1,10 @@
 # Phase 4D.9M release runbook — Value Trajectory (migrations 0019–0020)
 
+> **Historical record — executed 2026-10-03. Its rollback guidance is SUPERSEDED.** Do **not** roll production back to
+> `a5e960d` (deployment `m0zhti4s0`) or to any deployment built before the 4D.9M `vo_runtime` switch: those
+> deployments carry the historical `neondb_owner` credential in their build-time environment and run pre-0019 code.
+> Follow the rollback policy in [`security-b.md`](security-b.md).
+
 Prepared and rehearsed in Phase 4D.9L. **Nothing here has been run against production.** Each production step
 needs PMO authorisation at the time. Never print or paste connection strings, passwords or session secrets.
 
@@ -14,8 +19,9 @@ needs PMO authorisation at the time. Never print or paste connection strings, pa
 it a member of `neon_superuser` (CREATEROLE, CREATEDB, REPLICATION, BYPASSRLS, and `pg_read_all_data` /
 `pg_write_all_data`, which override the application's REVOKEs). Its replacement `vo_runtime` was created with SQL,
 granted by `grantAppRole`, and verified least-privilege on 2026-10-02. Its pooled connection string is in the macOS
-Keychain (service `value-office-prod-vo_runtime`). `vo_app` stays untouched until 4D.9N acceptance, as the rollback
-identity of the `a5e960d` deployment.
+Keychain (service `value-office-prod-vo_runtime`). `vo_app` stays untouched until 4D.9N acceptance. _Correction
+(Security A): `a5e960d` never ran as `vo_app`; it ran as `neondb_owner` through the Neon integration's `DATABASE_URL`.
+`vo_app` is a legacy role pending retirement and must not be used by the runtime._
 
 Migration file hashes (`drizzle.__drizzle_migrations.hash` = sha256 of the file):
 
@@ -69,7 +75,7 @@ columns, constraints and triggers.
 7. **Switch the runtime role, then deploy.**
    - Set Vercel's **Production** `DATABASE_URL` to the `vo_runtime` pooled string from the Keychain, piped from the
      Keychain into `vercel env`, never printed. An environment change applies only to new deployments, so the running
-     `a5e960d` deployment keeps `vo_app`.
+     `a5e960d` deployment keeps its build-time credential (in fact `neondb_owner`, not `vo_app` — see the note above).
    - Push the RC commit to `main` and wait for the Vercel production deployment of that exact commit. It starts on
      `vo_runtime`.
 8. **Verify** (checklist below).
@@ -115,13 +121,13 @@ Value Change that classifies the basis and phases the plan). Do not create traje
 
 ## Recovery
 
-| Situation                                             | Action                                                                                                                                                                                                                                  |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Migration fails                                       | One transaction: nothing is applied. Production stays at 0018 and `a5e960d` keeps serving. Do not push. Investigate.                                                                                                                    |
-| Migration succeeds, fingerprint differs unexpectedly  | Do not push. Hold the database (`a5e960d` stays compatible), report to PMO. If data must be restored, restore from the `pre-4d9m` branch / PITR.                                                                                        |
-| Migration succeeds, deploy fails (build/Vercel error) | Production keeps serving `a5e960d` on the migrated schema (rehearsed as safe). Fix forward or retry; no database action.                                                                                                                |
-| Deploy succeeds, health/manual checks fail            | Vercel _Instant Rollback_ to the `a5e960d` deployment, which still runs as `vo_app` (its environment is fixed at build). The 0020 schema stays (additive; `a5e960d` is compatible). Do not roll the database back unless data is wrong. |
-| Data found wrong after release                        | Restore the `pre-4d9m` branch / PITR (loses changes made since), after PMO decision.                                                                                                                                                    |
+| Situation                                             | Action                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration fails                                       | One transaction: nothing is applied. Production stays at 0018 and `a5e960d` keeps serving. Do not push. Investigate.                                                                                                                                                                  |
+| Migration succeeds, fingerprint differs unexpectedly  | Do not push. Hold the database (`a5e960d` stays compatible), report to PMO. If data must be restored, restore from the `pre-4d9m` branch / PITR.                                                                                                                                      |
+| Migration succeeds, deploy fails (build/Vercel error) | Production keeps serving `a5e960d` on the migrated schema (rehearsed as safe). Fix forward or retry; no database action.                                                                                                                                                              |
+| Deploy succeeds, health/manual checks fail            | **Superseded (Security B).** Do not roll back to `a5e960d`: its build-time environment holds the historical `neondb_owner` credential. Roll back only to a deployment built with `vo_runtime` ([`security-b.md`](security-b.md)). Do not roll the database back unless data is wrong. |
+| Data found wrong after release                        | Restore the `pre-4d9m` branch / PITR (loses changes made since), after PMO decision.                                                                                                                                                                                                  |
 
 ### Application rollback after the new release has been used
 

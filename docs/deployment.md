@@ -23,7 +23,9 @@ An unset mode is treated as `production`. An unknown value stops the server. Not
 **What the internal tier relaxes:**
 
 - the app may connect as the provider-managed role (Neon's `neondb_owner`). A table owner _could_ disable
-  triggers; the app never does, but the database no longer prevents it;
+  triggers; the app never does, but the database no longer prevents it. **Cardaxia's production does not use this
+  relaxation:** since 4D.9M it connects as the least-privilege `vo_runtime` role (see
+  [`release/security-b.md`](release/security-b.md));
 - issued PDFs may be stored in PostgreSQL instead of a private S3 bucket.
 
 The UI shows an "Internal pilot — no sensitive client data" badge in this tier.
@@ -34,7 +36,10 @@ The UI shows an "Internal pilot — no sensitive client data" badge in this tier
 
 1. **Import** the GitHub repository into Vercel (default Next.js settings; Node 24 comes from `package.json`).
 2. **Connect Neon** through the Vercel integration. It sets `DATABASE_URL` (pooled, `neondb_owner`) and
-   `DATABASE_URL_UNPOOLED`.
+   `DATABASE_URL_UNPOOLED`. **Not for Cardaxia's production project:** its Neon store is deliberately connected to
+   no Vercel project, because connecting it injects the owner `DATABASE_*` variables into Production and Preview.
+   Production uses a Production-only `DATABASE_URL` for `vo_runtime` instead (see
+   [`release/security-b.md`](release/security-b.md)).
 3. **Run migrations** once, from a developer machine, with the Neon owner connection. They are re-runnable and
    apply only what's missing:
    ```bash
@@ -116,13 +121,14 @@ non-commercial.
 
 ### Roles and secrets
 
-| Item                      | Where it lives                                                                                               |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Migration (owner) role    | Operator machine only (`MIGRATION_DATABASE_URL`). Owns the schema, tables and integrity functions.           |
-| Application role `vo_app` | Vercel `DATABASE_URL`. DML only: cannot alter or disable triggers, write audit rows, or edit issued reports. |
-| `VO_SESSION_SECRET`       | Vercel (Production). ≥ 32 random chars. Rotating it signs everyone out.                                      |
-| S3 key pair               | Vercel (Production). Scoped to the one bucket and prefix, Put and Get only.                                  |
-| Consultant passwords      | Typed at the `user:create` prompt. Stored only as scrypt hashes.                                             |
+| Item                   | Where it lives                                                                                                                                                                                |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Migration (owner) role | Operator machine only (`MIGRATION_DATABASE_URL`). Owns the schema, tables and integrity functions. Production: `neondb_owner`, supplied only at the hidden migration prompt; never in Vercel. |
+| Application role       | Vercel Production `DATABASE_URL` only. DML only: cannot alter or disable triggers, write audit rows, or edit issued reports. Production: `vo_runtime`.                                        |
+| Legacy role `vo_app`   | Production only: Neon-console-created, member of `neon_superuser`. Pending retirement; **must not be used by the runtime**.                                                                   |
+| `VO_SESSION_SECRET`    | Vercel (Production). ≥ 32 random chars. Rotating it signs everyone out.                                                                                                                       |
+| S3 key pair            | Vercel (Production). Scoped to the one bucket and prefix, Put and Get only.                                                                                                                   |
+| Consultant passwords   | Typed at the `user:create` prompt. Stored only as scrypt hashes.                                                                                                                              |
 
 The production tier refuses to start if any of the following is true:
 
@@ -145,16 +151,17 @@ Errors name the variable, never its value.
    pooled host.
 3. **Create the application role** as the owner:
    ```sql
-   CREATE ROLE vo_app LOGIN PASSWORD '<generated>';  -- run in the provider's SQL console
+   CREATE ROLE vo_runtime LOGIN PASSWORD '<generated>';  -- run as the owner over SQL, never via the Neon Console
    ```
-   The grants are applied by the migration step. Keep `vo_app` free of `CREATEROLE`, `BYPASSRLS` and superuser.
+   The grants are applied by the migration step. Keep the application role free of `CREATEROLE`, `BYPASSRLS` and
+   superuser.
    **Create it with SQL, never in the Neon Console, API or CLI.** Neon makes console-created roles members of
    `neon_superuser`, which brings CREATEROLE, BYPASSRLS and `pg_write_all_data` (overriding the REVOKEs). Verify with
    `npm run db:check-role`; the startup log must say `db-role=least-privilege`. (Production's runtime role is
    `vo_runtime`, created this way in 4D.9M.)
 4. **[Cardaxia] Set the production environment variables** (Vercel → Settings → Environment Variables,
    _Production_):
-   `DATABASE_URL` (the `vo_app` user on the pooled host), `VO_SESSION_SECRET`, `VO_APP_ORIGIN`,
+   `DATABASE_URL` (the application role on the pooled host), `VO_SESSION_SECRET`, `VO_APP_ORIGIN`,
    `VO_REPORT_STORAGE=s3`, `VO_S3_BUCKET`, `VO_S3_REGION`, `VO_S3_ACCESS_KEY_ID`, `VO_S3_SECRET_ACCESS_KEY`,
    `VO_PDF_RUNTIME=serverless`, `VO_DEPLOYMENT_MODE=production`, and optionally `VO_DB_POOL_MAX=5`, `VO_S3_PREFIX`, `VO_S3_ENDPOINT` (R2) and
    `VO_SESSION_TTL_HOURS`. Do **not** set `VO_DEV_USER_EMAIL`, `VO_AUTH_MODE=dev` or `MIGRATION_DATABASE_URL`.
@@ -162,13 +169,13 @@ Errors name the variable, never its value.
 6. **PDF runtime:** there's nothing to install. `VO_PDF_RUNTIME=serverless` is enough.
 7. **Run migrations** from an operator machine, with the owner URL:
    ```bash
-   MIGRATION_DATABASE_URL='<owner url>' VO_APP_DB_ROLE=vo_app npm run db:migrate
-   DATABASE_URL='<vo_app url>' npm run db:check-role     # must print ✓ … least-privilege
+   MIGRATION_DATABASE_URL='<owner url>' VO_APP_DB_ROLE=vo_runtime npm run db:migrate
+   DATABASE_URL='<application role url>' npm run db:check-role     # must print ✓ … least-privilege
    ```
 8. **Create the consultant accounts** (Rhys, John, Mike). The password is prompted and hidden; it is never an
    argument:
    ```bash
-   DATABASE_URL='<vo_app url>' npm run user:create -- --email rhys@cardaxia.ai --name "Rhys Davies"
+   DATABASE_URL='<application role url>' npm run user:create -- --email rhys@cardaxia.ai --name "Rhys Davies"
    ```
    Later: `npm run user:set-password -- --email …` and `npm run user:disable -- --email …`. Disabling revokes the
    account's sessions immediately.
@@ -187,7 +194,7 @@ Errors name the variable, never its value.
     checks this on every read.
 19. **Sign out.**
 20. **Verify protected access:** `/projects` redirects to sign-in, and the PDF URL redirects too.
-21. **Verify database integrity:** run `npm run db:check-role` (step 7). Optionally, as `vo_app`, confirm that
+21. **Verify database integrity:** run `npm run db:check-role` (step 7). Optionally, as the application role, confirm that
     `update report_issue set title = 'x'` fails with `permission denied`.
 
 Steps 10–20 are automated. Use test-only credentials, or a dedicated smoke account that you disable afterwards:
@@ -204,10 +211,14 @@ test". It is ordinary audited data.
 
 1. Review the release: CI must be green on the exact commit.
 2. **Migrate first** (step 7 command). Migrations so far are additive, so the running version keeps working on the
-   new schema. The command re-applies the `vo_app` grants for any new tables.
+   new schema. The command re-applies the application-role grants (`VO_APP_DB_ROLE`; production: `vo_runtime`) for
+   any new tables.
 3. Deploy the commit (push to `main` or promote in Vercel).
 4. Smoke: health, sign in, open a project, and `npm run smoke:deploy` for larger releases.
-5. **Rollback:** Vercel _Instant Rollback_ restores the previous build. The database is not rolled back:
+5. **Rollback:** Vercel _Instant Rollback_ restores a previous build **with the environment it was built with**, so
+   roll back only to a deployment built with the current least-privilege runtime role and compatible with the current
+   migration head. Production's safe targets and the deployments that must never be restored are listed in
+   [`release/security-b.md`](release/security-b.md). The database is not rolled back:
    migrations are forward-only, so rolling back code over an additive migration is safe. A destructive migration
    would need its own reviewed plan; none exists today. Issued reports and audit rows are never rewritten.
 
@@ -258,8 +269,9 @@ Protection for previews.
   - Enable the provider's managed backups with point-in-time recovery. Retention should be at least 14 days; 30 is
     better.
   - Document who can restore.
-  - Restore procedure: restore to a new database, re-create or re-grant `vo_app`, run `npm run db:check-role`,
-    then repoint `DATABASE_URL`.
+  - Restore procedure: restore to a new database or branch, re-create or re-grant the application role
+    (production: `vo_runtime`), run `npm run db:check-role`, then repoint `DATABASE_URL`. Production's recovery
+    branches are recorded in [`release/security-b.md`](release/security-b.md).
   - Test a restore before relying on it, then periodically.
 - **Internal tier:** issued PDFs are in PostgreSQL (`report_document`), so the database backups cover them.
 - **Object storage** holds the issued PDFs in the production tier.

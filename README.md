@@ -31,8 +31,8 @@ variable. Production fails closed on unsafe or incomplete security configuration
 
 | Variable                                    | Purpose                                                                                                  |
 | ------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                              | Application database (production: the least-privilege `vo_app` role)                                     |
-| `MIGRATION_DATABASE_URL`, `VO_APP_DB_ROLE`  | Migrations as the owner role, then re-grant the app role (operator machine only)                         |
+| `DATABASE_URL`                              | Application database (production: the least-privilege `vo_runtime` role)                                 |
+| `MIGRATION_DATABASE_URL`, `VO_APP_DB_ROLE`  | Migrations as the owner role, then re-grant the app role (`vo_runtime`; operator machine only)           |
 | `TEST_DATABASE_URL` / `E2E_DATABASE_URL`    | Test / Playwright databases — **reset every run**; names must end in `_test` / `_e2e`                    |
 | `VO_AUTH_MODE`                              | `password` (default; only mode in production) or `dev` (local convenience)                               |
 | `VO_DEV_USER_EMAIL` / `_NAME`               | Local development identity (implies `dev` mode outside production; refused in production)                |

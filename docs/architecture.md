@@ -603,6 +603,12 @@ Value Record → report read model (src/server/queries/reports.ts) → report mo
 
 ## Production database role
 
+Canonical production roles (Security B, 2026-10-04): **`vo_runtime`** — the least-privilege application runtime
+identity (Vercel Production `DATABASE_URL` only); **`neondb_owner`** — the administrative / migration identity
+(supplied only through the secure migration workflow, never in application runtime configuration); **`vo_app`** —
+legacy, Neon-console-created role pending retirement that MUST NOT be used by the runtime. Rollback policy, recovery
+branches and the Neon integration warning: `docs/release/security-b.md`.
+
 Migrations run as the owner role. The app connects as a non-owner role granted DML only
 (`src/server/db/role.ts`; re-granted after every migration when `VO_APP_DB_ROLE` is set). The audit functions are
 `SECURITY DEFINER`, so the app role has no direct write access to `audit_event`. It also has no UPDATE or DELETE
