@@ -1,6 +1,6 @@
 import { asc, count, eq, sql } from "drizzle-orm";
 
-import { deriveMobilisationStatus } from "@/domain/mobilisation";
+import { deriveMobilisationStatus, type MobilisationFacts } from "@/domain/mobilisation";
 import { INFORMATION_REQUEST_ITEM_STATUSES } from "@/domain/statuses";
 import { db, schema } from "@/server/db/client";
 
@@ -144,7 +144,7 @@ export async function getProjectOverview(projectId: string) {
   const goLive = keyDates.find((d) => d.kind === "go_live") ?? null;
   const inForce = timeline.find((t) => t.version.kind === "value_case" && t.version.status === "authorised") ?? null;
   const v1 = requalified;
-  const mobilisation = deriveMobilisationStatus({
+  const mobilisationFacts: MobilisationFacts = {
     everAuthorised,
     inForceVersionNumber: inForce?.version.versionNumber ?? null,
     hasValueBasis: Boolean(header.project.valueBasisDescription),
@@ -160,12 +160,14 @@ export async function getProjectOverview(projectId: string) {
     v1: v1
       ? {
           status: v1.version.status,
+          basedOnOriginal: Boolean(inherited && v1.version.basedOnVersionId === inherited.version.id),
           driverCount: v1.summary.driverCount,
           unqualified: v1.summary.qualification.unqualified,
           unevidenced: v1.summary.evidence.unevidenced,
         }
       : null,
-  });
+  };
+  const mobilisation = deriveMobilisationStatus(mobilisationFacts);
 
   return {
     header,
@@ -180,6 +182,7 @@ export async function getProjectOverview(projectId: string) {
     requalified,
     /** Derived Mobilisation status (4D.10C): one source for the Mobilisation page and the pre-V1 Overview. */
     mobilisation,
+    mobilisationFacts,
     /** The first Mobilisation request — the Day-1 Information Request, if one exists. */
     dayOneRequest: mobilisationRequests[0] ?? null,
     nextStep: mobilisation.next,
@@ -194,6 +197,7 @@ export async function getMobilisationStatus(projectId: string) {
   if (!o) return null;
   return {
     status: o.mobilisation,
+    facts: o.mobilisationFacts,
     dayOneRequest: o.dayOneRequest,
     allReferences: o.requests.map((r) => r.reference),
     originalBusinessCase: o.inherited

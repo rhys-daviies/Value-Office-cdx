@@ -1,5 +1,6 @@
 import { EVIDENCE_STATUSES, QUALIFICATION_STATUSES } from "@/domain/statuses";
-import { moneyChange } from "@/domain/value-case";
+import { proposalChecklist } from "@/domain/mobilisation";
+import { classifyDefinitionChange, moneyChange, type DefinitionChange } from "@/domain/value-case";
 import { recordEvidenceAction } from "@/server/actions/evidence";
 import {
   authoriseInitialVersionAction,
@@ -11,6 +12,7 @@ import { getCurrentActor } from "@/server/auth/actor";
 import { nextEvidenceCode } from "@/server/queries/evidence";
 import { listEvidenceOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
+import { getMobilisationStatus } from "@/server/queries/projects";
 import { getVersionTrajectoryAuthoring } from "@/server/queries/trajectory";
 import { getRequalificationWorkspace, type ComparisonRow } from "@/server/queries/value-case";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
@@ -30,12 +32,18 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default async function RequalificationPage({ params }: PageProps<"/projects/[projectId]/requalification">) {
   const { projectId } = await params;
   const { project, valueCase } = await requireProject(projectId);
-  const [ws, stakeholders, evidence, actor] = await Promise.all([
+  const [ws, stakeholders, evidence, actor, mobilisation] = await Promise.all([
     getRequalificationWorkspace(projectId),
     listStakeholders(projectId),
     listEvidenceOptions(projectId),
     getCurrentActor().catch(() => null),
+    getMobilisationStatus(projectId).then((m) => m!),
   ]);
+  // One derivation for the facts shared with Mobilisation (Value Basis, VCO, drivers, counts) — 4D.10D.
+  const checklist = proposalChecklist(mobilisation.facts);
+  const blocked = checklist.find((c) => c.blocking && !c.ok) ?? null;
+  const obc = ws.inheritedVersion;
+  const v1FromOriginal = Boolean(obc && ws.requalifiedVersion?.basedOnVersionId === obc.id);
   const currency = project.currency;
   const v1 = ws.requalifiedVersion;
   const trajectory = v1 ? await getVersionTrajectoryAuthoring(projectId, v1.id) : null;
@@ -153,37 +161,54 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
         </div>
       )}
 
-      {/* ---- No V1 yet ------------------------------------------------------------ */}
+      {/* ---- No V1 yet: entry into Value Case Definition (4D.10D) ------------------- */}
       {!v1 && (
-        <Section title="Create the draft Value Case (V1)">
-          {!ws.inheritedVersion && (
-            <Notice tone="warning">
-              No Original Business Case has been captured. You can start V1 without it, but the comparison needs it —{" "}
-              <TextLink href={`${base}/value-case`}>capture the Original Business Case first</TextLink>.
-            </Notice>
-          )}
-          {ws.inheritedVersion?.status === "draft" && (
-            <Notice tone="warning">
-              The Original Business Case is still being captured.{" "}
-              <TextLink href={`${base}/value-case/v/0`}>Record the Original Business Case</TextLink> to base V1 on it
-              and carry its drivers forward.
-            </Notice>
-          )}
+        <Section
+          title="Start Value Case Definition"
+          description="V1 will become Cardaxia's first governed Value Case: assessed, adjusted and qualified here, then proposed as a whole for the Value Case Owner's authorisation."
+        >
+          <div data-testid="definition-entry" data-baseline={obc?.status ?? "none"}>
+            {obc?.status === "recorded" && (
+              <Notice tone="info" title="Starting from the recorded Original Business Case">
+                {ws.inheritedDrivers.length > 0 ? (
+                  <>
+                    Its {ws.inheritedDrivers.length} {ws.inheritedDrivers.length === 1 ? "driver" : "drivers"} (
+                    {ws.inheritedDrivers.map((d) => d.code).join(", ")}) will be copied into the draft V1 as the
+                    starting point, keeping the same Value Drivers. You then assess, adjust and add to them. The
+                    Original Business Case itself is never changed.
+                  </>
+                ) : (
+                  <>
+                    It records a headline value only, so V1 starts with no drivers; the headline remains the comparison
+                    reference. The Original Business Case itself is never changed.
+                  </>
+                )}
+              </Notice>
+            )}
+            {obc === null && (
+              <Notice tone="warning" title="No Original Business Case baseline has been recorded">
+                You can start V1 without one, but there will be no Original Business Case to compare against.{" "}
+                <TextLink href={`${base}/value-case`}>Capture the Original Business Case first</TextLink> if one exists
+                — its drivers then become V1&apos;s starting point.
+              </Notice>
+            )}
+            {obc?.status === "draft" && (
+              <Notice tone="warning" title="The Original Business Case is still being captured">
+                Record it first to use it as V1&apos;s starting point:{" "}
+                <TextLink href={`${base}/value-case/v/0`}>finish and record the Original Business Case</TextLink>. If
+                you create V1 now, it starts empty and the Original Business Case drivers are not copied into it.
+              </Notice>
+            )}
+          </div>
           <ActionForm action={createDraftVersionAction} testId="create-v1-form">
             <Hidden name="projectId" value={projectId} />
-            {ws.inheritedVersion?.status === "recorded" && (
-              <Hidden name="basedOnVersionId" value={ws.inheritedVersion.id} />
-            )}
+            {obc?.status === "recorded" && <Hidden name="basedOnVersionId" value={obc.id} />}
             <div className="space-y-3">
               <TextField name="title" label="Title" required defaultValue="Value Case" />
               <TextArea name="summary" label="Summary" rows={2} />
-              {ws.inheritedVersion?.status === "recorded" && (
-                <p className="text-xs text-slate-500">
-                  Based on the Original Business Case. Its drivers ({ws.inheritedDrivers.length}) are copied into the
-                  draft for definition; the Original Business Case itself is never changed.
-                </p>
-              )}
-              <SubmitButton>Create draft V1</SubmitButton>
+              <SubmitButton>
+                {obc?.status === "recorded" ? "Create draft V1 from the Original Business Case" : "Create draft V1"}
+              </SubmitButton>
             </div>
           </ActionForm>
         </Section>
@@ -192,18 +217,32 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
       {/* ---- Comparison ----------------------------------------------------------- */}
       {v1 && (
         <Section
-          title="Original Business Case vs Value Case (V1)"
-          description="Per Value Driver. Drivers are matched by their stable code across versions."
+          title={`Original Business Case vs ${v1.status === "authorised" ? "Authorised" : v1.status === "superseded" ? "Superseded" : "Proposed"} Value Case V1`}
+          description="Per Value Driver, matched by the same Value Driver across the two. Unchanged, adjusted, new and not-carried-forward drivers are labelled; nothing has to reconcile."
         >
+          {obc && !v1FromOriginal && (
+            <Notice tone="warning" title="V1 was not created from the Original Business Case">
+              V1 was created before the Original Business Case was recorded, so none of its drivers were copied from it.
+              Drivers are compared only where the Original Business Case records a value against the same Value Driver.
+            </Notice>
+          )}
+          {!obc && (
+            <p className="mb-2 text-sm text-slate-600" data-testid="comparison-no-baseline">
+              No Original Business Case baseline has been recorded, so every driver is new in V1.
+            </p>
+          )}
           {ws.comparison.length === 0 ? (
             <Empty>No Value Drivers yet.</Empty>
           ) : (
-            <ComparisonTable
-              rows={ws.comparison}
-              currency={currency}
-              inheritedTotal={ws.inheritedTotal}
-              v1Total={v1Total}
-            />
+            <>
+              <DefinitionCounts rows={ws.comparison} />
+              <ComparisonTable
+                rows={ws.comparison}
+                currency={currency}
+                inheritedTotal={ws.inheritedTotal}
+                v1Total={v1Total}
+              />
+            </>
           )}
         </Section>
       )}
@@ -214,7 +253,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           title={`V${v1.versionNumber} Value Drivers`}
           description={
             v1.status === "draft"
-              ? "Expand a driver to define it. Incomplete qualification is visible but does not block proposal."
+              ? "Select Edit on a driver to assess, adjust or qualify it; add drivers for value the Original Business Case does not represent. Incomplete qualification is visible but does not block proposal."
               : "Read-only."
           }
         >
@@ -256,28 +295,23 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
 
       {/* ---- State transitions ---------------------------------------------------- */}
       {v1?.status === "draft" && (
-        <Section title="Propose V1 for VCO authorisation" tone="muted">
+        <Section title="Propose Value Case V1" tone="muted">
+          <p className="mb-3 text-sm text-slate-800" data-testid="propose-explanation">
+            This submits the <strong>complete proposed Value Case</strong>, including{" "}
+            {s.driverCount === 1 ? "its one driver" : `all ${s.driverCount} of its drivers`}, for the Value Case
+            Owner&apos;s authorisation. Drivers are not submitted individually — every driver above is part of this
+            proposal.
+          </p>
           <ul className="mb-3 space-y-1 text-sm" data-testid="propose-checklist">
-            <Check
-              ok={Boolean(project.valueBasisDescription)}
-              label="Value Basis defined"
-              required
-              fix={`${base}/setup#value-basis`}
-            />
-            <Check ok={s.driverCount > 0} label="At least one Value Driver" required />
-            <Check
-              ok={Boolean(vco)}
-              label="Value Case Owner nominated (needed to record authorisation)"
-              fix={`${base}/setup#stakeholders`}
-            />
-            <Check
-              ok={s.qualification.unqualified === 0}
-              label={`Unqualified drivers: ${s.qualification.unqualified} (visible, not blocking)`}
-            />
-            <Check
-              ok={s.evidence.unevidenced === 0}
-              label={`Unevidenced drivers: ${s.evidence.unevidenced} (visible, not blocking)`}
-            />
+            {checklist.map((c) => (
+              <Check
+                key={c.key}
+                ok={c.ok}
+                label={c.label}
+                required={c.blocking}
+                fix={c.fix ? `${base}/${c.fix}` : undefined}
+              />
+            ))}
           </ul>
           <p className="mb-3 text-sm text-slate-600">
             Proposing locks the draft and locks the project&apos;s currency and Value Basis. You can return a proposed
@@ -285,21 +319,12 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           </p>
           <ActionForm
             action={proposeVersionAction}
-            confirm="Propose V1 for VCO authorisation? The draft will be locked."
+            confirm={`Propose Value Case V1 — the complete Value Case with ${s.driverCount} ${s.driverCount === 1 ? "driver" : "drivers"} — for VCO authorisation? The draft will be locked.`}
           >
             <Hidden name="projectId" value={projectId} />
             <Hidden name="versionId" value={v1.id} />
-            <SubmitButton
-              disabled={!project.valueBasisDescription || s.driverCount === 0}
-              title={
-                !project.valueBasisDescription
-                  ? "Define the Value Basis first"
-                  : s.driverCount === 0
-                    ? "Add a Value Driver first"
-                    : undefined
-              }
-            >
-              Propose V1
+            <SubmitButton disabled={blocked !== null} title={blocked ? `${blocked.label} first` : undefined}>
+              Propose Value Case V1
             </SubmitButton>
           </ActionForm>
         </Section>
@@ -522,12 +547,16 @@ function ComparisonTable({
           <th>Qualification</th>
           <th>Evidence</th>
           <th>AVO</th>
-          <th />
+          <th>Definition</th>
         </tr>
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr key={r.driverId} data-testid="comparison-row">
+          <tr
+            key={r.driverId}
+            data-testid="comparison-row"
+            data-change={classifyDefinitionChange(r.inherited, r.requalified)}
+          >
             <td className="font-mono">{r.code}</td>
             <td className="font-medium">{r.name}</td>
             <td className="text-right whitespace-nowrap text-slate-500">
@@ -545,8 +574,7 @@ function ComparisonTable({
             <td>{r.requalified && <EvidenceBadge status={r.requalified.evidenceStatus} />}</td>
             <td>{r.requalified ? (r.requalified.avoName ?? <span className="text-amber-700">—</span>) : ""}</td>
             <td>
-              {!r.inherited && <PlainBadge tone="sky">New in V1</PlainBadge>}
-              {!r.requalified && <PlainBadge tone="red">Not carried into V1</PlainBadge>}
+              <DefinitionBadge change={classifyDefinitionChange(r.inherited, r.requalified)} />
             </td>
           </tr>
         ))}
@@ -564,5 +592,38 @@ function ComparisonTable({
         </tr>
       </tfoot>
     </Table>
+  );
+}
+
+/** Consultant-readable relation of a proposed V1 driver to the Original Business Case (4D.10D). */
+const DEFINITION_LABELS: Record<DefinitionChange, { label: string; tone: "slate" | "amber" | "sky" | "red" }> = {
+  unchanged: { label: "Carried forward · unchanged", tone: "slate" },
+  adjusted: { label: "Carried forward · adjusted", tone: "amber" },
+  new: { label: "New in V1", tone: "sky" },
+  not_carried_forward: { label: "Not carried into V1", tone: "red" },
+};
+
+function DefinitionBadge({ change }: { change: DefinitionChange }) {
+  const { label, tone } = DEFINITION_LABELS[change];
+  return <PlainBadge tone={tone}>{label}</PlainBadge>;
+}
+
+function DefinitionCounts({ rows }: { rows: ComparisonRow[] }) {
+  const counts = rows.reduce<Record<DefinitionChange, number>>(
+    (acc, r) => ({
+      ...acc,
+      [classifyDefinitionChange(r.inherited, r.requalified)]:
+        acc[classifyDefinitionChange(r.inherited, r.requalified)] + 1,
+    }),
+    { unchanged: 0, adjusted: 0, new: 0, not_carried_forward: 0 },
+  );
+  return (
+    <p className="mb-2 flex flex-wrap gap-2 text-sm" data-testid="definition-counts">
+      {(Object.keys(DEFINITION_LABELS) as DefinitionChange[]).map((k) => (
+        <span key={k} className="inline-flex items-center gap-1">
+          <DefinitionBadge change={k} /> {counts[k]}
+        </span>
+      ))}
+    </p>
   );
 }

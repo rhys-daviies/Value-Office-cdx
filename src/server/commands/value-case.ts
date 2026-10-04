@@ -1,4 +1,4 @@
-import { and, eq, inArray, max, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, max, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
@@ -256,6 +256,57 @@ export const addValueDriver = defineCommand(
       })
       .returning();
     return { driver: driver!, driverVersion: driverVersion! };
+  },
+);
+
+/**
+ * Late Original Business Case (4D.10D): records the Original Business Case's figure for a Value Driver that already
+ * exists in this Value Case (e.g. defined in V1 before the Original Business Case was captured), keeping the same
+ * stable identity so the two can be compared. Only into a DRAFT Original Business Case (V0); no identity is created,
+ * no other version is touched, and a recorded Original Business Case stays immutable (database-checked as well).
+ * The new row carries the driver's latest name; everything else is entered as the Original Business Case stated it.
+ */
+export const addExistingDriverToOriginal = defineCommand(
+  COMMANDS.addExistingDriverToOriginal,
+  z.object({
+    versionId: uuid,
+    valueDriverId: uuid,
+    financialValue: moneyString.optional(),
+    sortOrder: z.number().int().optional(),
+  }),
+  async ({ tx }, input) => {
+    const version = await getVersion(tx, input.versionId);
+    if (version.kind !== "inherited_business_case") {
+      throw new DomainError(
+        "VO_INVALID_TRANSITION",
+        "Existing drivers are added this way only to the Original Business Case",
+      );
+    }
+    requireDraft(version);
+    const [driver] = await tx.select().from(schema.valueDriver).where(eq(schema.valueDriver.id, input.valueDriverId));
+    if (driver?.valueCaseId !== version.valueCaseId) throw new DomainError("VO_NOT_FOUND", "Value Driver not found");
+    const rows = await tx
+      .select({ versionId: schema.valueDriverVersion.valueCaseVersionId, name: schema.valueDriverVersion.name })
+      .from(schema.valueDriverVersion)
+      .innerJoin(schema.valueCaseVersion, eq(schema.valueCaseVersion.id, schema.valueDriverVersion.valueCaseVersionId))
+      .where(eq(schema.valueDriverVersion.valueDriverId, driver.id))
+      .orderBy(asc(schema.valueCaseVersion.versionNumber));
+    if (rows.some((r) => r.versionId === version.id)) {
+      throw new DomainError("VO_DRIVER_ALREADY_INCLUDED", `${driver.code} is already in the Original Business Case`);
+    }
+    const [driverVersion] = await tx
+      .insert(schema.valueDriverVersion)
+      .values({
+        valueCaseVersionId: version.id,
+        valueDriverId: driver.id,
+        valueCaseId: version.valueCaseId,
+        projectId: version.projectId,
+        name: rows.at(-1)?.name ?? driver.code,
+        financialValue: input.financialValue,
+        sortOrder: input.sortOrder,
+      })
+      .returning();
+    return driverVersion!;
   },
 );
 

@@ -19,7 +19,10 @@ export type LivingStatus = "in_value_case" | "emerging";
  * Display status (Phase 4D.4, PMO): a driver that was in an earlier authorised version but not in the
  * one in force is "Outside Current Value Case", not "Emerging". Still derived; nothing is stored.
  */
-export type DriverPresentation = "in_value_case" | "outside_current" | "emerging";
+export type DriverPresentation = "in_value_case" | "outside_current" | "emerging" | "original_only" | "in_definition";
+// 4D.10D: before any authorisation, a driver recorded only in the Original Business Case is "original_only" and one in
+// the draft or proposed V1 is "in_definition" — neither is an Emerging driver. Emerging stays what it was: a living
+// driver that has never been in an authorised version (raised after authorisation, or pending in a Value Change).
 
 type Working = {
   name: string;
@@ -115,11 +118,17 @@ export async function getDriverRegister(projectId: string) {
     const forecast = authorisedRow ? (forecastRows.find((r) => r.valueDriverId === driver.id) ?? null) : null;
     const status: LivingStatus = authorisedRow ? "in_value_case" : "emerging";
     const everAuthorised = own.some((v) => v.version.status === "superseded" || v.version.status === "authorised");
+    const inOriginal = own.some((v) => v.version.kind === "inherited_business_case");
+    const inValueCase = own.filter((v) => v.version.kind === "value_case");
     const presentation: DriverPresentation = authorisedRow
       ? "in_value_case"
       : everAuthorised
         ? "outside_current"
-        : "emerging";
+        : !inForce && inValueCase.some((v) => v.version.status === "draft" || v.version.status === "proposed")
+          ? "in_definition"
+          : inOriginal && inValueCase.length === 0
+            ? "original_only"
+            : "emerging";
     return {
       presentation,
       driver,
@@ -152,6 +161,11 @@ export async function getDriverRegister(projectId: string) {
       workingEvidenceCount: evidenceLinks.filter((l) => l.valueDriverId === driver.id).length,
       /** Draft/proposed Value Change whose proposed version contains this identity (context only). */
       pendingChange: pending.find((p) => p.valueDriverId === driver.id) ?? null,
+      /** Pre-authorisation context for the display status (4D.10D). */
+      definition: {
+        v1Exists: versions.some((v) => v.version.kind === "value_case"),
+        v1Status: inValueCase.at(-1)?.version.status ?? null,
+      },
     };
   });
   return { entries, inForce, stakeholders, authorisedTotal: summary.authorisedTotal };

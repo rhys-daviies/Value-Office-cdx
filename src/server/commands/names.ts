@@ -26,6 +26,7 @@ export const COMMANDS = {
   createDraftVersion: "valueCase.createDraftVersion",
   updateVersionDetails: "valueCase.updateVersionDetails",
   addValueDriver: "valueCase.addValueDriver",
+  addExistingDriverToOriginal: "valueCase.addExistingDriverToOriginal",
   updateDriverVersion: "valueCase.updateDriverVersion",
   addAssumption: "valueCase.addAssumption",
   updateAssumption: "valueCase.updateAssumption",

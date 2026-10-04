@@ -11,7 +11,7 @@ export const WORKING_DRIVER_LABEL = "Working Value Driver — changes here do no
 export function LivingStatusBadge({
   entry,
 }: {
-  entry: Pick<DriverEntry, "presentation" | "authorised" | "formerlyIn" | "pendingChange">;
+  entry: Pick<DriverEntry, "presentation" | "authorised" | "formerlyIn" | "pendingChange" | "definition">;
 }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-1" data-testid="driver-status">
@@ -20,6 +20,14 @@ export function LivingStatusBadge({
       ) : entry.presentation === "outside_current" ? (
         <PlainBadge tone="slate">
           Outside Current Value Case{entry.formerlyIn !== null ? ` (last in V${entry.formerlyIn})` : ""}
+        </PlainBadge>
+      ) : entry.presentation === "in_definition" ? (
+        <PlainBadge tone={entry.definition.v1Status === "proposed" ? "sky" : "amber"}>
+          In {entry.definition.v1Status === "proposed" ? "proposed" : "draft"} Value Case V1
+        </PlainBadge>
+      ) : entry.presentation === "original_only" ? (
+        <PlainBadge tone="slate">
+          {entry.definition.v1Exists ? "Original Business Case only · not carried into V1" : "Original Business Case"}
         </PlainBadge>
       ) : (
         <PlainBadge tone="violet">Emerging</PlainBadge>

@@ -68,5 +68,35 @@ test("Mobilisation guides a new engagement without gating it", async ({ page }) 
 
   // Nothing is gated: Value Case Definition is open although Mobilisation is incomplete.
   await tab(page, "Value Case Definition").click();
-  await expect(page.getByTestId("create-v1-form")).toBeVisible();
+  await expect(page.getByTestId("definition-entry")).toHaveAttribute("data-baseline", "none");
+  await expect(page.getByTestId("definition-entry")).toContainText(
+    "No Original Business Case baseline has been recorded",
+  );
+
+  // 4D.10D late baseline: V1 first, then the Original Business Case — never presented as V1's starting point.
+  await page.getByTestId("create-v1-form").getByRole("button", { name: "Create draft V1" }).click();
+  await page.getByTestId("add-driver").locator("summary").click();
+  const addDriver = page.getByTestId("add-driver-form");
+  await addDriver.getByLabel("Name").fill("Procurement savings");
+  await addDriver.getByRole("textbox", { name: /^Financial value/ }).fill("4m");
+  await addDriver.getByRole("button", { name: "Add driver" }).click();
+  await expect(page.getByTestId("comparison-no-baseline")).toBeVisible();
+  await expect(page.getByTestId("comparison-row")).toHaveAttribute("data-change", "new");
+
+  await tab(page, "Value Case").click();
+  const v0 = page.getByTestId("create-v0-form");
+  await v0.getByLabel("Stated total value").fill("5m");
+  await v0.getByRole("button", { name: "Start capturing the Original Business Case" }).click();
+  await page.getByRole("link", { name: "Open Original Business Case" }).click();
+  await expect(page.getByText("V1 was not created from this Original Business Case")).toBeVisible();
+  await expect(page.getByText(/it is a comparison reference, not V1's starting point/)).toBeVisible();
+  const existing = page.getByTestId("obc-existing-driver-form");
+  await existing.getByLabel("Existing V1 Value Driver").selectOption({ label: "VD-01 Procurement savings" });
+  await existing.getByRole("textbox", { name: /Original Business Case value/ }).fill("5m");
+  await existing.getByRole("button", { name: "Add to the Original Business Case" }).click();
+  await expect(page.getByTestId("driver-VD-01")).toContainText("Procurement savings");
+
+  await tab(page, "Value Case Definition").click();
+  await expect(page.getByText("V1 was not created from the Original Business Case")).toBeVisible();
+  await expect(page.getByTestId("comparison-row")).toHaveAttribute("data-change", "adjusted");
 });

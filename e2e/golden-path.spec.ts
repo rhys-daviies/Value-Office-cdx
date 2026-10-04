@@ -73,8 +73,15 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await v0Driver.getByLabel("Name").fill("Service Productivity");
   await v0Driver.getByRole("textbox", { name: /^Financial value/ }).fill("6,000,000");
   await submit(v0Driver, "Add driver", "Value Driver VD-01 added");
+  // 4D.10D: the total and the drivers belong together; an explicit Edit; a summary before recording.
+  await expect(page.getByTestId("obc-stated-total")).toHaveText("NZ$18.0m");
+  await expect(page.getByTestId("obc-driver-summary")).toHaveText("1 driver");
+  await expect(page.getByTestId("driver-edit-VD-01").getByText("Edit VD-01")).toBeVisible();
+  await expect(page.getByTestId("obc-record-summary")).toContainText("VD-01 Service Productivity");
   await page.getByRole("button", { name: "Record the Original Business Case" }).click();
   await expect(page.getByText("Recorded — read-only")).toBeVisible();
+  await expect(page.getByTestId("driver-edit-VD-01")).toHaveCount(0); // no edit path once recorded
+  await expect(page.getByTestId("obc-continue").getByRole("link")).toHaveText("Continue to Value Case Definition");
 
   // ---- Information Request ---------------------------------------------------------
   await tab(page, "Information Requests").click();
@@ -108,13 +115,24 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
 
   // ---- Value Case Definition: draft V1 ------------------------------------------------------
   await tab(page, "Value Case Definition").click();
-  await page.getByTestId("create-v1-form").getByRole("button", { name: "Create draft V1" }).click();
+  await expect(page.getByTestId("definition-entry")).toContainText("1 driver (VD-01) will be copied into the draft V1");
+  await page
+    .getByTestId("create-v1-form")
+    .getByRole("button", { name: "Create draft V1 from the Original Business Case" })
+    .click();
   await expect(page.getByTestId("requal-state")).toContainText("Draft Value Case (V1) — editable");
-  await expect(page.getByTestId("comparison-row")).toHaveCount(1); // VD-01 carried from V0
+  await expect(page.getByTestId("comparison-row")).toHaveCount(1); // VD-01 carried from the Original Business Case
+  await expect(page.getByTestId("comparison-row")).toHaveAttribute("data-change", "unchanged");
 
-  // Re-qualify VD-01
+  // Pre-V1 drivers are explained on the Value Drivers utility page.
+  await tab(page, "Value Drivers").click();
+  await expect(page.getByTestId("drivers-pre-v1-guidance")).toContainText("Original Business Case drivers");
+  await expect(page.getByTestId("driver-row-VD-01").getByTestId("driver-status")).toHaveText("In draft Value Case V1");
+  await tab(page, "Value Case Definition").click();
+
+  // Define VD-01 via its explicit Edit affordance
   const vd01 = page.getByTestId("driver-VD-01");
-  await open(vd01);
+  await page.getByTestId("driver-edit-VD-01").click();
   const f = page.getByTestId("driver-form-VD-01");
   await f.getByLabel("Metric", { exact: true }).fill("effort units/case");
   await f.getByLabel("Baseline").fill("12.0");
@@ -156,9 +174,16 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await expect(page.getByTestId("requal-v1-total").locator("..")).toContainText("Non-financial");
   await expect(page.getByTestId("count-partially_qualified")).toContainText("1");
   await expect(page.getByTestId("count-unqualified")).toContainText("2");
+  const change = (code: string) => page.getByTestId("comparison-row").filter({ hasText: code });
+  await expect(change("VD-01")).toHaveAttribute("data-change", "adjusted");
+  await expect(change("VD-01")).toContainText("Carried forward · adjusted");
+  await expect(change("VD-02")).toContainText("New in V1");
 
-  // ---- Propose V1 -------------------------------------------------------------------
-  await page.getByRole("button", { name: "Propose V1" }).click();
+  // ---- Propose V1 (the version as a whole) -------------------------------------------------
+  await expect(page.getByTestId("propose-explanation")).toContainText(
+    "This submits the complete proposed Value Case, including all 3 of its drivers",
+  );
+  await page.getByRole("button", { name: "Propose Value Case V1" }).click();
   await expect(page.getByTestId("requal-state")).toContainText("Proposed Value Case (V1) — locked");
   await expect(page.getByRole("button", { name: "Save driver" })).toHaveCount(0);
 
@@ -177,7 +202,9 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
 
   // ---- Authorised V1 ------------------------------------------------------------------
   await expect(page.getByTestId("requal-state")).toContainText("Authorised Value Case V1 — read-only");
-  await expect(page.getByRole("button", { name: /Save driver|Add driver|Propose V1|Return to draft/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Save driver|Add driver|Propose Value Case V1|Return to draft/ }),
+  ).toHaveCount(0);
 
   await tab(page, "Value Case").click();
   await expect(page.getByTestId("timeline-v1")).toContainText("Authorised Value Case V1");

@@ -21,6 +21,8 @@ export type MobilisationFacts = {
   originalBusinessCase: "draft" | "recorded" | null;
   v1: {
     status: string;
+    /** V1 was created from the recorded Original Business Case (its drivers were copied). */
+    basedOnOriginal: boolean;
     driverCount: number;
     unqualified: number;
     unevidenced: number;
@@ -143,11 +145,19 @@ export function mobilisationItems(f: MobilisationFacts): MobilisationItem[] {
       requirement: "recommended",
       done: f.originalBusinessCase === "recorded",
       detail:
-        f.originalBusinessCase === "recorded"
-          ? "Recorded — the starting point for Value Case Definition"
-          : f.originalBusinessCase === "draft"
-            ? "Being captured — record it to make it the starting point for Value Case Definition"
-            : "Not captured — the existing business case is the starting point for Value Case Definition",
+        // 4D.10D: once V1 exists without having been created from it, the Original Business Case is a comparison
+        // reference only — never claimed as V1's starting point.
+        v1 && !v1.basedOnOriginal
+          ? f.originalBusinessCase === "recorded"
+            ? "Recorded after V1 was created — a comparison reference; V1 was not copied from it"
+            : f.originalBusinessCase === "draft"
+              ? "Being captured — V1 already exists, so it will be a comparison reference, not V1's starting point"
+              : "Not captured — V1 already exists, so it would be a comparison reference, not V1's starting point"
+          : f.originalBusinessCase === "recorded"
+            ? "Recorded — the starting point for Value Case Definition"
+            : f.originalBusinessCase === "draft"
+              ? "Being captured — record it to make it the starting point for Value Case Definition"
+              : "Not captured — the existing business case is the starting point for Value Case Definition",
       action:
         f.originalBusinessCase === "draft"
           ? { label: "Finish and record the Original Business Case", href: "value-case/v/0" }
@@ -221,8 +231,52 @@ export function deriveMobilisationStatus(f: MobilisationFacts): MobilisationStat
   const outstanding = items.filter((i) => !i.done);
   const open = (key: MobilisationItem["key"]) => outstanding.find((i) => i.key === key);
   const proposed = f.v1?.status === "proposed";
+  // Once V1 exists the Original Business Case can no longer be its starting point: still listed, never pushed.
+  const journey = f.v1 ? JOURNEY.filter((k) => k !== "original-business-case") : JOURNEY;
   const nextItem = proposed
     ? (open("vco") ?? open("v1-authorised"))
-    : JOURNEY.map(open).find((i): i is MobilisationItem => i !== undefined);
+    : journey.map(open).find((i): i is MobilisationItem => i !== undefined);
   return { stage: "mobilising", completed, outstanding, next: nextItem?.action ?? null };
+}
+
+/**
+ * The V1 proposal checklist on Value Case Definition (4D.10D), built from the same items as the Mobilisation status so
+ * the shared facts (Value Basis, VCO, driver existence and counts) are derived once. "blocking" marks only what the
+ * domain refuses at proposal (a Value Basis and at least one driver); the VCO is needed later, to record
+ * authorisation; qualification and evidence gaps are visible and never block.
+ */
+export type ProposalCheck = { key: string; ok: boolean; label: string; blocking: boolean; fix?: string };
+
+export function proposalChecklist(f: MobilisationFacts): ProposalCheck[] {
+  const item = (key: MobilisationItem["key"]) => mobilisationItems(f).find((i) => i.key === key)!;
+  const v1 = f.v1;
+  return [
+    {
+      key: "value-basis",
+      ok: item("value-basis").done,
+      label: "Value Basis defined",
+      blocking: true,
+      fix: "setup#value-basis",
+    },
+    { key: "v1-drivers", ok: item("v1-drivers").done, label: "At least one Value Driver", blocking: true },
+    {
+      key: "vco",
+      ok: item("vco").done,
+      label: "Value Case Owner nominated (needed to record authorisation)",
+      blocking: false,
+      fix: "setup#stakeholders",
+    },
+    {
+      key: "unqualified",
+      ok: (v1?.unqualified ?? 0) === 0,
+      label: `Unqualified drivers: ${v1?.unqualified ?? 0} (visible, not blocking)`,
+      blocking: false,
+    },
+    {
+      key: "unevidenced",
+      ok: (v1?.unevidenced ?? 0) === 0,
+      label: `Unevidenced drivers: ${v1?.unevidenced ?? 0} (visible, not blocking)`,
+      blocking: false,
+    },
+  ];
 }

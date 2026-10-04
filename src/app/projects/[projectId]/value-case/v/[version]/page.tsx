@@ -1,11 +1,15 @@
 import { notFound } from "next/navigation";
 
 import { versionAuthority } from "@/domain/value-case";
-import { recordInheritedBusinessCaseAction, updateVersionDetailsAction } from "@/server/actions/value-case";
+import {
+  addExistingDriverToOriginalAction,
+  recordInheritedBusinessCaseAction,
+  updateVersionDetailsAction,
+} from "@/server/actions/value-case";
 import { listEvidenceOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getVersionTrajectoryAuthoring } from "@/server/queries/trajectory";
-import { getVersionDetail, nextCode } from "@/server/queries/value-case";
+import { getRequalificationWorkspace, getVersionDetail } from "@/server/queries/value-case";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import {
   EvidenceBadge,
@@ -14,9 +18,17 @@ import {
   QualificationBadge,
   VersionBadge,
 } from "@/ui/components/badges";
-import { Hidden, MoneyField, TextArea, TextField } from "@/ui/components/fields";
-import { Empty, KeyValues, Notice, Section, Table, TextLink } from "@/ui/components/layout";
-import { formatDate, formatDateTime, formatMetric, formatMoneyShort, formatPeriod, moneyInputValue } from "@/ui/format";
+import { FormGrid, Hidden, MoneyField, SelectField, TextArea, TextField } from "@/ui/components/fields";
+import { ButtonLink, Empty, KeyValues, Notice, Section, Table, TextLink } from "@/ui/components/layout";
+import {
+  formatDate,
+  formatDateTime,
+  formatMetric,
+  formatMoney,
+  formatMoneyShort,
+  formatPeriod,
+  moneyInputValue,
+} from "@/ui/format";
 import { requireProject } from "@/ui/require";
 import { VersionTrajectorySection } from "@/ui/trajectory/milestones";
 import { AddDriverForm, DriverEditor, DriverReadOnly, DriverValue } from "@/ui/value-case/drivers";
@@ -41,6 +53,15 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
       : null;
   const base = `/projects/${projectId}`;
   const trajectory = isV0 ? null : await getVersionTrajectoryAuthoring(projectId, version.id);
+
+  // Original Business Case context (4D.10D): whether a V1 already exists, and whether it was created from this case.
+  const ws = isV0 ? await getRequalificationWorkspace(projectId) : null;
+  const v1 = ws?.requalifiedVersion ?? null;
+  const v1FromOriginal = Boolean(v1 && v1.basedOnVersionId === version.id);
+  const lateBaseline = Boolean(isV0 && v1 && !v1FromOriginal);
+  const v0DriverIds = new Set(drivers.map((d) => d.valueDriverId));
+  const existingForLate = (ws?.requalifiedDrivers ?? []).filter((d) => !v0DriverIds.has(d.valueDriverId));
+  const driverTotal = summary.financialCount > 0 ? summary.financialTotal : null;
 
   const ctx = editableV0
     ? {
@@ -89,7 +110,15 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
       )}
       {version.status === "recorded" && (
         <Notice tone="locked" title="Recorded — read-only">
-          The Original Business Case is preserved exactly as captured.
+          The Original Business Case is preserved exactly as captured. It is the recorded historical reference and
+          cannot be edited.
+          <span className="mt-2 block" data-testid="obc-continue">
+            {v1 ? (
+              <TextLink href={`${base}/requalification`}>Open Value Case Definition</TextLink>
+            ) : (
+              <ButtonLink href={`${base}/requalification`}>Continue to Value Case Definition</ButtonLink>
+            )}
+          </span>
         </Notice>
       )}
       {version.status === "proposed" && (
@@ -224,11 +253,65 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
         </Section>
       )}
 
-      <Section title={`Value Drivers (${summary.driverCount})`}>
+      {isV0 && (
+        <Section
+          title="Original Business Case: total and drivers"
+          description="Recorded exactly as the client presented it. The stated total and the drivers it itemises are both kept; they need not add up to each other."
+        >
+          <div className="grid gap-3 text-sm sm:grid-cols-2" data-testid="obc-total-and-drivers">
+            <div className="rounded border border-slate-200 p-3">
+              <p className="text-xs text-slate-500">Stated total</p>
+              <p className="text-2xl font-semibold" data-testid="obc-stated-total">
+                {formatMoneyShort(version.statedTotalValue, currency)}
+              </p>
+              {version.statedTotalValue === null && <p className="text-xs text-slate-500">Not stated</p>}
+            </div>
+            <div className="rounded border border-slate-200 p-3">
+              <p className="text-xs text-slate-500">Original Business Case drivers</p>
+              <p className="text-2xl font-semibold" data-testid="obc-driver-summary">
+                {summary.driverCount === 0
+                  ? "None itemised"
+                  : `${summary.driverCount} ${summary.driverCount === 1 ? "driver" : "drivers"}`}
+              </p>
+              {summary.driverCount > 0 && (
+                <p className="text-xs text-slate-500">
+                  Financial drivers total {formatMoneyShort(driverTotal, currency)}
+                  {summary.nonFinancialCount > 0 && ` · ${summary.nonFinancialCount} non-financial`}
+                </p>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-slate-600">
+            {lateBaseline
+              ? "A Value Case (V1) already exists and was not created from this Original Business Case: it is a comparison reference, not V1's starting point."
+              : "The existing business case is the starting point for Value Case Definition: when V1 is created from the recorded Original Business Case, its drivers are copied into V1 to be assessed, adjusted and qualified."}
+          </p>
+        </Section>
+      )}
+
+      {lateBaseline && (
+        <Notice tone="warning" title="V1 was not created from this Original Business Case">
+          Drivers added here are <strong>not</strong> copied into V{v1!.versionNumber}, and V{v1!.versionNumber} is
+          never rewritten. To compare a driver with V{v1!.versionNumber}, record the Original Business Case value
+          against that existing Value Driver
+          {editableV0 ? " below" : ""}.
+        </Notice>
+      )}
+
+      <Section
+        title={
+          isV0 ? `Original Business Case drivers (${summary.driverCount})` : `Value Drivers (${summary.driverCount})`
+        }
+        description={
+          editableV0
+            ? "Add the drivers the Original Business Case itemised, where available. Select Edit on a driver to change it while the Original Business Case is being captured."
+            : undefined
+        }
+      >
         {drivers.length === 0 ? (
           <Empty>{isV0 ? "No driver breakdown captured for the Original Business Case." : "No Value Drivers."}</Empty>
         ) : (
-          <>
+          !editableV0 && (
             <Table>
               <thead>
                 <tr>
@@ -265,7 +348,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
                 ))}
               </tbody>
             </Table>
-          </>
+          )
         )}
         <div className="mt-4 space-y-2">
           {drivers.map((d) =>
@@ -279,21 +362,68 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
             <AddDriverForm
               versionId={version.id}
               ctx={ctx}
-              nextCode={nextCode(
-                drivers.map((d) => d.code),
-                "VD",
-              )}
+              nextCode={ws!.nextDriverCode}
               sortOrder={drivers.length + 1}
+              open={drivers.length === 0 && !lateBaseline}
+              summary="Add an Original Business Case driver"
             />
+          )}
+          {editableV0 && lateBaseline && existingForLate.length > 0 && (
+            <div className="rounded border border-amber-200 bg-amber-50 p-3" data-testid="obc-existing-driver">
+              <p className="mb-2 text-sm font-medium">Record the Original Business Case value for an existing driver</p>
+              <ActionForm action={addExistingDriverToOriginalAction} resetOnSuccess testId="obc-existing-driver-form">
+                <Hidden name="projectId" value={projectId} />
+                <Hidden name="versionId" value={version.id} />
+                <Hidden name="sortOrder" value={String(drivers.length + 1)} />
+                <FormGrid cols={2}>
+                  <SelectField
+                    name="valueDriverId"
+                    label={`Existing V${v1!.versionNumber} Value Driver`}
+                    required
+                    placeholder="— Choose driver —"
+                    options={existingForLate.map((d) => ({ value: d.valueDriverId, label: `${d.code} ${d.name}` }))}
+                  />
+                  <MoneyField name="financialValue" label="Original Business Case value" currency={currency} />
+                </FormGrid>
+                <p className="mt-2 text-xs text-slate-500">
+                  Keeps the same Value Driver so the two can be compared. V{v1!.versionNumber} is not changed.
+                </p>
+                <div className="mt-2">
+                  <SubmitButton variant="secondary">Add to the Original Business Case</SubmitButton>
+                </div>
+              </ActionForm>
+            </div>
           )}
         </div>
       </Section>
 
       {editableV0 && (
         <Section title="Record the Original Business Case" tone="muted">
+          <div className="mb-3 rounded border border-slate-200 bg-white p-3 text-sm" data-testid="obc-record-summary">
+            <p className="font-medium">You are about to record:</p>
+            <ul className="mt-1 space-y-0.5">
+              <li>
+                Stated total:{" "}
+                <strong>
+                  {version.statedTotalValue === null ? "not stated" : formatMoney(version.statedTotalValue, currency)}
+                </strong>
+              </li>
+              <li>
+                Drivers: <strong>{summary.driverCount === 0 ? "none (headline only)" : summary.driverCount}</strong>
+              </li>
+              {drivers.map((d) => (
+                <li key={d.driverVersionId} className="pl-4 text-slate-600">
+                  {d.code} {d.name} · <DriverValue driver={d} currency={currency} />
+                </li>
+              ))}
+            </ul>
+          </div>
           <p className="mb-3 text-sm text-slate-600">
             Recording locks the Original Business Case permanently as the historical record of what the client
-            originally claimed. The Value Case (V1) can then be based on it in Value Case Definition.
+            originally claimed — it can no longer be edited.{" "}
+            {v1
+              ? `V${v1.versionNumber} already exists, so it remains a comparison reference.`
+              : "You then continue to Value Case Definition, where V1 is created from it."}
           </p>
           <ActionForm
             action={recordInheritedBusinessCaseAction}

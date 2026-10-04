@@ -83,3 +83,21 @@ export function versionAuthority(kind: VersionKind, status: VersionStatus, versi
 export function isLocked(status: VersionStatus): boolean {
   return status !== "draft";
 }
+
+/**
+ * Value Case Definition (4D.10D): how a driver in the proposed V1 relates to the Original Business Case, by stable
+ * driver identity. "Adjusted" means its financial value differs (a non-financial driver becoming financial, or the
+ * reverse, is an adjustment). Descriptive only — no reconciliation rule is implied.
+ */
+export type DefinitionChange = "unchanged" | "adjusted" | "new" | "not_carried_forward";
+
+export function classifyDefinitionChange(
+  original: { financialValue: string | null } | null,
+  proposed: { financialValue: string | null } | null,
+): DefinitionChange {
+  if (!proposed) return "not_carried_forward";
+  if (!original) return "new";
+  const [a, b] = [original.financialValue, proposed.financialValue];
+  if (a === null || b === null) return a === b ? "unchanged" : "adjusted";
+  return money(a).equals(money(b)) ? "unchanged" : "adjusted";
+}

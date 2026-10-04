@@ -90,7 +90,7 @@ test("Value Basis and plan milestones on a draft V1: pre-fill, NPV unavailable, 
   );
 
   // Proposal locks the plan: read-only, no edit controls.
-  await page.getByRole("button", { name: "Propose V1" }).click();
+  await page.getByRole("button", { name: "Propose Value Case V1" }).click();
   await expect(page.getByTestId("version-basis-form")).toHaveCount(0);
   await expect(page.getByTestId("milestone-remove")).toHaveCount(0);
   await expect(page.getByText("+ Add milestone")).toHaveCount(0);

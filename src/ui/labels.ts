@@ -88,6 +88,7 @@ export const COMMAND_LABELS: Record<string, string> = {
   "valueCase.createDraftVersion": "Draft Value Case version created",
   "valueCase.updateVersionDetails": "Version details updated",
   "valueCase.addValueDriver": "Value Driver added",
+  "valueCase.addExistingDriverToOriginal": "Existing Value Driver added to the Original Business Case",
   "valueCase.updateDriverVersion": "Value Driver updated",
   "valueCase.removeValueDriver": "Value Driver removed",
   "valueCase.addAssumption": "Assumption added",

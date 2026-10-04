@@ -81,7 +81,19 @@ export function DriverEditor({
     <Expander
       open={open}
       testId={`driver-${driver.code}`}
-      summary={<DriverSummaryLine driver={driver} currency={currency} />}
+      summary={
+        // 4D.10D: an explicit Edit affordance — editing is never hidden behind an unlabelled expander.
+        <span className="inline-flex w-[calc(100%-1.25rem)] flex-wrap items-center justify-between gap-2 align-middle">
+          <DriverSummaryLine driver={driver} currency={currency} />
+          <span
+            className="rounded border border-sky-300 bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-800"
+            data-testid={`driver-edit-${driver.code}`}
+          >
+            <span className="group-open:hidden">Edit {driver.code}</span>
+            <span className="hidden group-open:inline">Close editor</span>
+          </span>
+        </span>
+      }
     >
       <ActionForm action={updateDriverVersionAction} testId={`driver-form-${driver.code}`}>
         <Hidden name="projectId" value={projectId} />
@@ -314,14 +326,18 @@ export function AddDriverForm({
   nextCode,
   ctx,
   sortOrder,
+  open = false,
+  summary = "Add Value Driver",
 }: {
   versionId: string;
   nextCode: string;
   ctx: DriverEditorContext;
   sortOrder: number;
+  open?: boolean;
+  summary?: string;
 }) {
   return (
-    <Expander summary="Add Value Driver" testId="add-driver">
+    <Expander summary={`+ ${summary}`} testId="add-driver" open={open}>
       <ActionForm action={addValueDriverAction} resetOnSuccess testId="add-driver-form">
         <Hidden name="projectId" value={ctx.projectId} />
         <Hidden name="versionId" value={versionId} />

@@ -8,6 +8,7 @@ import {
 } from "@/domain/statuses";
 import {
   addAssumption,
+  addExistingDriverToOriginal,
   addValueDriver,
   authoriseInitialVersion,
   createDraftVersion,
@@ -118,6 +119,18 @@ export async function addValueDriverAction(_prev: ActionState, fd: FormData): Pr
       sortOrder: Number(opt(fd, "sortOrder") ?? 0) || 0,
     });
     return `Value Driver ${driver.code} added`;
+  });
+}
+
+export async function addExistingDriverToOriginalAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await addExistingDriverToOriginal(actor, {
+      versionId: required(fd, "versionId"),
+      valueDriverId: required(fd, "valueDriverId"),
+      financialValue: financialValue(fd, "create"),
+      sortOrder: Number(opt(fd, "sortOrder") ?? 0) || 0,
+    });
+    return "Original Business Case value recorded against the existing Value Driver";
   });
 }
 

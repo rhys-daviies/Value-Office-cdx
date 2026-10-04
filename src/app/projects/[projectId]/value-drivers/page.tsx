@@ -48,7 +48,7 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
               </span>
             </>
           ) : (
-            "No Authorised Value Case yet."
+            "No Authorised Value Case yet. Before authorisation, drivers are created in their lifecycle stage (below)."
           )
         }
       >
@@ -119,8 +119,14 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
 
       <Section title="Add a Value Driver" tone="muted">
         {!register.inForce ? (
-          <Notice tone="info">
-            Until the Value Case is authorised, add drivers to the draft Value Case in Value Case Definition.
+          <Notice tone="info" title="Before authorisation, drivers are created in their lifecycle stage">
+            <span data-testid="drivers-pre-v1-guidance">
+              <strong>Original Business Case drivers</strong> — the drivers the existing business case itemised — are
+              captured with the <TextLink href={`/projects/${projectId}/value-case`}>Original Business Case</TextLink>.{" "}
+              <strong>Proposed V1 drivers</strong> are added and edited in{" "}
+              <TextLink href={`/projects/${projectId}/requalification`}>Value Case Definition</TextLink>. Once the Value
+              Case is authorised, new drivers are raised here as Emerging drivers.
+            </span>
           </Notice>
         ) : (
           <Expander summary="+ Add Value Driver" testId="add-driver">

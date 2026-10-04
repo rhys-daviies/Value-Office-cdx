@@ -53,7 +53,7 @@ test("Project Horizon: $18.0m inherited, $15.5m authorised, six drivers", async 
   await expect(page.getByTestId("requal-v1-total")).toHaveText("$15.5m");
   await expect(page.getByTestId("requal-change")).toHaveText("-$2.5m");
   await expect(page.getByTestId("comparison-row")).toHaveCount(6);
-  await expect(page.getByRole("button", { name: /Propose V1|Save driver|Add driver/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Propose Value Case V1|Save driver|Add driver/ })).toHaveCount(0);
 });
 
 test("Project Horizon Assurance: $15.5m authorised, $14.7m forecast, $0.8m gap; $2.8m realised unattributed", async ({
