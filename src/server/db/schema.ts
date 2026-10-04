@@ -493,6 +493,12 @@ export const valueDriverVersion = pgTable(
     calculationRationale: text(),
     // Expressed on the project's Value Basis, in the project currency.
     financialValue: moneyCol(),
+    /**
+     * 4D.10E: WHY this governed value differs from its baseline (V1: the recorded Original Business Case
+     * counterpart; a driver with none is "introduced"). Distinct from calculationRationale (how the value is
+     * calculated). Required at V1 proposal for a non-zero movement (database-checked); not copied forward.
+     */
+    adjustmentRationale: text(),
     timingDescription: text(),
     benefitStartDate: date(),
     benefitFullDate: date(),
@@ -526,6 +532,38 @@ export const valueDriverVersion = pgTable(
       "value_driver_version_benefit_dates_order",
       sql`${t.benefitStartDate} is null or ${t.benefitFullDate} is null or ${t.benefitStartDate} <= ${t.benefitFullDate}`,
     ),
+  ],
+);
+
+/**
+ * 4D.10E: an Original Business Case driver deliberately not carried into the first governed Value Case (V1), with
+ * WHY — the same governed adjustment rationale, held here because a driver that is not carried forward has no row in
+ * V1 (no phantom value is created). Written only while V1 is a draft; never copied forward.
+ */
+export const valueDriverExclusion = pgTable(
+  "value_driver_exclusion",
+  {
+    id: id(),
+    valueCaseVersionId: uuid().notNull(),
+    valueDriverId: uuid().notNull(),
+    valueCaseId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    adjustmentRationale: text().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("value_driver_exclusion_uq").on(t.valueCaseVersionId, t.valueDriverId),
+    foreignKey({
+      name: "value_driver_exclusion_version_fk",
+      columns: [t.valueCaseVersionId, t.valueCaseId, t.projectId],
+      foreignColumns: [valueCaseVersion.id, valueCaseVersion.valueCaseId, valueCaseVersion.projectId],
+    }),
+    foreignKey({
+      name: "value_driver_exclusion_driver_fk",
+      columns: [t.valueDriverId, t.valueCaseId],
+      foreignColumns: [valueDriver.id, valueDriver.valueCaseId],
+    }),
+    check("value_driver_exclusion_rationale", sql`btrim(${t.adjustmentRationale}) <> ''`),
   ],
 );
 
@@ -651,12 +689,23 @@ export const valuePosition = pgTable(
     realisedValue: moneyCol(),
     /** Consultant explicitly could not assess the forecast; requires a rationale. */
     forecastNotAssessed: boolean().notNull().default(false),
+    /**
+     * Why the forecast is Not Assessed, or (4D.10E) why it moved from its formal baseline — required at
+     * finalisation for a non-zero movement (database-checked).
+     */
     forecastRationale: text(),
     realisedValueRationale: text(),
+    /** 4D.10E: optional Assurance matter (Value Leakage) that explains the forecast movement. Never required. */
+    valueLeakageId: uuid(),
     createdAt: createdAt(),
   },
   (t) => [
     unique("value_position_driver_uq").on(t.assuranceReviewId, t.valueDriverId),
+    foreignKey({
+      name: "value_position_matter_fk",
+      columns: [t.valueLeakageId, t.projectId],
+      foreignColumns: [valueLeakage.id, valueLeakage.projectId],
+    }),
     check(
       "value_position_not_assessed_shape",
       sql`not ${t.forecastNotAssessed} or (${t.currentForecast} is null and ${t.forecastRationale} is not null)`,

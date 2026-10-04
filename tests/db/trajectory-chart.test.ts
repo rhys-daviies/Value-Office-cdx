@@ -53,6 +53,7 @@ async function review(
   await upsertValuePositions(actor, {
     reviewId: r.id,
     positions: positions.map((p) => ({
+      forecastRationale: "Synthetic test rationale",
       valueDriverId: id(p.code),
       currentForecast: p.forecast,
       realisedValue: p.realised,
@@ -175,8 +176,8 @@ describe("primary Value Trajectory read model", () => {
     await upsertValuePositions(a.actor, {
       reviewId: r1.id,
       positions: [
-        { valueDriverId: id("VD-01"), currentForecast: "19000000.00" },
-        { valueDriverId: id("VD-02"), currentForecast: "9000000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-01"), currentForecast: "19000000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "9000000.00" },
       ],
     });
     await updateReview(a.actor, {
@@ -190,8 +191,13 @@ describe("primary Value Trajectory read model", () => {
     await upsertValuePositions(a.actor, {
       reviewId: r2.id,
       positions: [
-        { valueDriverId: id("VD-01"), currentForecast: "19000000.00", realisedValue: "3000000.00" },
-        { valueDriverId: id("VD-02"), currentForecast: "9000000.00" },
+        {
+          forecastRationale: "Synthetic test rationale",
+          valueDriverId: id("VD-01"),
+          currentForecast: "19000000.00",
+          realisedValue: "3000000.00",
+        },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "9000000.00" },
       ],
     });
     await updateReview(a.actor, {
@@ -322,9 +328,14 @@ describe("primary Value Trajectory read model", () => {
     await upsertValuePositions(x.actor, {
       reviewId: draft!.id,
       positions: [
-        { valueDriverId: id("VD-01"), currentForecast: "12000000.00", realisedValue: "3000000.00" },
-        { valueDriverId: id("VD-02"), currentForecast: "8000000.00" },
-        { valueDriverId: id("VD-03"), currentForecast: "4000000.00" },
+        {
+          forecastRationale: "Synthetic test rationale",
+          valueDriverId: id("VD-01"),
+          currentForecast: "12000000.00",
+          realisedValue: "3000000.00",
+        },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "8000000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-03"), currentForecast: "4000000.00" },
       ],
     });
     await setForecastPoint(x.actor, { reviewId: draft!.id, asOf: "2028-06-30", value: "17000000.00" });

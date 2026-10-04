@@ -74,6 +74,7 @@ export async function saveValuePositionsAction(_prev: ActionState, fd: FormData)
         realisedValue: moneyField(fd, `realised__${id}`, "update"),
         forecastRationale: clear(fd, `forecastRationale__${id}`),
         realisedValueRationale: clear(fd, `realisedRationale__${id}`),
+        valueLeakageId: clear(fd, `matter__${id}`),
       })),
     });
     return "Value Positions saved";

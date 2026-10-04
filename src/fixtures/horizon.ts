@@ -177,6 +177,7 @@ export async function seedHorizon(
   });
   for (const [i, d] of HORIZON.drivers.entries()) {
     await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: d.code,
       name: d.name,

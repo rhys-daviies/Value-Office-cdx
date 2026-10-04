@@ -63,8 +63,8 @@ async function draftReview(ctx: Ctx, positions = true) {
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
       positions: [
-        { valueDriverId: ctx.A, currentForecast: "900000.00" },
-        { valueDriverId: ctx.B, currentForecast: "400000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "900000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.B, currentForecast: "400000.00" },
         { valueDriverId: ctx.C, forecastRationale: "On track" },
       ],
     });
@@ -168,7 +168,7 @@ describe("A3 — finalising with a missing financial forecast", () => {
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
       positions: [
-        { valueDriverId: ctx.A, currentForecast: "900000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "900000.00" },
         { valueDriverId: ctx.B },
         { valueDriverId: ctx.C },
       ],
@@ -183,7 +183,7 @@ describe("A3 — finalising with a missing financial forecast", () => {
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
       positions: [
-        { valueDriverId: ctx.A, currentForecast: "900000.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "900000.00" },
         { valueDriverId: ctx.B, forecastNotAssessed: true, forecastRationale: "Vendor data not yet received" },
         { valueDriverId: ctx.C },
       ],

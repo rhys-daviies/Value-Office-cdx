@@ -93,7 +93,9 @@ describe("draft preview refinements", () => {
     const draft = await createReview(actor, { projectId: x.project.id, trigger: "ad_hoc", reviewDate: "2027-03-31" });
     await upsertValuePositions(actor, {
       reviewId: draft.id,
-      positions: [{ valueDriverId: d1!.id, currentForecast: "13000000.00" }],
+      positions: [
+        { forecastRationale: "Synthetic test rationale", valueDriverId: d1!.id, currentForecast: "13000000.00" },
+      ],
     });
     const s = await upsertScenario(actor, {
       reviewId: draft.id,

@@ -49,6 +49,7 @@ export async function proposedV1(actor: Actor) {
   await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
   const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
   const { driver, driverVersion } = await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-01",
     name: "Service Productivity",

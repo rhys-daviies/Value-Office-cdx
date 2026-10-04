@@ -139,6 +139,7 @@ async function authorisedProject(
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: drivers.map((x, i) => ({
+      forecastRationale: "Synthetic test rationale",
       valueDriverId: x.id,
       currentForecast: i === 0 ? "18000000.00" : "9000000.00",
       realisedValue: i === 0 ? "1500000.00" : "500000.00",
@@ -283,7 +284,11 @@ describe("model v3 report trajectories", () => {
     const r3 = await createReview(x.actor, { projectId: x.project.id, trigger: "ad_hoc", reviewDate: "2026-10-02" });
     await upsertValuePositions(x.actor, {
       reviewId: r3.id,
-      positions: drivers.map((d) => ({ valueDriverId: d.id, currentForecast: "9000000.00" })),
+      positions: drivers.map((d) => ({
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: d.id,
+        currentForecast: "9000000.00",
+      })),
     });
     await finaliseReview(x.actor, { reviewId: r3.id });
     const m = (await buildReport("assurance", x.project.id, r3.id))!.model as AssuranceReport;
@@ -441,6 +446,7 @@ describe("model v3 report trajectories", () => {
     await upsertValuePositions(x.actor, {
       reviewId: r3.id,
       positions: drivers.map((d) => ({
+        forecastRationale: "Synthetic test rationale",
         valueDriverId: d.id,
         currentForecast: "9000000.00",
         realisedValue: "2000000.00",

@@ -43,12 +43,19 @@ async function draftV1(actor: Actor) {
   await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
   const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
   const a = await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-01",
     name: "Alpha",
     financialValue: "1000000.00",
   });
-  const b = await addValueDriver(actor, { versionId: v1.id, code: "VD-02", name: "Beta", financialValue: "500000.00" });
+  const b = await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
+    versionId: v1.id,
+    code: "VD-02",
+    name: "Beta",
+    financialValue: "500000.00",
+  });
   await addValueDriver(actor, { versionId: v1.id, code: "VD-03", name: "Gamma" });
   const evidence = await recordEvidence(actor, { projectId: project.id, code: "E-AUTH", title: "Authorisation" });
   return { project, vco, v1, A: a.driver.id, B: b.driver.id, evidence };
@@ -82,8 +89,18 @@ async function draftReview(actor: Actor) {
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: ctx.A, currentForecast: "900000.00", realisedValue: "100000.00" },
-      { valueDriverId: ctx.B, currentForecast: "400000.00", realisedValue: "50000.00" },
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ctx.A,
+        currentForecast: "900000.00",
+        realisedValue: "100000.00",
+      },
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ctx.B,
+        currentForecast: "400000.00",
+        realisedValue: "50000.00",
+      },
     ],
   });
   const gamma = (
@@ -683,7 +700,14 @@ describe("H. legacy compatibility", () => {
     const review = await createReview(actor, { projectId: legacy.project.id, trigger: "ad_hoc", reviewDate: today });
     await upsertValuePositions(actor, {
       reviewId: review.id,
-      positions: [{ valueDriverId: legacy.driver.id, currentForecast: "4500000.00", realisedValue: "10000.00" }],
+      positions: [
+        {
+          forecastRationale: "Synthetic test rationale",
+          valueDriverId: legacy.driver.id,
+          currentForecast: "4500000.00",
+          realisedValue: "10000.00",
+        },
+      ],
     });
     await finaliseReview(actor, { reviewId: review.id });
     const t = await getValueTrajectory(legacy.project.id);

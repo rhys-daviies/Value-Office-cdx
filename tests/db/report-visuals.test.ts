@@ -251,7 +251,11 @@ describe("report-model compatibility", () => {
       reviewId: next.id,
       positions: drivers
         .filter((d) => d.code === "VD-01" || d.code === "VD-02") // the V2 drivers (VD-04 is emerging)
-        .map((d) => ({ valueDriverId: d.id, currentForecast: "100000.00" })),
+        .map((d) => ({
+          forecastRationale: "Synthetic test rationale",
+          valueDriverId: d.id,
+          currentForecast: "100000.00",
+        })),
     });
     await finaliseReview(actor, { reviewId: next.id });
 

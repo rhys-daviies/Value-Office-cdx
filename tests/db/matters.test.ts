@@ -61,7 +61,9 @@ async function finalisedReview(ctx: Ctx, before?: (reviewId: string) => Promise<
   const review = await createReview(ctx.actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
   await upsertValuePositions(ctx.actor, {
     reviewId: review.id,
-    positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00" }],
+    positions: [
+      { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4500000.00" },
+    ],
   });
   await before?.(review.id);
   return finaliseReview(ctx.actor, { reviewId: review.id });
@@ -371,7 +373,9 @@ describe("formal Assurance Review snapshot", () => {
     const review = await createReview(ctx.actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
-      positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00" }],
+      positions: [
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4500000.00" },
+      ],
     });
     // Bypassing the snapshot is refused by the database.
     await expectDomainError(
@@ -487,7 +491,9 @@ describe("legacy review-bound leakage (pre-4D.1)", () => {
     const draft = await createReview(actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
     await upsertValuePositions(actor, {
       reviewId: draft.id,
-      positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00" }],
+      positions: [
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4500000.00" },
+      ],
     });
     const legacy = await createLeakage(actor, {
       reviewId: draft.id,
@@ -537,7 +543,9 @@ describe("legacy review-bound leakage (pre-4D.1)", () => {
     const next = await createReview(ctx.actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
     await upsertValuePositions(ctx.actor, {
       reviewId: next.id,
-      positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4400000.00" }],
+      positions: [
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4400000.00" },
+      ],
     });
     await finaliseReview(ctx.actor, { reviewId: next.id });
     const snap = await db()

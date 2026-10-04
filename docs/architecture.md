@@ -209,6 +209,34 @@ created before 4D.2 keep a null purpose and read as Mobilisation. Nothing was ba
 Assurance matter (`information_request_item.value_leakage_id`), but only on an Assurance request, only while the
 matter is open, and the link is immutable. Information Request reports are unchanged.
 
+## Governed value movements (Phase 4D.10E)
+
+**Invariant.** Any non-zero governed value movement carries an explicit rationale at its formal governance gate.
+Drafts stay working space (no reason per keystroke), there is no materiality threshold, and evidence stays optional.
+The rationale answers _why the governed value changed_; `calculation_rationale` keeps its meaning (_how_ a value is
+calculated). Actor, time, command and before/after come from `audit_event`; nothing duplicates them.
+
+| Movement                  | Baseline                                                                                                                                                               | Gate                     | Stored in                                                                |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------ |
+| **Value Case Definition** | the driver's counterpart in the **recorded** Original Business Case (a draft one is not a baseline)                                                                    | V1 draft → proposed      | `value_driver_version.adjustment_rationale`                              |
+| — not carried forward     | a financial Original Business Case driver with no V1 row                                                                                                               | V1 draft → proposed      | `value_driver_exclusion` (same rationale concept; no phantom row)        |
+| **Assurance forecast**    | the previous finalised review's forecast for the driver; else (first review, absent there, or Not Assessed there) its authorised value in the version measured against | review draft → finalised | `value_position.forecast_rationale` (+ optional `value_leakage_id`)      |
+| **Value Change (V2+)**    | the version in force                                                                                                                                                   | Value Change proposal    | `value_change.reason` (existing, required); driver-level reason optional |
+
+- **Definition movement** = contribution(V1 row) − contribution(counterpart); a non-financial row or an absent
+  counterpart contributes nothing (the existing total semantics). Where there is no counterpart the reason is "why
+  introduced" — provenance for the commitment, not a claim of movement from zero, and the UI shows no movement
+  arithmetic. $0 and non-financial introductions need none. Pure rule: `definitionRationaleRequired`.
+- **Forecast movement** uses the existing movement basis (`forecastMovement`); non-financial drivers are outside it and
+  Not Assessed keeps its own required rationale. A forecast may name the Assurance matter (Value Leakage) that explains
+  it; never required, and Value Gap is never reconciled to Value Leakage. Evidence uses the existing review links.
+- **Enforcement:** `vo_version_rationale_gate` and `vo_review_value_rationale_gate` (0022), named to fire after the
+  existing guards; `vo_value_driver_exclusion_guard` (command, draft first governed version, Original Business Case
+  driver not in V1). Adjustment rationale is never copied forward (`copyVersionContents`).
+- **Prospective only.** Locked versions and finalised reviews are never re-checked or backfilled; historical rows
+  without rationale stay valid. Reports are unchanged (a rationale section would be a future versioned renderer).
+  Migration record and reversal: `docs/release/4d10e-migration.md`.
+
 ## Value Drivers: identity, living record, versioned snapshot (Phase 4D.3)
 
 | Layer                  | Record                                         | Changes how                                                   |

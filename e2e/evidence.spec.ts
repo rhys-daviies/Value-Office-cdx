@@ -98,6 +98,10 @@ test("matter → request evidence → document and fulfil → stage stays → de
 
   const positions = page.getByTestId("positions-form");
   await positions.getByTestId("position-editor-VD-01").getByLabel("Current Forecast").fill("0.9m");
+  await positions
+    .getByTestId("position-editor-VD-01")
+    .getByLabel("Why the forecast changed (or why Not Assessed)")
+    .fill("Synthetic: slower ramp-up");
   await positions.getByTestId("position-editor-VD-02").getByLabel("Current Forecast").fill("0.5m");
   await positions.getByTestId("position-editor-VD-03").getByLabel("Outcome outlook").fill("On track");
   await positions.getByRole("button", { name: "Save Value Positions" }).click();

@@ -102,7 +102,9 @@ async function draftReview(ctx: Ctx) {
   const review = await createReview(ctx.actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
   await upsertValuePositions(ctx.actor, {
     reviewId: review.id,
-    positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00" }],
+    positions: [
+      { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4500000.00" },
+    ],
   });
   return review;
 }

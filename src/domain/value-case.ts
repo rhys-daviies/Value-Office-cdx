@@ -101,3 +101,22 @@ export function classifyDefinitionChange(
   if (a === null || b === null) return a === b ? "unchanged" : "adjusted";
   return money(a).equals(money(b)) ? "unchanged" : "adjusted";
 }
+
+/**
+ * Governed Value Case Definition movement (4D.10E). A driver's contribution to the Value Case financial total is its
+ * financial value; a non-financial row or an absent driver contributes nothing (the existing total semantics). A
+ * proposed V1 driver whose contribution differs from its recorded Original Business Case counterpart's — or that is
+ * introduced with a non-zero value where there is no counterpart — needs an adjustment rationale before V1 can be
+ * proposed; so does a financial Original Business Case driver not carried into V1. Mirrors vo_version_rationale_gate.
+ * `original` is the counterpart in the RECORDED Original Business Case only (a draft one is not a governed baseline).
+ */
+export function definitionRationaleRequired(
+  original: { financialValue: string | null } | null,
+  proposed: { financialValue: string | null } | null,
+): boolean {
+  const contribution = (row: { financialValue: string | null } | null) => money(row?.financialValue ?? "0");
+  return !contribution(proposed).equals(contribution(original));
+}
+
+/** Blank or whitespace-only text is no rationale. */
+export const hasRationale = (text: string | null | undefined) => Boolean(text && text.trim());

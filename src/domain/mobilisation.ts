@@ -247,10 +247,24 @@ export function deriveMobilisationStatus(f: MobilisationFacts): MobilisationStat
  */
 export type ProposalCheck = { key: string; ok: boolean; label: string; blocking: boolean; fix?: string };
 
-export function proposalChecklist(f: MobilisationFacts): ProposalCheck[] {
+export function proposalChecklist(
+  f: MobilisationFacts,
+  /** 4D.10E: codes of governed movements still without a rationale (Value Case Definition-specific). */
+  definition: { missingRationale: readonly string[] } = { missingRationale: [] },
+): ProposalCheck[] {
   const item = (key: MobilisationItem["key"]) => mobilisationItems(f).find((i) => i.key === key)!;
   const v1 = f.v1;
+  const missing = definition.missingRationale;
   return [
+    {
+      key: "adjustment-rationale",
+      ok: missing.length === 0,
+      label:
+        missing.length === 0
+          ? "Every governed value movement has a rationale"
+          : `Rationale missing for ${missing.join(", ")} — why the value differs from the Original Business Case, is introduced, or is not carried forward`,
+      blocking: true,
+    },
     {
       key: "value-basis",
       ok: item("value-basis").done,

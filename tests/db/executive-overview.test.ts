@@ -67,6 +67,7 @@ async function authorisedProject(opts: { plan?: boolean; review?: "none" | "reco
     await upsertValuePositions(actor, {
       reviewId: r.id,
       positions: drivers.map((x, i) => ({
+        forecastRationale: "Synthetic test rationale",
         valueDriverId: x.id,
         currentForecast: i === 0 ? "19000000.00" : "9000000.00",
         realisedValue: "500000.00",
@@ -187,6 +188,7 @@ describe("executive Overview", () => {
     await upsertValuePositions(actor, {
       reviewId: r3.id,
       positions: drivers.map((d, i) => ({
+        forecastRationale: "Synthetic test rationale",
         valueDriverId: d.id,
         currentForecast: i === 0 ? "14000000.00" : i === 1 ? "8000000.00" : "4000000.00",
         realisedValue: i === 0 ? "4500000.00" : "0.00",

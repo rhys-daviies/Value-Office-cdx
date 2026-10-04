@@ -1,12 +1,21 @@
+import { Fragment } from "react";
+
 import { EVIDENCE_STATUSES, QUALIFICATION_STATUSES } from "@/domain/statuses";
 import { proposalChecklist } from "@/domain/mobilisation";
-import { classifyDefinitionChange, moneyChange, type DefinitionChange } from "@/domain/value-case";
+import {
+  classifyDefinitionChange,
+  definitionRationaleRequired,
+  hasRationale,
+  moneyChange,
+  type DefinitionChange,
+} from "@/domain/value-case";
 import { recordEvidenceAction } from "@/server/actions/evidence";
 import {
   authoriseInitialVersionAction,
   createDraftVersionAction,
   proposeVersionAction,
   returnVersionToDraftAction,
+  setNotCarriedForwardAction,
 } from "@/server/actions/value-case";
 import { getCurrentActor } from "@/server/auth/actor";
 import { nextEvidenceCode } from "@/server/queries/evidence";
@@ -40,7 +49,26 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
     getMobilisationStatus(projectId).then((m) => m!),
   ]);
   // One derivation for the facts shared with Mobilisation (Value Basis, VCO, drivers, counts) — 4D.10D.
-  const checklist = proposalChecklist(mobilisation.facts);
+  // 4D.10E: governed movement rationale. Only a RECORDED Original Business Case is a governed baseline.
+  const baseline = ws.inheritedVersion?.status === "recorded" ? ws.inheritedDrivers : [];
+  const counterpart = (driverId: string) => baseline.find((b) => b.valueDriverId === driverId) ?? null;
+  const exclusionOf = (driverId: string) => ws.exclusions.find((x) => x.valueDriverId === driverId) ?? null;
+  const missingRationale = [
+    ...ws.requalifiedDrivers.filter(
+      (d) => definitionRationaleRequired(counterpart(d.valueDriverId), d) && !hasRationale(d.adjustmentRationale),
+    ),
+    ...baseline.filter(
+      (b) =>
+        !ws.requalifiedDrivers.some((d) => d.valueDriverId === b.valueDriverId) &&
+        definitionRationaleRequired(b, null) &&
+        !exclusionOf(b.valueDriverId),
+    ),
+  ]
+    .map((d) => d.code)
+    .sort();
+  const checklist = proposalChecklist(mobilisation.facts, {
+    missingRationale: ws.requalifiedVersion ? missingRationale : [],
+  });
   const blocked = checklist.find((c) => c.blocking && !c.ok) ?? null;
   const obc = ws.inheritedVersion;
   const v1FromOriginal = Boolean(obc && ws.requalifiedVersion?.basedOnVersionId === obc.id);
@@ -237,6 +265,10 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
             <>
               <DefinitionCounts rows={ws.comparison} />
               <ComparisonTable
+                projectId={projectId}
+                v1={v1}
+                baselineRecorded={ws.inheritedVersion?.status === "recorded"}
+                exclusions={ws.exclusions}
                 rows={ws.comparison}
                 currency={currency}
                 inheritedTotal={ws.inheritedTotal}
@@ -260,7 +292,24 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           <div className="space-y-2">
             {ws.requalifiedDrivers.map((d) =>
               v1.status === "draft" ? (
-                <DriverEditor key={d.driverVersionId} driver={d} ctx={ctx} />
+                <DriverEditor
+                  key={d.driverVersionId}
+                  driver={d}
+                  ctx={ctx}
+                  adjustment={
+                    counterpart(d.valueDriverId)
+                      ? {
+                          label: "Why the value differs from the Original Business Case",
+                          hint: "Governed adjustment rationale — required at proposal when the value differs from the recorded Original Business Case. How the value is calculated stays in the rationale above.",
+                          required: definitionRationaleRequired(counterpart(d.valueDriverId), d),
+                        }
+                      : {
+                          label: "Why this value is introduced",
+                          hint: "Governed rationale for introducing this value into the first governed Value Case (there is no recorded Original Business Case counterpart) — required at proposal for a financial value.",
+                          required: definitionRationaleRequired(null, d),
+                        }
+                  }
+                />
               ) : (
                 <DriverReadOnly key={d.driverVersionId} driver={d} currency={currency} projectId={projectId} />
               ),
@@ -525,11 +574,19 @@ function Check({ ok, label, required, fix }: { ok: boolean; label: string; requi
 }
 
 function ComparisonTable({
+  projectId,
+  v1,
+  baselineRecorded,
+  exclusions,
   rows,
   currency,
   inheritedTotal,
   v1Total,
 }: {
+  projectId: string;
+  v1: { id: string; status: string };
+  baselineRecorded: boolean;
+  exclusions: { valueDriverId: string; adjustmentRationale: string }[];
   rows: ComparisonRow[];
   currency: string;
   inheritedTotal: string | null;
@@ -552,31 +609,36 @@ function ComparisonTable({
       </thead>
       <tbody>
         {rows.map((r) => (
-          <tr
-            key={r.driverId}
-            data-testid="comparison-row"
-            data-change={classifyDefinitionChange(r.inherited, r.requalified)}
-          >
-            <td className="font-mono">{r.code}</td>
-            <td className="font-medium">{r.name}</td>
-            <td className="text-right whitespace-nowrap text-slate-500">
-              {r.inherited ? <DriverValue driver={r.inherited} currency={currency} /> : "—"}
-            </td>
-            <td className="text-right font-semibold whitespace-nowrap" data-testid="comparison-v1-value">
-              {r.requalified ? <DriverValue driver={r.requalified} currency={currency} /> : "—"}
-            </td>
-            <td className="text-right whitespace-nowrap">
-              {r.inherited && r.requalified
-                ? formatMoneyChange(moneyChange(r.inherited.financialValue, r.requalified.financialValue), currency)
-                : "—"}
-            </td>
-            <td>{r.requalified && <QualificationBadge status={r.requalified.qualificationStatus} />}</td>
-            <td>{r.requalified && <EvidenceBadge status={r.requalified.evidenceStatus} />}</td>
-            <td>{r.requalified ? (r.requalified.avoName ?? <span className="text-amber-700">—</span>) : ""}</td>
-            <td>
-              <DefinitionBadge change={classifyDefinitionChange(r.inherited, r.requalified)} />
-            </td>
-          </tr>
+          <Fragment key={r.driverId}>
+            <tr data-testid="comparison-row" data-change={classifyDefinitionChange(r.inherited, r.requalified)}>
+              <td className="font-mono">{r.code}</td>
+              <td className="font-medium">{r.name}</td>
+              <td className="text-right whitespace-nowrap text-slate-500">
+                {r.inherited ? <DriverValue driver={r.inherited} currency={currency} /> : "—"}
+              </td>
+              <td className="text-right font-semibold whitespace-nowrap" data-testid="comparison-v1-value">
+                {r.requalified ? <DriverValue driver={r.requalified} currency={currency} /> : "—"}
+              </td>
+              <td className="text-right whitespace-nowrap">
+                {r.inherited && r.requalified
+                  ? formatMoneyChange(moneyChange(r.inherited.financialValue, r.requalified.financialValue), currency)
+                  : "—"}
+              </td>
+              <td>{r.requalified && <QualificationBadge status={r.requalified.qualificationStatus} />}</td>
+              <td>{r.requalified && <EvidenceBadge status={r.requalified.evidenceStatus} />}</td>
+              <td>{r.requalified ? (r.requalified.avoName ?? <span className="text-amber-700">—</span>) : ""}</td>
+              <td>
+                <DefinitionBadge change={classifyDefinitionChange(r.inherited, r.requalified)} />
+              </td>
+            </tr>
+            <RationaleRow
+              row={r}
+              projectId={projectId}
+              v1={v1}
+              baselineRecorded={baselineRecorded}
+              exclusion={exclusions.find((x) => x.valueDriverId === r.driverId) ?? null}
+            />
+          </Fragment>
         ))}
       </tbody>
       <tfoot>
@@ -625,5 +687,74 @@ function DefinitionCounts({ rows }: { rows: ComparisonRow[] }) {
         </span>
       ))}
     </p>
+  );
+}
+
+/**
+ * 4D.10E: the governed "why" beneath each compared driver — why changed, why introduced (no recorded counterpart; no
+ * movement arithmetic is shown), or why not carried forward. "Required" mirrors the proposal gate exactly.
+ */
+function RationaleRow({
+  row,
+  projectId,
+  v1,
+  baselineRecorded,
+  exclusion,
+}: {
+  row: ComparisonRow;
+  projectId: string;
+  v1: { id: string; status: string };
+  baselineRecorded: boolean;
+  exclusion: { adjustmentRationale: string } | null;
+}) {
+  const original = baselineRecorded ? row.inherited : null;
+  const editable = v1.status === "draft";
+  if (row.requalified) {
+    const required = definitionRationaleRequired(original, row.requalified);
+    const text = row.requalified.adjustmentRationale;
+    if (!required && !hasRationale(text)) return null;
+    return (
+      <tr data-testid="comparison-rationale" data-code={row.code}>
+        <td />
+        <td colSpan={8} className="pb-2 text-xs text-slate-600">
+          <span className="font-semibold">{original ? "Why changed: " : "Why introduced: "}</span>
+          {hasRationale(text) ? (
+            text
+          ) : (
+            <span className="text-red-700">Required before proposal — select Edit on {row.code} to record it</span>
+          )}
+        </td>
+      </tr>
+    );
+  }
+  if (!original) return null; // not in V1 and no governed baseline row: nothing to explain
+  const required = definitionRationaleRequired(original, null);
+  return (
+    <tr data-testid="comparison-rationale" data-code={row.code}>
+      <td />
+      <td colSpan={8} className="pb-2 text-xs text-slate-600">
+        <span className="font-semibold">Why not carried forward: </span>
+        {exclusion && !editable && exclusion.adjustmentRationale}
+        {!exclusion && !editable && "—"}
+        {editable && (
+          <ActionForm action={setNotCarriedForwardAction} testId={`not-carried-form-${row.code}`}>
+            <Hidden name="projectId" value={projectId} />
+            <Hidden name="versionId" value={v1.id} />
+            <Hidden name="valueDriverId" value={row.driverId} />
+            <div className="mt-1 flex items-end gap-2">
+              <div className="flex-1">
+                <TextArea
+                  name="adjustmentRationale"
+                  label={required ? "Reason (required before proposal)" : "Reason (optional)"}
+                  rows={1}
+                  defaultValue={exclusion?.adjustmentRationale}
+                />
+              </div>
+              <SubmitButton variant="secondary">Save reason</SubmitButton>
+            </div>
+          </ActionForm>
+        )}
+      </td>
+    </tr>
   );
 }

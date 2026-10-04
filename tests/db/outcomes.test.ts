@@ -115,7 +115,9 @@ describe("Alternative Value Outcomes read model", () => {
     });
     await upsertValuePositions(actor, {
       reviewId: review.id,
-      positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00" }],
+      positions: [
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4500000.00" },
+      ],
     });
     const a = await upsertScenario(actor, {
       reviewId: review.id,

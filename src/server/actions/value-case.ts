@@ -9,12 +9,14 @@ import {
 import {
   addAssumption,
   addExistingDriverToOriginal,
+  clearNotCarriedForward,
   addValueDriver,
   authoriseInitialVersion,
   createDraftVersion,
   createInheritedBusinessCase,
   proposeVersion,
   recordInheritedBusinessCase,
+  setNotCarriedForward,
   removeAssumption,
   removeValueDriver,
   returnVersionToDraft,
@@ -134,6 +136,19 @@ export async function addExistingDriverToOriginalAction(_prev: ActionState, fd: 
   });
 }
 
+export async function setNotCarriedForwardAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    const input = { versionId: required(fd, "versionId"), valueDriverId: required(fd, "valueDriverId") };
+    const rationale = opt(fd, "adjustmentRationale");
+    if (rationale) {
+      await setNotCarriedForward(actor, { ...input, adjustmentRationale: rationale });
+      return "Reason for not carrying the driver forward recorded";
+    }
+    await clearNotCarriedForward(actor, input);
+    return "Reason removed";
+  });
+}
+
 export async function updateDriverVersionAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return perform(projectOf(fd), async (actor) => {
     await updateDriverVersion(actor, {
@@ -146,6 +161,7 @@ export async function updateDriverVersionAction(_prev: ActionState, fd: FormData
       targetValue: metricField(fd, "targetValue", "update"),
       calculationRationale: clear(fd, "calculationRationale"),
       financialValue: financialValue(fd, "update"),
+      adjustmentRationale: clear(fd, "adjustmentRationale"),
       timingDescription: clear(fd, "timingDescription"),
       benefitStartDate: clear(fd, "benefitStartDate"),
       benefitFullDate: clear(fd, "benefitFullDate"),

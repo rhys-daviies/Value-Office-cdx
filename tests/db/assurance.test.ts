@@ -46,8 +46,20 @@ async function authorisedProject(actor?: Actor) {
   await asCommand(actor, COMMANDS.removeValueDriver, (tx) =>
     tx.delete(schema.valueDriverVersion).where(eq(schema.valueDriverVersion.valueCaseVersionId, v1.id)),
   );
-  const a = await addValueDriver(actor, { versionId: v1.id, code: "VD-01", name: "A", financialValue: "1000000.00" });
-  const b = await addValueDriver(actor, { versionId: v1.id, code: "VD-02", name: "B", financialValue: "500000.00" });
+  const a = await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
+    versionId: v1.id,
+    code: "VD-01",
+    name: "A",
+    financialValue: "1000000.00",
+  });
+  const b = await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
+    versionId: v1.id,
+    code: "VD-02",
+    name: "B",
+    financialValue: "500000.00",
+  });
   const c = await addValueDriver(actor, { versionId: v1.id, code: "VD-03", name: "C (non-financial)" });
   await proposeVersion(actor, { versionId: v1.id });
   const auth = await recordEvidence(actor, { projectId: project.id, code: "E-AUTH", title: "Authorisation" });
@@ -77,8 +89,8 @@ async function finalisedReview(ctx: Ctx, forecasts: { A: string | null; B: strin
   await upsertValuePositions(ctx.actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: ctx.A, currentForecast: forecasts.A },
-      { valueDriverId: ctx.B, currentForecast: forecasts.B },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: forecasts.A },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.B, currentForecast: forecasts.B },
       { valueDriverId: ctx.C, forecastRationale: "On track" },
     ],
   });
@@ -246,7 +258,7 @@ describe("Value Positions", () => {
     await expectDomainError(
       upsertValuePositions(ctx.actor, {
         reviewId: review.id,
-        positions: [{ valueDriverId: other.A, currentForecast: "1.00" }],
+        positions: [{ forecastRationale: "Synthetic test rationale", valueDriverId: other.A, currentForecast: "1.00" }],
       }),
       "VO_DRIVER_NOT_IN_VERSION",
     );
@@ -258,7 +270,9 @@ describe("Value Positions", () => {
     await expectDomainError(
       upsertValuePositions(ctx.actor, {
         reviewId: review.id,
-        positions: [{ valueDriverId: ctx.legacy, currentForecast: "1.00" }],
+        positions: [
+          { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.legacy, currentForecast: "1.00" },
+        ],
       }),
       "VO_DRIVER_NOT_IN_VERSION",
     );
@@ -271,19 +285,19 @@ describe("Value Positions", () => {
       upsertValuePositions(ctx.actor, {
         reviewId: review.id,
         positions: [
-          { valueDriverId: ctx.A, currentForecast: "1.00" },
-          { valueDriverId: ctx.A, currentForecast: "2.00" },
+          { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "1.00" },
+          { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "2.00" },
         ],
       }),
       "VO_DUPLICATE_POSITION",
     );
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
-      positions: [{ valueDriverId: ctx.A, currentForecast: "1.00" }],
+      positions: [{ forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "1.00" }],
     });
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
-      positions: [{ valueDriverId: ctx.A, currentForecast: "2.00" }],
+      positions: [{ forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "2.00" }],
     });
     const rows = await db()
       .select()
@@ -310,8 +324,8 @@ describe("Value Positions", () => {
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
       positions: [
-        { valueDriverId: ctx.A, currentForecast: "-450000.35" },
-        { valueDriverId: ctx.B, currentForecast: "0.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "-450000.35" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.B, currentForecast: "0.00" },
       ],
     });
     const ws = await getAssuranceWorkspace(ctx.project.id, review.id);
@@ -376,8 +390,8 @@ describe("finalisation", () => {
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
       positions: [
-        { valueDriverId: ctx.A, currentForecast: "1.00" },
-        { valueDriverId: ctx.B, currentForecast: "1.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "1.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.B, currentForecast: "1.00" },
       ],
     });
     const err = await expectDomainError(finaliseReview(ctx.actor, { reviewId: review.id }), "VO_POSITIONS_INCOMPLETE");
@@ -395,8 +409,8 @@ describe("finalisation", () => {
     await upsertValuePositions(ctx.actor, {
       reviewId: review.id,
       positions: [
-        { valueDriverId: ctx.A, currentForecast: "1.00" },
-        { valueDriverId: ctx.B, currentForecast: "1.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "1.00" },
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.B, currentForecast: "1.00" },
         { valueDriverId: ctx.C },
       ],
     });
@@ -421,7 +435,7 @@ describe("finalisation", () => {
     await expectDomainError(
       upsertValuePositions(ctx.actor, {
         reviewId: review.id,
-        positions: [{ valueDriverId: ctx.A, currentForecast: "2.00" }],
+        positions: [{ forecastRationale: "Synthetic test rationale", valueDriverId: ctx.A, currentForecast: "2.00" }],
       }),
       "VO_REVIEW_IMMUTABLE",
     );

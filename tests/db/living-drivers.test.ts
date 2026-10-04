@@ -68,7 +68,14 @@ async function project() {
   const review = await createReview(actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
   await upsertValuePositions(actor, {
     reviewId: review.id,
-    positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00", realisedValue: "1000000.00" }],
+    positions: [
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ctx.driver.id,
+        currentForecast: "4500000.00",
+        realisedValue: "1000000.00",
+      },
+    ],
   });
   await finaliseReview(actor, { reviewId: review.id });
   return { actor, ...ctx, v1, jon, review };
@@ -225,7 +232,9 @@ describe("emerging drivers", () => {
     await expectDomainError(
       upsertValuePositions(ctx.actor, {
         reviewId: review.id,
-        positions: [{ valueDriverId: driver.id, currentForecast: "3000000.00" }],
+        positions: [
+          { forecastRationale: "Synthetic test rationale", valueDriverId: driver.id, currentForecast: "3000000.00" },
+        ],
       }),
       "VO_DRIVER_NOT_IN_VERSION",
     );

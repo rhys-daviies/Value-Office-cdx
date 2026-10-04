@@ -130,7 +130,13 @@ describe("initial VCO authorisation path", () => {
     const { person: vco } = await addStakeholder(actor, { projectId: project.id, name: "VCO" });
     await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "V1" });
-    await addValueDriver(actor, { versionId: v1.id, code: "VD-01", name: "D", financialValue: "1.00" });
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v1.id,
+      code: "VD-01",
+      name: "D",
+      financialValue: "1.00",
+    });
     const evidence = await recordEvidence(actor, { projectId: project.id, code: "E-1", title: "Auth" });
     await expectDomainError(
       authoriseInitialVersion(actor, {
@@ -349,6 +355,7 @@ describe("inherited Business Case (V0) and copy-on-write", () => {
       statedTotalValue: "18000000.00",
     });
     const { driverVersion: v0Driver } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v0.id,
       code: "VD-01",
       name: "Inherited driver",

@@ -67,14 +67,20 @@ function DriverSummaryLine({ driver, currency }: { driver: DriverRow; currency: 
 }
 
 /** Full editor for a driver in a draft version. */
+/** 4D.10E: the governed "why" for this driver's value, separate from how it is calculated. */
+export type AdjustmentPrompt = { label: string; hint: string; required: boolean };
+
 export function DriverEditor({
   driver,
   ctx,
   open = false,
+  adjustment,
 }: {
   driver: DriverRow;
   ctx: DriverEditorContext;
   open?: boolean;
+  /** Shown only on Value Case versions (V1 definition, Value Change drafts); never on the Original Business Case. */
+  adjustment?: AdjustmentPrompt;
 }) {
   const { projectId, currency } = ctx;
   return (
@@ -169,6 +175,16 @@ export function DriverEditor({
               options={evidenceStatusOptions}
             />
           </FormGrid>
+          {adjustment && (
+            <TextArea
+              name="adjustmentRationale"
+              label={adjustment.label}
+              rows={2}
+              defaultValue={driver.adjustmentRationale}
+              required={adjustment.required}
+              hint={adjustment.hint}
+            />
+          )}
           <TextArea name="notes" label="Notes" rows={2} defaultValue={driver.notes} />
           <SubmitButton>Save driver</SubmitButton>
         </div>

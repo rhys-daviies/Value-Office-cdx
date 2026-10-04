@@ -2,6 +2,7 @@ import { and, asc, eq, isNotNull } from "drizzle-orm";
 
 import {
   computeValuePosition,
+  forecastMovement,
   type DriverBasis,
   type PositionTotals,
   type PositionValues,
@@ -166,6 +167,9 @@ export async function getAssuranceWorkspace(projectId: string, reviewId: string)
     rows: rows.map((r) => ({
       ...r,
       forecastRationale: byDriver.get(r.valueDriverId)?.forecastRationale ?? null,
+      valueLeakageId: byDriver.get(r.valueDriverId)?.valueLeakageId ?? null,
+      /** 4D.10E: the formal baseline and whether a movement rationale is required at finalisation. */
+      governed: forecastMovement(r, previous ? "review" : "authorised"),
       realisedValueRationale: byDriver.get(r.valueDriverId)?.realisedValueRationale ?? null,
       previousRealised: previousPositions?.get(r.valueDriverId)?.realisedValue ?? null,
     })),
@@ -263,4 +267,19 @@ export async function listReviewEvidenceOptions(projectId: string) {
     .from(schema.evidence)
     .where(eq(schema.evidence.projectId, projectId))
     .orderBy(asc(schema.evidence.code));
+}
+
+/** 4D.10E: Assurance matters a forecast movement may be related to (open first; closed ones stay selectable). */
+export async function listMatterOptions(projectId: string) {
+  const rows = await db()
+    .select({
+      id: schema.valueLeakage.id,
+      code: schema.valueLeakage.code,
+      title: schema.valueLeakage.title,
+      status: schema.valueLeakage.status,
+    })
+    .from(schema.valueLeakage)
+    .where(eq(schema.valueLeakage.projectId, projectId))
+    .orderBy(asc(schema.valueLeakage.code));
+  return [...rows.filter((r) => r.status === "open"), ...rows.filter((r) => r.status !== "open")];
 }

@@ -13,6 +13,7 @@ import {
   proposeVersion,
   recordInheritedBusinessCase,
   removeValueDriver,
+  setNotCarriedForward,
   updateDriverVersion,
   updateVersionDetails,
 } from "@/server/commands/value-case";
@@ -58,12 +59,14 @@ describe("Original Business Case capture and recording", () => {
     )!;
     expect(draftItem.action).toEqual({ label: "Finish and record the Original Business Case", href: "value-case/v/0" });
     const { driverVersion: a } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v0.id,
       code: "VD-01",
       name: "Procurement",
       financialValue: "6000000.00",
     });
     await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v0.id,
       code: "VD-02",
       name: "Productivity",
@@ -82,7 +85,13 @@ describe("Original Business Case capture and recording", () => {
       "VO_VERSION_IMMUTABLE",
     );
     await expectDomainError(
-      addValueDriver(actor, { versionId: v0.id, code: "VD-03", name: "Late", financialValue: "1.00" }),
+      addValueDriver(actor, {
+        adjustmentRationale: "Synthetic test rationale",
+        versionId: v0.id,
+        code: "VD-03",
+        name: "Late",
+        financialValue: "1.00",
+      }),
       "VO_VERSION_IMMUTABLE",
     );
     await expectDomainError(
@@ -120,18 +129,21 @@ describe("Value Case Definition from the Original Business Case", () => {
       statedTotalValue: "9000000.00",
     });
     const { driver: d1 } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v0.id,
       code: "VD-01",
       name: "A",
       financialValue: "5000000.00",
     });
     const { driver: d2 } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v0.id,
       code: "VD-02",
       name: "B",
       financialValue: "3000000.00",
     });
     const { driver: d3 } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v0.id,
       code: "VD-03",
       name: "C",
@@ -149,7 +161,13 @@ describe("Value Case Definition from the Original Business Case", () => {
     const byId = Object.fromEntries(ws.requalifiedDrivers.map((d) => [d.code, d.driverVersionId]));
     await updateDriverVersion(actor, { driverVersionId: byId["VD-02"]!, financialValue: "2500000.00" }); // adjusted
     await removeValueDriver(actor, { driverVersionId: byId["VD-03"]! }); // not carried forward
-    await addValueDriver(actor, { versionId: v1.id, code: "VD-04", name: "New", financialValue: "750000.00" }); // new
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v1.id,
+      code: "VD-04",
+      name: "New",
+      financialValue: "750000.00",
+    }); // new
     expect(await comparison(project.id)).toEqual({
       "VD-01": "unchanged",
       "VD-02": "adjusted",
@@ -166,6 +184,16 @@ describe("Value Case Definition from the Original Business Case", () => {
     expect((await presentation(project.id))["VD-03"]).toBe("original_only");
 
     // Proposal and authorisation keep their existing gates.
+    // 4D.10E: the adjusted and not-carried-forward drivers need their governed reasons before proposal.
+    await updateDriverVersion(actor, {
+      driverVersionId: byId["VD-02"]!,
+      adjustmentRationale: "Synthetic: re-baselined",
+    });
+    await setNotCarriedForward(actor, {
+      versionId: v1.id,
+      valueDriverId: d3.id,
+      adjustmentRationale: "Synthetic: benefit no longer achievable",
+    });
     await proposeVersion(actor, { versionId: v1.id });
     const ev = await recordEvidence(actor, { projectId: project.id, code: "E-001", title: "Notice" });
     await authoriseInitialVersion(actor, {
@@ -181,7 +209,13 @@ describe("Value Case Definition from the Original Business Case", () => {
     const actor = await newActor();
     const { project } = await withVco(actor);
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Value Case" });
-    await addValueDriver(actor, { versionId: v1.id, code: "VD-01", name: "A", financialValue: "1.00" });
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v1.id,
+      code: "VD-01",
+      name: "A",
+      financialValue: "1.00",
+    });
     expect(await comparison(project.id)).toEqual({ "VD-01": "new" });
     expect((await getMobilisationStatus(project.id))!.facts.v1?.basedOnOriginal).toBe(false);
   });
@@ -193,12 +227,14 @@ describe("late Original Business Case (V1 already exists)", () => {
     const { project } = await withVco(actor);
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Value Case" });
     const { driver: d1 } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: "VD-01",
       name: "Procurement",
       financialValue: "4000000.00",
     });
     await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: "VD-02",
       name: "Productivity",
@@ -248,6 +284,7 @@ describe("late Original Business Case (V1 already exists)", () => {
     const { project: other } = await withVco(actor);
     const ov1 = await createDraftVersion(actor, { projectId: other.id, title: "Other" });
     const { driver: foreign } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: ov1.id,
       code: "VD-01",
       name: "X",

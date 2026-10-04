@@ -25,9 +25,13 @@ test("position → leakage → options → recommendation → decision → Value
   // ---- A3: explicit Not Assessed makes the project forecast Incomplete ----------------
   const positions = page.getByTestId("positions-form");
   await positions.getByTestId("position-editor-VD-01").getByLabel("Current Forecast").fill("0.9m");
+  await positions
+    .getByTestId("position-editor-VD-01")
+    .getByLabel("Why the forecast changed (or why Not Assessed)")
+    .fill("Synthetic: slower ramp-up");
   const beta = positions.getByTestId("position-editor-VD-02");
   await beta.getByLabel("Not assessed — no forecast possible yet").check();
-  await beta.getByRole("textbox", { name: "Forecast rationale" }).fill("Vendor volumes not yet reported");
+  await beta.getByRole("textbox", { name: /Why the forecast changed/ }).fill("Vendor volumes not yet reported");
   await positions.getByTestId("position-editor-VD-03").getByLabel("Outcome outlook").fill("Positive");
   await positions.getByRole("button", { name: "Save Value Positions" }).click();
   await saved(positions, "Value Positions saved");

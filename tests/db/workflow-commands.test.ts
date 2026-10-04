@@ -115,12 +115,19 @@ describe("Value Driver editing (PMO decisions 1 and 2)", () => {
     const { project } = await newProject(actor);
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "V1" });
     const { driverVersion: a } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: "VD-01",
       name: "A",
       financialValue: "4800000.00",
     });
-    await addValueDriver(actor, { versionId: v1.id, code: "VD-02", name: "B", financialValue: "1000000.00" });
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v1.id,
+      code: "VD-02",
+      name: "B",
+      financialValue: "1000000.00",
+    });
     const cleared = await updateDriverVersion(actor, { driverVersionId: a.id, financialValue: null });
     expect(cleared.financialValue).toBeNull();
     const { total, driversWithoutValue } = await getVersionTotal(v1.id);
@@ -132,8 +139,15 @@ describe("Value Driver editing (PMO decisions 1 and 2)", () => {
     const actor = await newActor();
     const { project } = await newProject(actor);
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "V1" });
-    await addValueDriver(actor, { versionId: v1.id, code: "VD-01", name: "Benefit", financialValue: "2000000.00" });
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v1.id,
+      code: "VD-01",
+      name: "Benefit",
+      financialValue: "2000000.00",
+    });
     const { driverVersion } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: "VD-02",
       name: "Dis-benefit",
@@ -148,6 +162,7 @@ describe("Value Driver editing (PMO decisions 1 and 2)", () => {
     const { project } = await newProject(actor);
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "V1" });
     const { driverVersion } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: "VD-01",
       name: "A",

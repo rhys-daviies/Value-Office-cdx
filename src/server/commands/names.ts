@@ -27,6 +27,8 @@ export const COMMANDS = {
   updateVersionDetails: "valueCase.updateVersionDetails",
   addValueDriver: "valueCase.addValueDriver",
   addExistingDriverToOriginal: "valueCase.addExistingDriverToOriginal",
+  setNotCarriedForward: "valueCase.setNotCarriedForward", // trigger-checked
+  clearNotCarriedForward: "valueCase.clearNotCarriedForward", // trigger-checked
   updateDriverVersion: "valueCase.updateDriverVersion",
   addAssumption: "valueCase.addAssumption",
   updateAssumption: "valueCase.updateAssumption",

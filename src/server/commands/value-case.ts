@@ -172,7 +172,8 @@ export async function copyVersionContents(tx: Tx, fromVersionId: string, toVersi
   for (const { id: oldDriverVersionId, createdAt, ...driver } of drivers) {
     const [copy] = await tx
       .insert(schema.valueDriverVersion)
-      .values({ ...driver, valueCaseVersionId: toVersionId })
+      // 4D.10E: an adjustment rationale explains one version against its own baseline — never copied forward.
+      .values({ ...driver, adjustmentRationale: null, valueCaseVersionId: toVersionId })
       .returning({ id: schema.valueDriverVersion.id });
 
     const links = await tx
@@ -224,6 +225,7 @@ const driverFields = z.object({
   targetValue: metricString.optional(),
   calculationRationale: optionalText,
   financialValue: moneyString.optional(),
+  adjustmentRationale: optionalText,
   timingDescription: optionalText,
   benefitStartDate: isoDate.optional(),
   benefitFullDate: isoDate.optional(),
@@ -311,6 +313,50 @@ export const addExistingDriverToOriginal = defineCommand(
 );
 
 /**
+ * 4D.10E: why an Original Business Case driver is not carried into the first governed Value Case (V1). The same
+ * governed adjustment rationale as a driver row, held separately because the driver has no V1 row. Draft V1 only;
+ * the database checks the command, the version and that the driver is an Original Business Case driver not in V1.
+ */
+export const setNotCarriedForward = defineCommand(
+  COMMANDS.setNotCarriedForward,
+  z.object({ versionId: uuid, valueDriverId: uuid, adjustmentRationale: nonBlank }),
+  async ({ tx }, input) => {
+    const version = await getVersion(tx, input.versionId);
+    requireDraft(version);
+    const [row] = await tx
+      .insert(schema.valueDriverExclusion)
+      .values({
+        valueCaseVersionId: version.id,
+        valueDriverId: input.valueDriverId,
+        valueCaseId: version.valueCaseId,
+        projectId: version.projectId,
+        adjustmentRationale: input.adjustmentRationale,
+      })
+      .onConflictDoUpdate({
+        target: [schema.valueDriverExclusion.valueCaseVersionId, schema.valueDriverExclusion.valueDriverId],
+        set: { adjustmentRationale: input.adjustmentRationale },
+      })
+      .returning();
+    return row!;
+  },
+);
+
+export const clearNotCarriedForward = defineCommand(
+  COMMANDS.clearNotCarriedForward,
+  z.object({ versionId: uuid, valueDriverId: uuid }),
+  async ({ tx }, input) => {
+    await tx
+      .delete(schema.valueDriverExclusion)
+      .where(
+        and(
+          eq(schema.valueDriverExclusion.valueCaseVersionId, input.versionId),
+          eq(schema.valueDriverExclusion.valueDriverId, input.valueDriverId),
+        ),
+      );
+  },
+);
+
+/**
  * Edits a driver version in a draft. `null` clears a field: a cleared
  * financial value makes the driver non-financial (excluded from the total).
  */
@@ -326,6 +372,8 @@ export const updateDriverVersion = defineCommand(
     targetValue: clearableMetric,
     calculationRationale: clearableText,
     financialValue: clearableMoney,
+    /** 4D.10E: why the governed value differs from its baseline (required at V1 proposal for a movement). */
+    adjustmentRationale: clearableText,
     timingDescription: clearableText,
     benefitStartDate: clearableDate,
     benefitFullDate: clearableDate,
@@ -377,6 +425,7 @@ export async function driverInUse(tx: Tx, valueDriverId: string): Promise<boolea
         or exists (select 1 from evidence_link where value_driver_id = ${valueDriverId})
         or exists (select 1 from value_leakage_driver where value_driver_id = ${valueDriverId})
         or exists (select 1 from information_request_item where value_driver_id = ${valueDriverId})
+        or exists (select 1 from value_driver_exclusion where value_driver_id = ${valueDriverId})
         or exists (select 1 from leakage_assessment where ${valueDriverId}::uuid = any (snapshot_driver_ids))
       as used`);
   return result.rows[0]!.used;

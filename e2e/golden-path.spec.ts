@@ -142,6 +142,10 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await f.getByLabel("Accountable Value Owner").selectOption({ label: "Avery Accountable" });
   await f.getByLabel("Qualification status").selectOption({ label: "Partially qualified" });
   await f.getByLabel("Evidence status").selectOption({ label: "Partially evidenced" });
+  // 4D.10E: the governed "why", separate from the calculation rationale above.
+  await f
+    .getByLabel("Why the value differs from the Original Business Case")
+    .fill("Effort study supports 5 units per case, not the 6 assumed in the Original Business Case");
   await submit(f, "Save driver", "Value Driver saved");
 
   // Assumption + evidence link on VD-01
@@ -166,6 +170,20 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await add.getByLabel("Name").fill("Transition dis-benefit");
   await add.getByRole("textbox", { name: /^Financial value/ }).fill("-0.3m");
   await submit(add, "Add driver", "Value Driver VD-03 added");
+
+  // The introduced VD-03 needs its "why introduced" before V1 can be proposed (VD-02 is non-financial: none needed).
+  await expect(page.getByTestId("propose-checklist")).toContainText("Rationale missing for VD-03");
+  await expect(page.getByRole("button", { name: "Propose Value Case V1" })).toBeDisabled();
+  await page.getByTestId("driver-edit-VD-03").click();
+  const f3 = page.getByTestId("driver-form-VD-03");
+  await f3
+    .getByLabel("Why this value is introduced")
+    .fill("Transition dis-benefit not recognised in the Original Business Case");
+  await submit(f3, "Save driver", "Value Driver saved");
+  await expect(page.getByTestId("propose-checklist")).toContainText("Every governed value movement has a rationale");
+  const why = (code: string) => page.locator(`[data-testid="comparison-rationale"][data-code="${code}"]`);
+  await expect(why("VD-01")).toContainText("Why changed: Effort study supports 5 units per case");
+  await expect(why("VD-03")).toContainText("Why introduced: Transition dis-benefit");
 
   await expect(page.getByTestId("requal-v1-total")).toHaveText("NZ$4.5m");
   await expect(page.getByTestId("requal-inherited-total")).toHaveText("NZ$18.0m");

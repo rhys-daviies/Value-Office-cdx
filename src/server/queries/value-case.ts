@@ -242,7 +242,18 @@ export async function getRequalificationWorkspace(projectId: string) {
     (inheritedSummary.financialCount > 0 ? inheritedSummary.financialTotal : null);
 
   const requalifiedSummary = summariseDrivers(requalifiedDrivers);
+  // 4D.10E: reasons recorded for Original Business Case drivers not carried into V1.
+  const exclusions = requalifiedVersion
+    ? await db()
+        .select({
+          valueDriverId: schema.valueDriverExclusion.valueDriverId,
+          adjustmentRationale: schema.valueDriverExclusion.adjustmentRationale,
+        })
+        .from(schema.valueDriverExclusion)
+        .where(eq(schema.valueDriverExclusion.valueCaseVersionId, requalifiedVersion.id))
+    : [];
   return {
+    exclusions,
     inheritedVersion,
     inheritedDrivers,
     inheritedTotal,

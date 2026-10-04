@@ -98,7 +98,13 @@ describe("Mobilisation status through the pre-V1 journey", () => {
     expect((await status(p2.id)).next?.label).toMatch(/Start Value Case Definition/);
     const v1 = await createDraftVersion(actor, { projectId: p2.id, title: "Value Case", basedOnVersionId: v0.id });
     expect((await status(p2.id)).next?.label).toBe("Add Value Drivers to the draft V1");
-    await addValueDriver(actor, { versionId: v1.id, code: "VD-01", name: "D", financialValue: "900000.00" });
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v1.id,
+      code: "VD-01",
+      name: "D",
+      financialValue: "900000.00",
+    });
     expect((await item(p2.id, "v1-drivers")).detail).toBe(
       "1 driver · 1 unqualified · 1 unevidenced (visible, not blocking)",
     );

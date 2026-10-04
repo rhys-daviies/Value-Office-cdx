@@ -81,11 +81,13 @@ async function reviewWithOptions(
       reviewId,
       positions: [
         {
+          forecastRationale: "Synthetic test rationale",
           valueDriverId: id("VD-01"),
           currentForecast: "19000000.00",
           realisedValue: realised === "complete" || realised === "partial" ? amounts[0] : undefined,
         },
         {
+          forecastRationale: "Synthetic test rationale",
           valueDriverId: id("VD-02"),
           currentForecast: "9000000.00",
           realisedValue: realised === "complete" ? amounts[1] : undefined,

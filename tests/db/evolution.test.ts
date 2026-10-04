@@ -146,7 +146,9 @@ describe("Value Case Evolution read model", () => {
     });
     await upsertValuePositions(actor, {
       reviewId: review.id,
-      positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00" }], // realised not recorded
+      positions: [
+        { forecastRationale: "Synthetic test rationale", valueDriverId: ctx.driver.id, currentForecast: "4500000.00" },
+      ], // realised not recorded
     });
     await finaliseReview(actor, { reviewId: review.id });
     const { change, version: v2 } = await createValueChange(actor, {
@@ -154,7 +156,13 @@ describe("Value Case Evolution read model", () => {
       code: "VC-001",
       reason: "Add a driver",
     });
-    await addValueDriver(actor, { versionId: v2.id, code: "VD-02", name: "Extra", financialValue: "200000.00" });
+    await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
+      versionId: v2.id,
+      code: "VD-02",
+      name: "Extra",
+      financialValue: "200000.00",
+    });
     await proposeValueChange(actor, { changeId: change.id });
     const ev = await recordEvidence(actor, { projectId: ctx.project.id, code: "E-V2", title: "V2 authorisation" });
     await authoriseValueChange(actor, {

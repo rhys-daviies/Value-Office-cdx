@@ -48,6 +48,7 @@ export async function seedCompactAuthorised(actor: Actor, opts: { code?: string;
   await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
   const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
   await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-01",
     name: "Alpha Savings",
@@ -55,6 +56,7 @@ export async function seedCompactAuthorised(actor: Actor, opts: { code?: string;
     sortOrder: 1,
   });
   await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-02",
     name: "Beta Revenue",
@@ -103,8 +105,8 @@ export async function seedCompactDecided(actor: Actor, opts: { code: string; nam
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: id("VD-01"), currentForecast: "900000.00" },
-      { valueDriverId: id("VD-02"), currentForecast: "500000.00" },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-01"), currentForecast: "900000.00" },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "500000.00" },
       { valueDriverId: id("VD-03"), forecastRationale: "On track" },
     ],
   });
@@ -149,8 +151,8 @@ export async function seedCompactOperating(actor: Actor, opts: { code: string; n
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: id("VD-01"), currentForecast: "900000.00" },
-      { valueDriverId: id("VD-02"), currentForecast: "500000.00" },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-01"), currentForecast: "900000.00" },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "500000.00" },
       { valueDriverId: id("VD-03"), forecastRationale: "On track" },
     ],
   });
@@ -229,6 +231,7 @@ export async function seedCompactEvolution(actor: Actor, opts: { code: string; n
     basedOnVersionId: v0.id,
   });
   await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-01",
     name: "Alpha Savings",
@@ -236,6 +239,7 @@ export async function seedCompactEvolution(actor: Actor, opts: { code: string; n
     sortOrder: 1,
   });
   await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-02",
     name: "Beta Revenue",
@@ -265,6 +269,7 @@ export async function seedCompactEvolution(actor: Actor, opts: { code: string; n
     await upsertValuePositions(actor, {
       reviewId: review.id,
       positions: positions.map((p) => ({
+        forecastRationale: "Synthetic test rationale",
         valueDriverId: id(p.code),
         currentForecast: p.forecast,
         realisedValue: p.realised,
@@ -392,8 +397,8 @@ export async function seedCompactDecision(actor: Actor, opts: { code: string; na
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: id("VD-01"), currentForecast: "900000.00" },
-      { valueDriverId: id("VD-02"), currentForecast: "500000.00" },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-01"), currentForecast: "900000.00" },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "500000.00" },
       { valueDriverId: id("VD-03"), forecastRationale: "On track" },
     ],
   });
@@ -476,9 +481,24 @@ export async function seedCompactTrajectory(
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: ids[0]!, currentForecast: "13000000.00", realisedValue: "2500000.00" },
-      { valueDriverId: ids[1]!, currentForecast: "9000000.00", realisedValue: "1000000.00" },
-      { valueDriverId: ids[2]!, currentForecast: "4000000.00", realisedValue: "500000.00" },
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ids[0]!,
+        currentForecast: "13000000.00",
+        realisedValue: "2500000.00",
+      },
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ids[1]!,
+        currentForecast: "9000000.00",
+        realisedValue: "1000000.00",
+      },
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ids[2]!,
+        currentForecast: "4000000.00",
+        realisedValue: "500000.00",
+      },
     ],
   });
   await setForecastPoint(actor, { reviewId: review.id, asOf: "2027-12-31", value: "16000000.00" });
@@ -527,6 +547,7 @@ export async function seedCompactTrajectoryDraft(actor: Actor, opts: { code: str
   await setValueCaseOwner(actor, { projectId: project.id, personId: vco.id });
   const v1 = await createDraftVersion(actor, { projectId: project.id, title: "Re-Qualified Value Case" });
   await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-01",
     name: "Procurement Savings",
@@ -534,6 +555,7 @@ export async function seedCompactTrajectoryDraft(actor: Actor, opts: { code: str
     sortOrder: 1,
   });
   await addValueDriver(actor, {
+    adjustmentRationale: "Synthetic test rationale",
     versionId: v1.id,
     code: "VD-02",
     name: "Revenue Uplift",

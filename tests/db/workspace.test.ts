@@ -48,7 +48,14 @@ async function project() {
   const review = await createReview(actor, { projectId: ctx.project.id, trigger: "ad_hoc", reviewDate: today });
   await upsertValuePositions(actor, {
     reviewId: review.id,
-    positions: [{ valueDriverId: ctx.driver.id, currentForecast: "4500000.00", realisedValue: "1000000.00" }],
+    positions: [
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: ctx.driver.id,
+        currentForecast: "4500000.00",
+        realisedValue: "1000000.00",
+      },
+    ],
   });
   await finaliseReview(actor, { reviewId: review.id });
   const { person: owner } = await addStakeholder(actor, { projectId: ctx.project.id, name: "Rita Risk" });

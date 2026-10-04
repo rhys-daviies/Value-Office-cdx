@@ -178,7 +178,13 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
     review3: Row<typeof createReview>;
   };
   const positions = (forecast: readonly string[], realised: readonly string[]) =>
-    s.drivers.map((id, i) => ({ valueDriverId: id, currentForecast: forecast[i]!, realisedValue: realised[i]! }));
+    s.drivers.map((id, i) => ({
+      valueDriverId: id,
+      currentForecast: forecast[i]!,
+      realisedValue: realised[i]!,
+      // 4D.10E: a forecast that moves from its formal baseline needs a reason at finalisation.
+      forecastRationale: "Synthetic: forecast as formally assessed at this review",
+    }));
 
   return {
     state: s,
@@ -226,6 +232,8 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
           code,
           name,
           financialValue: value,
+          // 4D.10E: the Original Business Case is a headline only, so every driver is introduced in V1.
+          adjustmentRationale: "Synthetic: introduced in the first governed Value Case",
           sortOrder: i + 1,
         });
         s.drivers.push(driver.id);

@@ -8,7 +8,13 @@ import {
   unlinkReviewEvidenceAction,
   updateReviewAction,
 } from "@/server/actions/assurance";
-import { getAssuranceWorkspace, listReviewEvidenceOptions, type AssuranceWorkspace } from "@/server/queries/assurance";
+import { hasRationale } from "@/domain/value-case";
+import {
+  getAssuranceWorkspace,
+  listMatterOptions,
+  listReviewEvidenceOptions,
+  type AssuranceWorkspace,
+} from "@/server/queries/assurance";
 import { listOpenMatterEvidence } from "@/server/queries/evidence";
 import { listDriverOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
@@ -53,9 +59,10 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   if (!isUuid(reviewId)) notFound();
   const ws = await getAssuranceWorkspace(projectId, reviewId);
   if (!ws) notFound();
-  const [evidenceOptions, matterEvidence] = await Promise.all([
+  const [evidenceOptions, matterEvidence, matters] = await Promise.all([
     listReviewEvidenceOptions(projectId),
     listOpenMatterEvidence(projectId),
+    listMatterOptions(projectId),
   ]);
 
   const { review, totals } = ws;
@@ -69,6 +76,8 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   const realised = realisedHeadline(totals, currency);
   const blankForecasts = totals.forecastBlockers.filter((b) => !b.notAssessed);
   const notAssessed = totals.forecastBlockers.filter((b) => b.notAssessed);
+  // 4D.10E: forecast movements that still need their governed "why" (mirrors the finalisation gate).
+  const unexplained = ws.rows.filter((r) => r.governed.rationaleRequired && !hasRationale(r.forecastRationale));
   const response = await getReviewResponse(projectId, review.id);
   const trajectory = await getReviewTrajectoryAuthoring(projectId, review.id, ws.totals.forecastTotal);
   const [stakeholders, driverOptions, alternatives, story] = await Promise.all([
@@ -252,8 +261,8 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
         title="Value Position"
         description={`Per Value Driver. Movement is Current Forecast − ${ws.previous ? `Review #${ws.previous.sequence} forecast` : "Authorised Value (first review)"}; Value Gap is Authorised Value − Current Forecast.`}
       >
-        <PositionTable ws={ws} currency={currency} />
-        {draft && <PositionEditor ws={ws} projectId={projectId} currency={currency} />}
+        <PositionTable ws={ws} currency={currency} matters={matters} draft={draft} />
+        {draft && <PositionEditor ws={ws} projectId={projectId} currency={currency} matters={matters} />}
       </Section>
 
       {/* ---- Summary ------------------------------------------------------------------- */}
@@ -441,6 +450,11 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
                 as Incomplete
               </li>
             )}
+            <li className={unexplained.length === 0 ? "text-emerald-800" : "text-red-700"} data-testid="finalise-why">
+              {unexplained.length === 0
+                ? "✓ Every forecast movement has a reason"
+                : `✗ ${unexplained.map((r) => r.code).join(", ")}: forecast moved from its formal baseline — record why (required)`}
+            </li>
             <li className={review.whatChanged ? "text-emerald-800" : "text-amber-800"}>
               {review.whatChanged ? "✓ What changed recorded" : "⚠ What changed not recorded"}
             </li>
@@ -459,13 +473,15 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             <Hidden name="projectId" value={projectId} />
             <Hidden name="reviewId" value={review.id} />
             <SubmitButton
-              disabled={ws.missingPositions > 0 || blankForecasts.length > 0}
+              disabled={ws.missingPositions > 0 || blankForecasts.length > 0 || unexplained.length > 0}
               title={
                 ws.missingPositions > 0
                   ? "Save a position for every driver first"
                   : blankForecasts.length > 0
                     ? "Every financial driver needs a forecast or an explicit Not Assessed"
-                    : undefined
+                    : unexplained.length > 0
+                      ? "Record why each moved forecast changed"
+                      : undefined
               }
             >
               Finalise review
@@ -477,7 +493,19 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   );
 }
 
-function PositionTable({ ws, currency }: { ws: AssuranceWorkspace; currency: string }) {
+type MatterOption = { id: string; code: string; title: string; status: string };
+
+function PositionTable({
+  ws,
+  currency,
+  matters,
+  draft,
+}: {
+  ws: AssuranceWorkspace;
+  currency: string;
+  matters: MatterOption[];
+  draft: boolean;
+}) {
   const money = (v: string | null) => (v === null ? "—" : formatMoneyShort(v, currency));
   return (
     <Table>
@@ -503,7 +531,20 @@ function PositionTable({ ws, currency }: { ws: AssuranceWorkspace; currency: str
               <span className="font-mono text-slate-500">{r.code}</span> <span className="font-medium">{r.name}</span>
               {!r.hasPosition && <span className="block text-xs text-red-700">No position saved</span>}
               {r.forecastRationale && (
-                <span className="block text-xs text-slate-500">Forecast: {r.forecastRationale}</span>
+                <span className="block text-xs text-slate-500" data-testid="position-why">
+                  {r.governed.moved ? "Why it moved" : r.forecastNotAssessed ? "Not Assessed" : "Forecast"}:{" "}
+                  {r.forecastRationale}
+                </span>
+              )}
+              {draft && r.governed.rationaleRequired && !hasRationale(r.forecastRationale) && (
+                <span className="block text-xs text-red-700" data-testid="position-why-missing">
+                  Forecast moved — a reason is required at finalisation
+                </span>
+              )}
+              {r.valueLeakageId && (
+                <span className="block text-xs text-slate-500">
+                  Related matter: {matters.find((m) => m.id === r.valueLeakageId)?.code ?? "—"}
+                </span>
               )}
               {r.realisedValueRationale && (
                 <span className="block text-xs text-slate-500">Realised: {r.realisedValueRationale}</span>
@@ -556,7 +597,17 @@ function PositionTable({ ws, currency }: { ws: AssuranceWorkspace; currency: str
   );
 }
 
-function PositionEditor({ ws, projectId, currency }: { ws: AssuranceWorkspace; projectId: string; currency: string }) {
+function PositionEditor({
+  ws,
+  projectId,
+  currency,
+  matters,
+}: {
+  ws: AssuranceWorkspace;
+  projectId: string;
+  currency: string;
+  matters: MatterOption[];
+}) {
   if (ws.rows.length === 0) return <Empty>The authorised version has no Value Drivers.</Empty>;
   return (
     <div className="mt-5 border-t border-slate-200 pt-4">
@@ -599,9 +650,12 @@ function PositionEditor({ ws, projectId, currency }: { ws: AssuranceWorkspace; p
                   />
                   <TextArea
                     name={`forecastRationale__${r.valueDriverId}`}
-                    label="Forecast rationale"
+                    label="Why the forecast changed (or why Not Assessed)"
                     rows={1}
                     defaultValue={r.forecastRationale}
+                    hint={`Required at finalisation when the forecast differs from its formal baseline: ${
+                      r.governed.baseline === null ? "—" : formatMoneyShort(r.governed.baseline, currency)
+                    } (${r.governed.source === "previous_review" ? `Review #${ws.previous!.sequence} forecast` : "authorised value"}).`}
                   />
                   <TextField
                     name={`realised__${r.valueDriverId}`}
@@ -615,6 +669,19 @@ function PositionEditor({ ws, projectId, currency }: { ws: AssuranceWorkspace; p
                     rows={1}
                     defaultValue={r.realisedValueRationale}
                   />
+                  <div className="sm:col-span-2">
+                    <SelectField
+                      name={`matter__${r.valueDriverId}`}
+                      label="Related Assurance matter (optional)"
+                      defaultValue={r.valueLeakageId}
+                      placeholder="— None —"
+                      options={matters.map((m) => ({
+                        value: m.id,
+                        label: `${m.code} ${m.title}${m.status === "open" ? "" : " (closed)"}`,
+                      }))}
+                      hint="If an Assurance matter explains the movement. Value Leakage need not reconcile to the Value Gap."
+                    />
+                  </div>
                   <div className="sm:col-span-4">
                     <Checkbox
                       name={`notAssessed__${r.valueDriverId}`}

@@ -306,7 +306,7 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
               Edit only the drivers affected by this change. V{d.fromVersion.versionNumber} is never modified.
             </p>
             {d.toDrivers.map((drv) => (
-              <DriverEditor key={drv.driverVersionId} driver={drv} ctx={ctx} />
+              <DriverEditor key={drv.driverVersionId} driver={drv} ctx={ctx} adjustment={VALUE_CHANGE_ADJUSTMENT} />
             ))}
             <AddDriverForm
               versionId={d.toVersion.id}
@@ -516,3 +516,13 @@ function Figure({ label, value, note, testId }: { label: string; value: string; 
     </div>
   );
 }
+
+/**
+ * 4D.10E: on a Value Change the governed explanation is the change's own reason (required at proposal). A
+ * driver-level reason is optional — useful when several drivers move for different reasons.
+ */
+const VALUE_CHANGE_ADJUSTMENT = {
+  label: "Why this driver changes (optional)",
+  hint: "The Value Change reason explains the change as a whole and is required at proposal. Add a driver-level reason when drivers move for different reasons.",
+  required: false,
+};

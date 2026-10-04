@@ -302,6 +302,7 @@ describe("draft trajectory preview", () => {
       reviewId: draft.id,
       positions: [
         {
+          forecastRationale: "Synthetic test rationale",
           valueDriverId: await driverId(x.project.id, "VD-01"),
           currentForecast: "13000000.00",
           realisedValue: "4000000.00",

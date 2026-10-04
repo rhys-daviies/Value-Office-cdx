@@ -79,8 +79,13 @@ async function compactDecided() {
   await upsertValuePositions(actor, {
     reviewId: review.id,
     positions: [
-      { valueDriverId: id("VD-01"), currentForecast: "900000.00", realisedValue: "100000.00" },
-      { valueDriverId: id("VD-02"), currentForecast: "400000.00" },
+      {
+        forecastRationale: "Synthetic test rationale",
+        valueDriverId: id("VD-01"),
+        currentForecast: "900000.00",
+        realisedValue: "100000.00",
+      },
+      { forecastRationale: "Synthetic test rationale", valueDriverId: id("VD-02"), currentForecast: "400000.00" },
       { valueDriverId: id("VD-03"), forecastRationale: "On track" },
     ],
   });

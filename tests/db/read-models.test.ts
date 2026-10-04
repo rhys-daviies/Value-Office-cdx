@@ -60,6 +60,7 @@ describe("evidence register", () => {
     await setValueCaseOwner(actor, { projectId: project.id, personId: person.id });
     const v1 = await createDraftVersion(actor, { projectId: project.id, title: "V1" });
     const { driverVersion } = await addValueDriver(actor, {
+      adjustmentRationale: "Synthetic test rationale",
       versionId: v1.id,
       code: "VD-01",
       name: "D",

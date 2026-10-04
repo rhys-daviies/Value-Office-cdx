@@ -9,7 +9,7 @@ function tab(page: Page, name: string) {
 
 async function enterPositions(
   page: Page,
-  values: Record<string, { forecast?: string; realised?: string; note?: string }>,
+  values: Record<string, { forecast?: string; realised?: string; note?: string; why?: string }>,
 ) {
   const form = page.getByTestId("positions-form");
   for (const [code, v] of Object.entries(values)) {
@@ -17,6 +17,7 @@ async function enterPositions(
     if (v.forecast !== undefined) await block.getByLabel("Current Forecast").fill(v.forecast);
     if (v.realised !== undefined) await block.getByLabel("Realised Value (cumulative)").fill(v.realised);
     if (v.note !== undefined) await block.getByLabel("Outcome outlook").fill(v.note);
+    if (v.why !== undefined) await block.getByLabel("Why the forecast changed (or why Not Assessed)").fill(v.why);
   }
   await form.getByRole("button", { name: "Save Value Positions" }).click();
   await expect(form.getByRole("status")).toContainText("Value Positions saved");
@@ -78,6 +79,18 @@ test("Authorised V1 → review → positions → finalise → second review comp
   await page.getByTestId("why-it-matters-form").getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("why-it-matters-form").getByRole("status")).toContainText("Review saved");
 
+  // 4D.10E: both forecasts moved from the authorised value — finalisation needs the governed "why".
+  await expect(page.getByTestId("finalise-why")).toContainText("VD-01, VD-02: forecast moved from its formal baseline");
+  await expect(page.getByRole("button", { name: "Finalise review" })).toBeDisabled();
+  await enterPositions(page, {
+    "VD-01": { why: "Ramp-up slower than planned" },
+    "VD-02": { why: "Beta volumes below plan in Q3" },
+  });
+  await expect(page.getByTestId("finalise-why")).toContainText("Every forecast movement has a reason");
+  await expect(row(page, "VD-02").getByTestId("position-why")).toHaveText(
+    "Why it moved: Beta volumes below plan in Q3",
+  );
+
   await page.getByRole("button", { name: "Finalise review" }).click();
   await expect(page.getByTestId("review-state")).toContainText("Finalised");
   await expect(page.getByTestId("positions-form")).toHaveCount(0);
@@ -98,7 +111,7 @@ test("Authorised V1 → review → positions → finalise → second review comp
   await expect(page.getByTestId("previous-position")).toContainText("Review #1");
 
   await enterPositions(page, {
-    "VD-01": { forecast: "1.0m", realised: "300k" },
+    "VD-01": { forecast: "1.0m", realised: "300k", why: "Recovered after the vendor fix" },
     "VD-02": { forecast: "0.4m" },
     "VD-03": { note: "Unchanged" },
   });

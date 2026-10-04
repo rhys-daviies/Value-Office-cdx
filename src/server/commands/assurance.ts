@@ -149,8 +149,11 @@ const positionInput = z.object({
   realisedValue: clearableMoney,
   /** Explicit "Not Assessed": clears the forecast and requires a rationale. */
   forecastNotAssessed: z.boolean().optional(),
+  /** Why Not Assessed, or (4D.10E) why the forecast moved from its formal baseline — required at finalisation. */
   forecastRationale: clearableText,
   realisedValueRationale: clearableText,
+  /** 4D.10E: optional Assurance matter that explains the movement. */
+  valueLeakageId: clearableUuid,
 });
 
 /**

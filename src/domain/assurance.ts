@@ -133,3 +133,32 @@ export function computeValuePosition(
     },
   };
 }
+
+/**
+ * Governed forecast movement (4D.10E): the formal baseline a Current Forecast is measured against at finalisation —
+ * the previous finalised review's forecast for the driver (the existing movement basis), or the driver's authorised
+ * value in the version measured against when there is none (first review; the driver absent from, or Not Assessed in,
+ * the previous review). A different forecast needs a forecast rationale. Non-financial drivers and Not Assessed
+ * positions are outside this rule (Not Assessed keeps its own required rationale). Mirrors
+ * vo_review_value_rationale_gate.
+ */
+export type ForecastMovement = {
+  baseline: string | null;
+  source: "previous_review" | "authorised";
+  moved: boolean;
+  rationaleRequired: boolean;
+};
+
+export function forecastMovement(
+  row: Pick<DriverPositionRow, "financial" | "authorisedValue" | "previousForecast" | "currentForecast">,
+  priorKind: PriorPosition["kind"],
+): ForecastMovement {
+  const fromReview = priorKind === "review" && row.previousForecast !== null;
+  const baseline = row.financial ? (fromReview ? row.previousForecast : row.authorisedValue) : null;
+  const moved =
+    row.financial &&
+    row.currentForecast !== null &&
+    baseline !== null &&
+    !money(row.currentForecast).equals(money(baseline));
+  return { baseline, source: fromReview ? "previous_review" : "authorised", moved, rationaleRequired: moved };
+}
