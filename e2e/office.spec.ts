@@ -16,15 +16,19 @@ test("daily Value Office: overview → assurance → matter → formal → drive
   await page.goto("/projects");
   await page.getByRole("link", { name: "Office Compact" }).click();
 
-  // Primary and secondary navigation.
-  for (const name of ["Overview", "Assurance", "Value Drivers", "Evidence", "Value Case", "Value Changes", "Reports"]) {
-    await expect(tab(page, name)).toBeVisible();
+  // Consultant navigation (4D.10B): lifecycle, cross-lifecycle, utility. Value Changes are reached in context.
+  const groups = {
+    "nav-lifecycle": ["Overview", "Mobilisation", "Value Case Definition", "Value Case", "Assurance"],
+    "nav-cross-lifecycle": ["Evidence", "Information Requests"],
+    "nav-utility": ["Value Drivers", "Reports", "History"],
+  };
+  for (const [testId, names] of Object.entries(groups)) {
+    const group = page.getByTestId(testId);
+    await expect(group.getByRole("link")).toHaveText(names);
   }
-  const more = page.getByTestId("nav-secondary");
-  await expect(more).toContainText("More");
-  for (const name of ["Setup", "Information Requests", "Re-Qualification", "History"]) {
-    await expect(more.getByRole("link", { name, exact: true })).toBeVisible();
-  }
+  await expect(page.getByTestId("nav-cross-lifecycle")).toContainText("Across the lifecycle");
+  await expect(tab(page, "Value Changes")).toHaveCount(0);
+  for (const old of ["Setup", "Re-Qualification"]) await expect(tab(page, old)).toHaveCount(0);
 
   // Overview (4D.9I): the governed position, then ONE matter requiring attention (working figures labelled).
   await expect(page.getByTestId("overview-authorised-value")).toHaveText("$1.5m");
@@ -117,11 +121,26 @@ test("daily Value Office: overview → assurance → matter → formal → drive
   await expect(e003.getByTestId("evidence-use")).toContainText("Matter VL-102 (working)");
   await expect(e003.getByTestId("evidence-formal")).toHaveText("—");
 
-  // Secondary navigation.
-  await more.getByRole("link", { name: "Re-Qualification", exact: true }).click();
+  // Value Changes from the Value Case page (no longer a navigation destination).
+  await tab(page, "Value Case").click();
+  await page.getByTestId("value-case-changes-link").getByRole("link", { name: "Open Value Changes" }).click();
+  await expect(page).toHaveURL(/\/changes$/);
+
+  // The rest of the lifecycle and the utilities.
+  await tab(page, "Value Case Definition").click();
+  await expect(page).toHaveURL(/\/requalification$/);
   await expect(page.getByTestId("requal-role")).toContainText("For ongoing Value Driver assessment, use Value Drivers");
-  await more.getByRole("link", { name: "History", exact: true }).click();
+  await tab(page, "Mobilisation").click();
+  await expect(page).toHaveURL(/\/setup$/);
+  await expect(page).toHaveTitle(/Mobilisation/);
+  await tab(page, "History").click();
   await expect(page).toHaveURL(/\/history$/);
-  await more.getByRole("link", { name: "Information Requests", exact: true }).click();
+  // Consultant aliases (4D.10B) land on the existing pages.
+  const project = page.url().replace(/\/history$/, "");
+  await page.goto(`${project}/mobilisation`);
+  await expect(page).toHaveURL(/\/setup$/);
+  await page.goto(`${project}/value-case-definition`);
+  await expect(page).toHaveURL(/\/requalification$/);
+  await tab(page, "Information Requests").click();
   await expect(page.getByTestId("ir-index-row")).toContainText("Assurance");
 });

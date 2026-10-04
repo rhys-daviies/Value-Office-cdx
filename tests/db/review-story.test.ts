@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
-import { todayIso } from "@/domain/attention";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { realisedPositionComplete } from "@/domain/trajectory";
+import { CANONICAL } from "@/fixtures/canonical";
 import { seedCompactDecision, seedCompactTrajectory } from "@/fixtures/compact";
 import { createReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
@@ -108,7 +108,7 @@ describe("review story", () => {
       totalValue: "27000000.00",
       milestones: 3,
       deciderName: "Test VCO",
-      decidedOn: todayIso(), // after the recommendation was issued (4D.9K temporal order)
+      decidedOn: CANONICAL.journeyDate, // fixed governance date (4D.9N.1C), whatever day the test runs
       rationale: "Synthetic: delay to align with the budget cycle",
       differenceFromRecommendation: "-2000000.00",
     });

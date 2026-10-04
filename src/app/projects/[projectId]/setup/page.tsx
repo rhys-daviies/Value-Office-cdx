@@ -17,7 +17,7 @@ import { formatDate, formatPeriod } from "@/ui/format";
 import { KEY_DATE_LABELS } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
 
-export const metadata = { title: "Setup" };
+export const metadata = { title: "Mobilisation" };
 
 export default async function SetupPage({ params }: PageProps<"/projects/[projectId]/setup">) {
   const { projectId } = await params;
@@ -28,7 +28,7 @@ export default async function SetupPage({ params }: PageProps<"/projects/[projec
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        Mobilise: just enough to establish the engagement and proceed to Re-Qualification.
+        Mobilisation: just enough to establish the engagement and proceed to Value Case Definition.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-2">

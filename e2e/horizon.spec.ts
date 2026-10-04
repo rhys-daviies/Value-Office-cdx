@@ -27,7 +27,7 @@ test("Project Horizon: $18.0m inherited, $15.5m authorised, six drivers", async 
   await expect(page.getByTestId("timeline-v0-total")).toHaveText("$18.0m");
   await expect(page.getByTestId("timeline-v1-total")).toHaveText("$15.5m");
   await expect(page.getByTestId("timeline-v1")).toContainText("Authorised Value Case V1");
-  await expect(page.getByTestId("timeline-v0")).toContainText("Inherited Business Case");
+  await expect(page.getByTestId("timeline-v0")).toContainText("Original Business Case");
 
   // Authorised V1 version view
   await page.getByRole("link", { name: "Open V1" }).click();
@@ -43,8 +43,11 @@ test("Project Horizon: $18.0m inherited, $15.5m authorised, six drivers", async 
   }
   await expect(page.getByRole("button", { name: "Save driver" })).toHaveCount(0);
 
-  // Re-Qualification workspace is read-only for the authorised version
-  await page.getByRole("link", { name: "Re-Qualification" }).click();
+  // Value Case Definition is read-only for the authorised version
+  await page
+    .getByRole("navigation", { name: "Project" })
+    .getByRole("link", { name: "Value Case Definition", exact: true })
+    .click();
   await expect(page.getByTestId("requal-state")).toContainText("Authorised Value Case V1 — read-only");
   await expect(page.getByTestId("requal-inherited-total")).toHaveText("$18.0m");
   await expect(page.getByTestId("requal-v1-total")).toHaveText("$15.5m");
@@ -118,10 +121,12 @@ test("Project Horizon Phase 3: options, recommendation vs decision, unassessed l
   await vl.locator("summary").click();
   await expect(vl.getByTestId("leakage-description")).toContainText("do not reconcile");
 
+  // Value Changes are reached from the Value Case (4D.10B), not the navigation.
   await page
     .getByRole("navigation", { name: "Project" })
-    .getByRole("link", { name: "Value Changes", exact: true })
+    .getByRole("link", { name: "Value Case", exact: true })
     .click();
+  await page.getByTestId("value-case-changes-link").getByRole("link").click();
   await expect(page).toHaveURL(/\/changes$/);
   await page.getByTestId("change-row").getByRole("link", { name: "VC-002" }).click();
   await expect(page.getByTestId("change-from-total")).toHaveText("$15.5m");

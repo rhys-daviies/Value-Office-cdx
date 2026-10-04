@@ -53,7 +53,7 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
         }
       >
         {register.entries.length === 0 ? (
-          <Empty>No Value Drivers yet. Drivers are first added through Re-Qualification.</Empty>
+          <Empty>No Value Drivers yet. Drivers are first added through Value Case Definition.</Empty>
         ) : (
           <Table>
             <thead>
@@ -120,7 +120,7 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
       <Section title="Add a Value Driver" tone="muted">
         {!register.inForce ? (
           <Notice tone="info">
-            Until the Value Case is authorised, add drivers to the draft Value Case in Re-Qualification.
+            Until the Value Case is authorised, add drivers to the draft Value Case in Value Case Definition.
           </Notice>
         ) : (
           <Expander summary="+ Add Value Driver" testId="add-driver">

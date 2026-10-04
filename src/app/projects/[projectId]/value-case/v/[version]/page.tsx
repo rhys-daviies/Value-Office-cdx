@@ -89,7 +89,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
       )}
       {version.status === "recorded" && (
         <Notice tone="locked" title="Recorded — read-only">
-          The inherited Business Case is preserved exactly as captured.
+          The Original Business Case is preserved exactly as captured.
         </Notice>
       )}
       {version.status === "proposed" && (
@@ -100,7 +100,15 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
       )}
       {version.kind === "value_case" && version.status === "draft" && (
         <Notice tone="warning" title="Draft">
-          Edit this version in the <TextLink href={`${base}/requalification`}>Re-Qualification workspace</TextLink>.
+          {version.versionNumber === 1 ? (
+            <>
+              Edit this version in <TextLink href={`${base}/requalification`}>Value Case Definition</TextLink>.
+            </>
+          ) : (
+            <>
+              Edit this version in its <TextLink href={`${base}/changes`}>Value Change</TextLink>.
+            </>
+          )}
         </Notice>
       )}
 
@@ -108,8 +116,8 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
         <Section title="Version">
           <KeyValues
             items={[
-              ["Version", `V${version.versionNumber}`],
-              ["Kind", isV0 ? "Inherited Business Case" : "Value Case"],
+              ["Version", isV0 ? "Original Business Case" : `V${version.versionNumber}`],
+              ["Kind", isV0 ? "Inherited starting point (recorded, never authorised)" : "Value Case"],
               [
                 "Status",
                 <VersionBadge
@@ -173,7 +181,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
 
       {editableV0 && ctx && (
         <Section
-          title="Capture inherited Business Case"
+          title="Capture the Original Business Case"
           description="Record the Business Case as the client presented it. Driver detail is optional — the stated total is what the client claimed."
         >
           <ActionForm action={updateVersionDetailsAction}>
@@ -203,7 +211,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
           title="Value Basis and planned value"
           description={
             version.status === "draft"
-              ? "Edit this draft's basis and milestones where the version is edited (Re-Qualification or its Value Change)."
+              ? "Edit this draft's basis and milestones where the version is edited (Value Case Definition or its Value Change)."
               : "As recorded on this version."
           }
         >
@@ -218,7 +226,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
 
       <Section title={`Value Drivers (${summary.driverCount})`}>
         {drivers.length === 0 ? (
-          <Empty>{isV0 ? "No driver breakdown captured for the inherited Business Case." : "No Value Drivers."}</Empty>
+          <Empty>{isV0 ? "No driver breakdown captured for the Original Business Case." : "No Value Drivers."}</Empty>
         ) : (
           <>
             <Table>
@@ -282,18 +290,18 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
       </Section>
 
       {editableV0 && (
-        <Section title="Record the inherited Business Case" tone="muted">
+        <Section title="Record the Original Business Case" tone="muted">
           <p className="mb-3 text-sm text-slate-600">
-            Recording locks V0 permanently as the historical record of what the client originally claimed. The
-            Re-Qualified V1 can then be based on it.
+            Recording locks the Original Business Case permanently as the historical record of what the client
+            originally claimed. The Value Case (V1) can then be based on it in Value Case Definition.
           </p>
           <ActionForm
             action={recordInheritedBusinessCaseAction}
-            confirm="Record and lock the inherited Business Case (V0)? This cannot be undone."
+            confirm="Record and lock the Original Business Case? This cannot be undone."
           >
             <Hidden name="projectId" value={projectId} />
             <Hidden name="versionId" value={version.id} />
-            <SubmitButton>Record V0</SubmitButton>
+            <SubmitButton>Record the Original Business Case</SubmitButton>
           </ActionForm>
         </Section>
       )}

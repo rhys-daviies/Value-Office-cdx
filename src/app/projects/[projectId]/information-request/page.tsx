@@ -33,9 +33,9 @@ export default async function InformationRequestPage({
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        What Cardaxia needs from the client — to re-qualify the Business Case at Mobilisation, and as evidence for
-        Assurance matters throughout the engagement. Track each item until it is received, and link what arrives to the
-        evidence register.
+        What Cardaxia needs from the client — to define the Value Case at Mobilisation, and as evidence for Assurance
+        matters throughout the engagement. Track each item until it is received, and link what arrives to the evidence
+        register.
       </p>
       {ws.requests.length === 0 ? (
         <Section title="Create the Information Request">
@@ -44,7 +44,12 @@ export default async function InformationRequestPage({
             <Hidden name="purpose" value="mobilisation" />
             <FormGrid>
               <TextField name="reference" label="Reference" required defaultValue="IR-01" />
-              <TextField name="title" label="Title" required defaultValue="Information Request — Re-Qualification" />
+              <TextField
+                name="title"
+                label="Title"
+                required
+                defaultValue="Information Request — Value Case Definition"
+              />
             </FormGrid>
             <div className="mt-3">
               <SubmitButton>Create Information Request</SubmitButton>

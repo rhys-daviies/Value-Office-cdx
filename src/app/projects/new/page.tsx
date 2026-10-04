@@ -17,7 +17,7 @@ export default async function NewProjectPage() {
         description={
           <>
             Establish the engagement. Only client, project name and currency are required — everything else can be added
-            in Setup as it becomes known. <TextLink href="/projects">Back to projects</TextLink>
+            in Mobilisation as it becomes known. <TextLink href="/projects">Back to projects</TextLink>
           </>
         }
       />
@@ -69,7 +69,7 @@ export default async function NewProjectPage() {
           </div>
         </Section>
 
-        <Section title="Key dates" description="Optional — add more in Setup.">
+        <Section title="Key dates" description="Optional — add more in Mobilisation.">
           <FormGrid>
             <DateField name="kickoffDate" label="Kick-off" />
             <DateField name="goLiveDate" label="Go-Live (if known)" />

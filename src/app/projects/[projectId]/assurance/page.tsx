@@ -54,7 +54,7 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
     return (
       <Notice tone="info" title="Value Assurance begins once the Value Case is authorised">
         Record the VCO&apos;s authorisation of V1 in{" "}
-        <TextLink href={`${base}/requalification`}>Re-Qualification</TextLink>.
+        <TextLink href={`${base}/requalification`}>Value Case Definition</TextLink>.
       </Notice>
     );
   }

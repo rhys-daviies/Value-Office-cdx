@@ -98,6 +98,25 @@ const CODES: Record<string, string> = {
   VO_INVALID_VALUE: "A value is not in the allowed format.",
 };
 
+// Consultant terminology (4D.10B) for rule messages raised by commands and database guards, which keep their
+// original wording. The Re-Qualification Report keeps its name (reports are unchanged).
+const TERMINOLOGY: [RegExp, string][] = [
+  [/\b(?:the )?inherited Business Case \(V0\)/gi, "the Original Business Case"],
+  [/\binherited Business Case\b/gi, "Original Business Case"],
+  [/\brecording V0\b/g, "recording the Original Business Case"],
+  [/\bRe-Qualified Value Case\b/g, "Value Case"],
+  [/\bRe-Qualification\b(?! Report)/g, "Value Case Definition"],
+];
+
+/** Keeps the matched text's leading capital, so "The inherited…" reads "The Original…". */
+export function presentRuleMessage(message: string): string {
+  return TERMINOLOGY.reduce(
+    (m, [pattern, term]) =>
+      m.replace(pattern, (hit) => (/^[A-Z]/.test(hit) ? term[0]!.toUpperCase() + term.slice(1) : term)),
+    message,
+  );
+}
+
 function friendlyIssue(issue: InputIssue): string {
   if (/>=1 character|received undefined|expected string, received null/i.test(issue.message)) return "Required";
   if (/ISO date/i.test(issue.message)) return "Enter a valid date";
@@ -136,7 +155,7 @@ export function toActionState(err: unknown): ActionState {
       };
     }
     // Rule violations raised by commands/triggers already carry a readable message.
-    return { status: "error", message: CODES[err.code] ?? err.message, nonce };
+    return { status: "error", message: CODES[err.code] ?? presentRuleMessage(err.message), nonce };
   }
   console.error(err);
   return { status: "error", message: "Unexpected error — the change was not saved.", nonce };

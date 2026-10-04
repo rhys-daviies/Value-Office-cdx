@@ -22,7 +22,7 @@ import { EVIDENCE_STATUSES, INFORMATION_REQUEST_ITEM_STATUSES, QUALIFICATION_STA
 
 // Executive Overview (Phase 4D.9I): where the project stands on value, what is changing and what needs management
 // attention — value position → Value Trajectory → value requiring attention → latest value decision → governed
-// commitment. Detail lives in Assurance and Value Case. Before authorisation the setup record is the page.
+// commitment. Detail lives in Assurance and Value Case. Before authorisation the mobilisation record is the page.
 
 export default async function ProjectOverviewPage({ params }: PageProps<"/projects/[projectId]">) {
   const { projectId } = await params;
@@ -50,7 +50,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
             <LatestValueDecision o={x} base={base} />
           </div>
           <ValueCaseSummary summary={x.valueCase} base={base} />
-          <Expander summary="Project setup and mobilisation record" testId="overview-setup-record">
+          <Expander summary="Mobilisation and Value Case Definition record" testId="overview-setup-record">
             <div className="pt-3">
               <SetupRecord o={o} base={base} currency={currency} preAuthorisation={false} />
             </div>
@@ -61,7 +61,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
   );
 }
 
-/** Setup and re-qualification record: the working surface before authorisation, a collapsed record after it. */
+/** Mobilisation and Value Case Definition record: the working surface before authorisation, a collapsed record after it. */
 function SetupRecord({
   o,
   base,
@@ -118,13 +118,13 @@ function SetupRecord({
           <>
             {/* Pre-authorisation only (4D.9I): after V1 is authorised the Value Case summary and page carry this history. */}
             <Section
-              title="Re-Qualification baseline (V0 → V1)"
+              title="Original Business Case → Value Case (V1)"
               actions={<TextLink href={`${base}/value-case`}>Open Value Case</TextLink>}
             >
               <div className="space-y-3 text-sm" data-testid="overview-value-case">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <p className="text-slate-500">Inherited Business Case</p>
+                    <p className="text-slate-500">Original Business Case</p>
                     {o.inherited ? (
                       <VersionBadge
                         kind="inherited_business_case"
@@ -141,7 +141,7 @@ function SetupRecord({
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
                   <div>
-                    <p className="text-slate-500">Re-Qualified Value Case</p>
+                    <p className="text-slate-500">Value Case (V1)</p>
                     {o.requalified ? (
                       <>
                         <VersionBadge
@@ -168,7 +168,7 @@ function SetupRecord({
                     {o.inherited?.headlineTotal && requalifiedTotal && (
                       <p className="text-xs text-slate-500">
                         {formatMoneyChange(moneyChange(o.inherited.headlineTotal, requalifiedTotal), currency)} vs
-                        inherited
+                        original
                       </p>
                     )}
                   </div>
@@ -177,7 +177,7 @@ function SetupRecord({
             </Section>
           </>
         )}
-        <Section title="Mobilisation" actions={<TextLink href={`${base}/setup`}>Open Setup</TextLink>}>
+        <Section title="Mobilisation" actions={<TextLink href={`${base}/setup`}>Open Mobilisation</TextLink>}>
           <KeyValues
             items={[
               ["Stakeholders", o.stakeholders.length === 0 ? <Missing>None recorded</Missing> : o.stakeholders.length],
@@ -224,11 +224,11 @@ function SetupRecord({
 
       {preAuthorisation && (
         <Section
-          title="Re-Qualification status"
-          actions={<TextLink href={`${base}/requalification`}>Open Re-Qualification</TextLink>}
+          title="Value Case Definition status"
+          actions={<TextLink href={`${base}/requalification`}>Open Value Case Definition</TextLink>}
         >
           {!o.requalified ? (
-            <p className="text-sm text-slate-600">No Re-Qualified Value Case yet.</p>
+            <p className="text-sm text-slate-600">No draft Value Case (V1) yet.</p>
           ) : (
             <div className="grid gap-4 text-sm sm:grid-cols-3" data-testid="overview-requalification">
               <div>

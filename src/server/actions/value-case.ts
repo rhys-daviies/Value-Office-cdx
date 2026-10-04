@@ -67,7 +67,7 @@ export async function createInheritedBusinessCaseAction(_prev: ActionState, fd: 
       summary: opt(fd, "summary"),
       statedTotalValue: moneyField(fd, "statedTotalValue", "create"),
     });
-    return "Inherited Business Case started";
+    return "Original Business Case started";
   });
 }
 
@@ -86,7 +86,7 @@ export async function updateVersionDetailsAction(_prev: ActionState, fd: FormDat
 export async function recordInheritedBusinessCaseAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return perform(projectOf(fd), async (actor) => {
     await recordInheritedBusinessCase(actor, { versionId: required(fd, "versionId") });
-    return "Inherited Business Case recorded and locked";
+    return "Original Business Case recorded and locked";
   });
 }
 
@@ -100,7 +100,7 @@ export async function createDraftVersionAction(_prev: ActionState, fd: FormData)
       summary: opt(fd, "summary"),
       basedOnVersionId: opt(fd, "basedOnVersionId"),
     });
-    return "Draft Re-Qualified Value Case created";
+    return "Draft Value Case (V1) created";
   });
 }
 

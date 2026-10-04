@@ -37,8 +37,8 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await expect(page.getByTestId("project-name")).toHaveText(`Golden Path ${uid}`);
   await expect(page.getByText("Nominate the Value Case Owner")).toBeVisible();
 
-  // ---- Setup: stakeholders, VCO, document reference --------------------------------
-  await tab(page, "Setup").click();
+  // ---- Mobilisation: stakeholders, VCO, document reference --------------------------------
+  await tab(page, "Mobilisation").click();
   const addStakeholder = page.getByTestId("add-stakeholder-form");
   await addStakeholder.getByLabel("Name").fill("Vera Owner");
   await addStakeholder.getByLabel("Title").fill("Chief Operating Officer");
@@ -59,20 +59,20 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await doc.getByLabel("Location / URL").fill("https://sharepoint.example/acme/bc-v3.2.pdf");
   await submit(doc, "Record document reference", "Document reference recorded");
 
-  // ---- Capture inherited Business Case V0 -----------------------------------------
+  // ---- Capture the Original Business Case (V0) -----------------------------------------
   await tab(page, "Value Case").click();
   const v0 = page.getByTestId("create-v0-form");
   await v0.getByLabel("Stated total value").fill("18m");
-  await v0.getByRole("button", { name: "Start capturing V0" }).click(); // form is replaced by the V0 card
+  await v0.getByRole("button", { name: "Start capturing the Original Business Case" }).click(); // replaced by its card
   await expect(page.getByTestId("timeline-v0-total")).toHaveText("NZ$18.0m");
-  await expect(page.getByTestId("timeline-v0")).toContainText("Inherited Business Case (being captured)");
-  await page.getByRole("link", { name: "Open V0" }).click();
+  await expect(page.getByTestId("timeline-v0")).toContainText("Original Business Case (being captured)");
+  await page.getByRole("link", { name: "Open Original Business Case" }).click();
   await open(page.getByTestId("add-driver"));
   const v0Driver = page.getByTestId("add-driver-form");
   await v0Driver.getByLabel("Name").fill("Service Productivity");
   await v0Driver.getByRole("textbox", { name: /^Financial value/ }).fill("6,000,000");
   await submit(v0Driver, "Add driver", "Value Driver VD-01 added");
-  await page.getByRole("button", { name: "Record V0" }).click();
+  await page.getByRole("button", { name: "Record the Original Business Case" }).click();
   await expect(page.getByText("Recorded — read-only")).toBeVisible();
 
   // ---- Information Request ---------------------------------------------------------
@@ -105,10 +105,10 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await irItem.getByRole("button", { name: "Save item" }).click();
   await expect(page.getByTestId("ir-item").first()).toContainText("Received");
 
-  // ---- Re-Qualification: draft V1 ------------------------------------------------------
-  await tab(page, "Re-Qualification").click();
+  // ---- Value Case Definition: draft V1 ------------------------------------------------------
+  await tab(page, "Value Case Definition").click();
   await page.getByTestId("create-v1-form").getByRole("button", { name: "Create draft V1" }).click();
-  await expect(page.getByTestId("requal-state")).toContainText("Draft Re-Qualified Value Case (V1) — editable");
+  await expect(page.getByTestId("requal-state")).toContainText("Draft Value Case (V1) — editable");
   await expect(page.getByTestId("comparison-row")).toHaveCount(1); // VD-01 carried from V0
 
   // Re-qualify VD-01
@@ -204,6 +204,6 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   const history = page.getByTestId("history");
   await expect(history).toContainText("VCO authorisation recorded");
   await expect(history).toContainText("Value Case proposed for authorisation");
-  await expect(history).toContainText("Inherited Business Case (V0) recorded");
+  await expect(history).toContainText("Original Business Case recorded");
   await expect(history).toContainText("E2E Consultant");
 });

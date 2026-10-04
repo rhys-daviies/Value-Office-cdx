@@ -46,7 +46,7 @@ export function ValueCaseSummary({ summary: s, base }: { summary: Summary; base:
             : s.originalBusinessCase.value === null
               ? "Value not stated"
               : m(s.originalBusinessCase.value),
-          s.originalBusinessCase ? "V0 · inherited" : null,
+          s.originalBusinessCase ? "Inherited starting point" : null,
           "summary-original",
         )}
         {item(

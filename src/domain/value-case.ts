@@ -56,12 +56,12 @@ export function moneyChange(from: string | null, to: string | null): string | nu
 /** The authority a version carries, for display. Phase 1 has no forecast concept. */
 export function versionAuthority(kind: VersionKind, status: VersionStatus, versionNumber: number): string {
   if (kind === "inherited_business_case") {
-    return status === "draft" ? "Inherited Business Case (being captured)" : "Inherited Business Case";
+    return status === "draft" ? "Original Business Case (being captured)" : "Original Business Case";
   }
   switch (status) {
     case "draft":
       return versionNumber === 1
-        ? "Draft Re-Qualified Value Case"
+        ? "Draft Value Case (in definition)"
         : `Draft Value Case V${versionNumber} (Value Change)`;
     case "proposed":
       return versionNumber === 1

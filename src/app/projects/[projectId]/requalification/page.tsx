@@ -23,7 +23,7 @@ import { VersionTrajectorySection } from "@/ui/trajectory/milestones";
 import { requireProject } from "@/ui/require";
 import { AddDriverForm, DriverEditor, DriverReadOnly, DriverValue } from "@/ui/value-case/drivers";
 
-export const metadata = { title: "Re-Qualification" };
+export const metadata = { title: "Value Case Definition" };
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -55,8 +55,9 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
     <>
       <StateBanner status={v1?.status ?? null} versionNumber={v1?.versionNumber ?? 1} />
       <p className="-mt-2 mb-4 text-sm text-slate-600 print:hidden" data-testid="requal-role">
-        Re-Qualification establishes the initial defensible Value Case and Authorised V1. For ongoing Value Driver
-        assessment, use <TextLink href={`/projects/${projectId}/value-drivers`}>Value Drivers</TextLink>.
+        Value Case Definition turns the Original Business Case into the initial defensible Value Case and Authorised V1.
+        For ongoing Value Driver assessment, use{" "}
+        <TextLink href={`/projects/${projectId}/value-drivers`}>Value Drivers</TextLink>.
         {v1 && (
           <>
             {" "}
@@ -68,7 +69,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
       {/* ---- Headline comparison -------------------------------------------------- */}
       <div className="mb-6 grid gap-3 sm:grid-cols-3" data-testid="requal-headline">
         <Stat
-          label="Inherited Business Case (V0)"
+          label="Original Business Case"
           value={formatMoneyShort(ws.inheritedTotal, currency)}
           sub={
             ws.inheritedVersion ? (
@@ -80,7 +81,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           testId="requal-inherited-total"
         />
         <Stat
-          label={v1?.status === "authorised" ? "Authorised Value Case (V1)" : "Re-Qualified Value Case (V1)"}
+          label={v1?.status === "authorised" ? "Authorised Value Case (V1)" : "Draft Value Case (V1)"}
           value={formatMoneyShort(v1Total, currency)}
           sub={
             v1 ? (
@@ -100,11 +101,11 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           emphasis
         />
         <Stat
-          label="Change from inherited stated total"
+          label="Change from the Original Business Case"
           value={formatMoneyChange(change, currency)}
           sub={
             <span className="text-xs text-slate-500">
-              {change === null ? "Needs both totals" : "V1 financial total − V0 stated total"}
+              {change === null ? "Needs both totals" : "V1 financial total − Original Business Case stated total"}
             </span>
           }
           testId="requal-change"
@@ -154,17 +155,18 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
 
       {/* ---- No V1 yet ------------------------------------------------------------ */}
       {!v1 && (
-        <Section title="Create the draft Re-Qualified Value Case (V1)">
+        <Section title="Create the draft Value Case (V1)">
           {!ws.inheritedVersion && (
             <Notice tone="warning">
-              No inherited Business Case has been captured. You can start V1 without it, but the comparison needs V0 —{" "}
-              <TextLink href={`${base}/value-case`}>capture V0 first</TextLink>.
+              No Original Business Case has been captured. You can start V1 without it, but the comparison needs it —{" "}
+              <TextLink href={`${base}/value-case`}>capture the Original Business Case first</TextLink>.
             </Notice>
           )}
           {ws.inheritedVersion?.status === "draft" && (
             <Notice tone="warning">
-              V0 is still being captured. <TextLink href={`${base}/value-case/v/0`}>Record V0</TextLink> to base V1 on
-              it and carry its drivers forward.
+              The Original Business Case is still being captured.{" "}
+              <TextLink href={`${base}/value-case/v/0`}>Record the Original Business Case</TextLink> to base V1 on it
+              and carry its drivers forward.
             </Notice>
           )}
           <ActionForm action={createDraftVersionAction} testId="create-v1-form">
@@ -173,12 +175,12 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
               <Hidden name="basedOnVersionId" value={ws.inheritedVersion.id} />
             )}
             <div className="space-y-3">
-              <TextField name="title" label="Title" required defaultValue="Re-Qualified Value Case" />
+              <TextField name="title" label="Title" required defaultValue="Value Case" />
               <TextArea name="summary" label="Summary" rows={2} />
               {ws.inheritedVersion?.status === "recorded" && (
                 <p className="text-xs text-slate-500">
-                  Based on V0. Any V0 drivers ({ws.inheritedDrivers.length}) are copied into the draft for
-                  re-qualification; V0 itself is never changed.
+                  Based on the Original Business Case. Its drivers ({ws.inheritedDrivers.length}) are copied into the
+                  draft for definition; the Original Business Case itself is never changed.
                 </p>
               )}
               <SubmitButton>Create draft V1</SubmitButton>
@@ -190,7 +192,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
       {/* ---- Comparison ----------------------------------------------------------- */}
       {v1 && (
         <Section
-          title="Inherited V0 vs Re-Qualified V1"
+          title="Original Business Case vs Value Case (V1)"
           description="Per Value Driver. Drivers are matched by their stable code across versions."
         >
           {ws.comparison.length === 0 ? (
@@ -212,7 +214,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           title={`V${v1.versionNumber} Value Drivers`}
           description={
             v1.status === "draft"
-              ? "Expand a driver to re-qualify it. Incomplete qualification is visible but does not block proposal."
+              ? "Expand a driver to define it. Incomplete qualification is visible but does not block proposal."
               : "Read-only."
           }
         >
@@ -324,7 +326,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
 
           {!vco ? (
             <Notice tone="warning" title="No Value Case Owner">
-              Nominate the VCO in <TextLink href={`${base}/setup#stakeholders`}>Setup</TextLink> before recording
+              Nominate the VCO in <TextLink href={`${base}/setup#stakeholders`}>Mobilisation</TextLink> before recording
               authorisation.
             </Notice>
           ) : (
@@ -412,7 +414,7 @@ export default async function RequalificationPage({ params }: PageProps<"/projec
           <p className="text-sm">
             Authorised by the Value Case Owner on <strong>{formatDate(v1.authorisedOn)}</strong>.{" "}
             <TextLink href={`${base}/value-case/v/${v1.versionNumber}`}>View Authorised V{v1.versionNumber}</TextLink> ·{" "}
-            <TextLink href={`${base}/value-case/v/0`}>View inherited V0</TextLink>
+            <TextLink href={`${base}/value-case/v/0`}>View Original Business Case</TextLink>
           </p>
         </Section>
       )}
@@ -424,12 +426,12 @@ function StateBanner({ status, versionNumber }: { status: string | null; version
   const banners: Record<string, { cls: string; title: string; body: string }> = {
     none: {
       cls: "border-slate-300 bg-white text-slate-800",
-      title: "Re-Qualification not started",
-      body: "Convert the inherited Business Case into a structured, defensible Value Case.",
+      title: "Value Case Definition not started",
+      body: "Turn the Original Business Case into a structured, defensible Value Case.",
     },
     draft: {
       cls: "border-amber-300 bg-amber-50 text-amber-900",
-      title: `Draft Re-Qualified Value Case (V${versionNumber}) — editable`,
+      title: `Draft Value Case (V${versionNumber}) — editable`,
       body: "Work in progress. Not yet proposed to the Value Case Owner.",
     },
     proposed: {
@@ -441,6 +443,12 @@ function StateBanner({ status, versionNumber }: { status: string | null; version
       cls: "border-emerald-400 bg-emerald-50 text-emerald-900",
       title: `Authorised Value Case V${versionNumber} — read-only`,
       body: "Management-approved. Preserved permanently; later changes require an approved Value Change.",
+    },
+    // 4D.10B: once a Value Change is authorised V1 is superseded — the definition is complete, never "not started".
+    superseded: {
+      cls: "border-slate-300 bg-slate-50 text-slate-800",
+      title: `Authorised Value Case V${versionNumber} — superseded by an authorised Value Change`,
+      body: "Value Case Definition is complete and preserved. The Value Case in force is shown on the Value Case page.",
     },
   };
   const b = banners[status ?? "none"] ?? banners.none!;
@@ -508,8 +516,8 @@ function ComparisonTable({
         <tr>
           <th>Code</th>
           <th>Value Driver</th>
-          <th className="text-right">Inherited V0</th>
-          <th className="text-right">Re-Qualified V1</th>
+          <th className="text-right">Original Business Case</th>
+          <th className="text-right">Value Case V1</th>
           <th className="text-right">Change</th>
           <th>Qualification</th>
           <th>Evidence</th>
@@ -546,7 +554,7 @@ function ComparisonTable({
       <tfoot>
         <tr className="border-t-2 border-slate-300 font-semibold">
           <td />
-          <td className="px-2 py-1.5">Total (financial drivers; V0 = stated total)</td>
+          <td className="px-2 py-1.5">Total (financial drivers; Original Business Case = stated total)</td>
           <td className="px-2 py-1.5 text-right">{formatMoneyShort(inheritedTotal, currency)}</td>
           <td className="px-2 py-1.5 text-right">{formatMoneyShort(v1Total, currency)}</td>
           <td className="px-2 py-1.5 text-right">

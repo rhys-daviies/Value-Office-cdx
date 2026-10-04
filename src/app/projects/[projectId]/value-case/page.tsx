@@ -154,11 +154,18 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
       <ValueCaseEvolution evolution={evolution} id="evolution" tableOpen />
 
       <section aria-labelledby="value-change-history" className="mb-6" data-testid="value-change-history">
-        <h2 id="value-change-history" className="text-base font-semibold text-slate-900">
-          Value Change history
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 id="value-change-history" className="text-base font-semibold text-slate-900">
+            Value Change history
+          </h2>
+          {/* 4D.10B: Value Changes left the navigation; this is their home entry point. */}
+          <span className="text-sm" data-testid="value-case-changes-link">
+            <TextLink href={`${base}/changes`}>Open Value Changes</TextLink>
+          </span>
+        </div>
         <p className="mb-2 text-sm text-slate-600">
           The governed actions that produced the movement above: each authorised Value Change created the next version.
+          Value Changes are prepared from a recorded management decision in an Assurance Review.
         </p>
         {changes.length === 0 ? (
           <p className="text-sm text-slate-600" data-testid="no-value-changes">
@@ -221,8 +228,8 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
         ) : (
           <li>
             <Section
-              title="Inherited Business Case (V0)"
-              description="Capture the Business Case the engagement inherited — at minimum its headline value. Driver-level detail is optional."
+              title="Original Business Case"
+              description="Capture the Original Business Case the engagement inherited — at minimum its headline value. Driver-level detail is optional."
             >
               <ActionForm action={createInheritedBusinessCaseAction} testId="create-v0-form">
                 <Hidden name="projectId" value={projectId} />
@@ -232,15 +239,15 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
                     name="statedTotalValue"
                     label="Stated total value"
                     currency={project.currency}
-                    hint={`${project.currency}. The headline value as stated in the inherited Business Case.`}
+                    hint={`${project.currency}. The headline value as stated in the Original Business Case.`}
                   />
                   <TextArea
                     name="summary"
                     label="Summary"
                     rows={2}
-                    placeholder="Source, date and scope of the inherited Business Case"
+                    placeholder="Source, date and scope of the Original Business Case"
                   />
-                  <SubmitButton>Start capturing V0</SubmitButton>
+                  <SubmitButton>Start capturing the Original Business Case</SubmitButton>
                 </div>
               </ActionForm>
             </Section>
@@ -267,11 +274,11 @@ export default async function ValueCasePage({ params }: PageProps<"/projects/[pr
               ↓
             </li>
             <li className="rounded-lg border border-dashed border-slate-300 p-4 text-sm text-slate-600">
-              <p className="font-medium">V1 · Re-Qualified Value Case — not started</p>
+              <p className="font-medium">V1 · Value Case Definition — not started</p>
               <p className="mt-1">
-                Re-Qualification converts the inherited Business Case into a structured, defensible Value Case.{" "}
+                Value Case Definition turns the Original Business Case into a structured, defensible Value Case.{" "}
                 <Link className="text-sky-800 underline" href={`${base}/requalification`}>
-                  Go to Re-Qualification
+                  Go to Value Case Definition
                 </Link>
               </p>
             </li>
@@ -341,13 +348,15 @@ function TimelineCard({
             {formatMoneyShort(headlineTotal, currency)}
           </p>
           {change !== null && (
-            <p className="text-xs text-slate-500">{formatMoneyChange(change, currency)} vs inherited</p>
+            <p className="text-xs text-slate-500">{formatMoneyChange(change, currency)} vs original</p>
           )}
         </div>
       </div>
       <div className="mt-3">
         <ButtonLink variant="secondary" href={href}>
-          Open V{version.versionNumber}
+          {version.kind === "inherited_business_case"
+            ? "Open Original Business Case"
+            : `Open V${version.versionNumber}`}
         </ButtonLink>
       </div>
     </li>

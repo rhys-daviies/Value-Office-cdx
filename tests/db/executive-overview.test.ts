@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { firstNeedingAttention, todayIso, type AttentionItem } from "@/domain/attention";
 import { formatDate } from "@/ui/format";
+import { CANONICAL } from "@/fixtures/canonical";
 import { seedCompactEvolution, seedCompactTrajectory, seedCompactTrajectoryDraft } from "@/fixtures/compact";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
@@ -143,7 +144,7 @@ describe("executive Overview", () => {
     expect(text).toContain("Cardaxia recommendation Act now · $29.0m");
     expect(text).toContain("Management selected Delay 3 months · $27.0m");
     expect(text).toContain("Difference -$2.0m");
-    expect(text).toContain(`Decision ${formatDate(todayIso())} · Test VCO`); // decided after the recommendation issued
+    expect(text).toContain(`Decision ${formatDate(CANONICAL.journeyDate)} · Test VCO`); // fixed governance date (4D.9N.1C)
     expect(text).toContain("View Value Case history →");
   });
 

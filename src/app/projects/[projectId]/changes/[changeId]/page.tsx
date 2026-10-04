@@ -402,7 +402,8 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
           </div>
           {!d.vco ? (
             <Notice tone="warning">
-              Nominate the Value Case Owner in <TextLink href={`${base}/setup#stakeholders`}>Setup</TextLink> first.
+              Nominate the Value Case Owner in <TextLink href={`${base}/setup#stakeholders`}>Mobilisation</TextLink>{" "}
+              first.
             </Notice>
           ) : (
             <div className="grid gap-6 lg:grid-cols-2">

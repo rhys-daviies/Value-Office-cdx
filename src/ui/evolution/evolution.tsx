@@ -263,7 +263,7 @@ function CompanionTable({ evolution }: { evolution: ValueCaseEvolution }) {
                     {cell(`${e.key}-forecast`, na)}
                     {cell(`${e.key}-realised`, na)}
                     {cell(`${e.key}-gap`, na)}
-                    <td className="py-1.5 text-slate-600">Inherited · V{e.original.versionNumber}</td>
+                    <td className="py-1.5 text-slate-600">Inherited starting point</td>
                   </>
                 ) : e.kind === "authorisation" ? (
                   <>

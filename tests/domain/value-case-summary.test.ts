@@ -57,8 +57,8 @@ describe("moneyChange / versionAuthority", () => {
       versionAuthority("value_case", "authorised", 1),
     ];
     expect(labels).toEqual([
-      "Inherited Business Case",
-      "Draft Re-Qualified Value Case",
+      "Original Business Case",
+      "Draft Value Case (in definition)",
       "Proposed Value Case — awaiting VCO authorisation",
       "Authorised Value Case V1",
     ]);
@@ -68,6 +68,7 @@ describe("moneyChange / versionAuthority", () => {
 
 describe("nextStep guidance", () => {
   const base = {
+    everAuthorised: false,
     hasValueBasis: true,
     hasVco: true,
     hasInformationRequest: true,
@@ -78,9 +79,32 @@ describe("nextStep guidance", () => {
   it("follows the journey order", () => {
     expect(nextStep({ ...base, hasValueBasis: false })?.label).toMatch(/Value Basis/);
     expect(nextStep({ ...base, hasVco: false })?.label).toMatch(/Value Case Owner/);
-    expect(nextStep({ ...base, inheritedStatus: null })?.label).toMatch(/inherited Business Case/);
-    expect(nextStep({ ...base, requalifiedStatus: null })?.label).toMatch(/draft Re-Qualified/);
+    expect(nextStep({ ...base, inheritedStatus: null })?.label).toMatch(/Original Business Case/);
+    expect(nextStep({ ...base, requalifiedStatus: null })?.label).toMatch(/Value Case Definition/);
     expect(nextStep({ ...base, requalifiedStatus: "proposed" })?.label).toMatch(/authorisation/);
-    expect(nextStep({ ...base, requalifiedStatus: "authorised" })).toBeNull();
+    expect(nextStep({ ...base, requalifiedStatus: "authorised", everAuthorised: true })).toBeNull();
+  });
+
+  // 4D.10B regression: the checklist is for reaching the first Authorised Value Case. Once any version has been
+  // authorised the project never falls back into it — even when V1 is superseded and nothing else is "done".
+  const nothingDone = {
+    hasValueBasis: false,
+    hasVco: false,
+    hasInformationRequest: false,
+    inheritedStatus: null,
+    requalifiedDriverCount: 0,
+  };
+  it("gives no setup step once a Value Case has ever been authorised", () => {
+    expect(nextStep({ ...nothingDone, everAuthorised: true, requalifiedStatus: "authorised" })).toBeNull();
+    expect(nextStep({ ...nothingDone, everAuthorised: true, requalifiedStatus: "superseded" })).toBeNull();
+    // e.g. DEMO-TRAJ2: V1 superseded by an authorised V2, no Information Request ever created.
+    expect(
+      nextStep({ ...base, hasInformationRequest: false, everAuthorised: true, requalifiedStatus: "superseded" }),
+    ).toBeNull();
+  });
+  it("still guides a project that has never been authorised", () => {
+    expect(nextStep({ ...nothingDone, everAuthorised: false, requalifiedStatus: null })?.label).toMatch(/Value Basis/);
+    expect(nextStep({ ...base, requalifiedStatus: "draft" })?.label).toMatch(/propose V1/);
+    expect(nextStep({ ...base, hasInformationRequest: false })?.label).toMatch(/Information Request/);
   });
 });

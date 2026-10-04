@@ -88,7 +88,7 @@ export function deriveAssuranceRequirements(input: CadenceInput): AssuranceRequi
       label: "Go-Live review",
       status: s.done ? "satisfied" : s.inProgress ? "in_progress" : date === null ? "unknown" : dated(date),
       date,
-      basis: date ? "Go-Live key date" : "Record the Go-Live date in Setup to derive this",
+      basis: date ? "Go-Live key date" : "Record the Go-Live date in Mobilisation to derive this",
     });
   }
 
@@ -129,7 +129,7 @@ export function deriveAssuranceRequirements(input: CadenceInput): AssuranceRequi
         label: "Six-month review",
         status: inProgress ? "in_progress" : "unknown",
         date: null,
-        basis: "Record the Go-Live date in Setup to derive the six-monthly cadence",
+        basis: "Record the Go-Live date in Mobilisation to derive the six-monthly cadence",
       });
     }
   }

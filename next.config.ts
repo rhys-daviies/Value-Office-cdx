@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { ROUTE_ALIASES } from "./src/ui/navigation";
+
 const production = process.env.NODE_ENV === "production";
 
 // Static security headers for every response. The per-request, nonce-based
@@ -35,6 +37,15 @@ const nextConfig: NextConfig = {
       "./node_modules/playwright-core/package.json",
       "./node_modules/playwright-core/lib/**",
     ],
+  },
+  // Consultant-facing aliases (4D.10B). Temporary (307) so the canonical routes can still be renamed later; they run
+  // before the proxy, so an unauthenticated alias request still ends at sign-in.
+  async redirects() {
+    return ROUTE_ALIASES.map(({ alias, route }) => ({
+      source: `/projects/:projectId${alias}`,
+      destination: `/projects/:projectId${route}`,
+      permanent: false,
+    }));
   },
   async headers() {
     return [

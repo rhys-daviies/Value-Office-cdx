@@ -108,8 +108,12 @@ export async function getProjectOverview(projectId: string) {
 
   const timeline = await getValueCaseTimeline(projectId);
   const inherited = timeline.find((t) => t.version.kind === "inherited_business_case") ?? null;
-  // The Re-Qualified Value Case is V1; later versions are Value Changes (shown in Assurance / Changes).
+  // The defined Value Case is V1; later versions are Value Changes (shown in Assurance / Changes).
   const requalified = timeline.find((t) => t.version.kind === "value_case" && t.version.versionNumber === 1) ?? null;
+  // A version is superseded only after it was authorised, so authorised-or-superseded means "ever authorised".
+  const everAuthorised = timeline.some(
+    (t) => t.version.kind === "value_case" && (t.version.status === "authorised" || t.version.status === "superseded"),
+  );
 
   return {
     header,
@@ -123,6 +127,7 @@ export async function getProjectOverview(projectId: string) {
     inherited,
     requalified,
     nextStep: nextStep({
+      everAuthorised,
       hasValueBasis: Boolean(header.project.valueBasisDescription),
       hasVco: Boolean(vco),
       hasInformationRequest: requests.length > 0,
@@ -135,8 +140,13 @@ export async function getProjectOverview(projectId: string) {
 
 export type ProjectOverview = NonNullable<Awaited<ReturnType<typeof getProjectOverview>>>;
 
-/** Workflow guidance only: the next thing the state machine needs, in journey order. */
+/**
+ * Workflow guidance only: the next thing the state machine needs, in journey order. The checklist covers getting to
+ * the first Authorised Value Case; once any version has ever been authorised (even if since superseded by a Value
+ * Change) the project never returns to it.
+ */
 export function nextStep(s: {
+  everAuthorised: boolean;
   hasValueBasis: boolean;
   hasVco: boolean;
   hasInformationRequest: boolean;
@@ -144,7 +154,7 @@ export function nextStep(s: {
   requalifiedStatus: string | null;
   requalifiedDriverCount: number;
 }): { label: string; href: string } | null {
-  if (s.requalifiedStatus === "authorised") return null;
+  if (s.everAuthorised || s.requalifiedStatus === "authorised") return null;
   if (s.requalifiedStatus === "proposed") {
     return s.hasVco
       ? { label: "Record the VCO's authorisation of the proposed Value Case", href: "requalification#authorise" }
@@ -153,11 +163,11 @@ export function nextStep(s: {
   if (!s.hasValueBasis) return { label: "Define the Value Basis", href: "setup#value-basis" };
   if (!s.hasVco) return { label: "Nominate the Value Case Owner", href: "setup#stakeholders" };
   if (!s.hasInformationRequest) return { label: "Create the Information Request", href: "information-request" };
-  if (s.inheritedStatus === null) return { label: "Capture the inherited Business Case (V0)", href: "value-case" };
+  if (s.inheritedStatus === null) return { label: "Capture the Original Business Case", href: "value-case" };
   if (s.inheritedStatus === "draft")
-    return { label: "Finish and record the inherited Business Case (V0)", href: "value-case/v/0" };
+    return { label: "Finish and record the Original Business Case", href: "value-case/v/0" };
   if (s.requalifiedStatus === null)
-    return { label: "Create the draft Re-Qualified Value Case (V1)", href: "requalification" };
+    return { label: "Start Value Case Definition: create the draft Value Case (V1)", href: "requalification" };
   if (s.requalifiedDriverCount === 0) return { label: "Add Value Drivers to the draft V1", href: "requalification" };
-  return { label: "Complete Re-Qualification and propose V1", href: "requalification" };
+  return { label: "Complete Value Case Definition and propose V1", href: "requalification" };
 }

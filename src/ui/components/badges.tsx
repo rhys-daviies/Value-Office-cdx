@@ -45,8 +45,8 @@ export function VersionBadge({
   const label =
     kind === "inherited_business_case"
       ? status === "draft"
-        ? "V0 · Inherited · Draft"
-        : "V0 · Inherited · Recorded"
+        ? "Original Business Case · Draft"
+        : "Original Business Case · Recorded"
       : {
           draft: `V${versionNumber} · Draft`,
           proposed: `V${versionNumber} · Proposed`,

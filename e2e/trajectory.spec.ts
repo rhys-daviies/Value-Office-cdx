@@ -45,7 +45,7 @@ test("Value Basis and plan milestones on a draft V1: pre-fill, NPV unavailable, 
 }) => {
   page.on("dialog", (d) => void d.accept());
   await openProject(page, "Trajectory Draft");
-  await tab(page, "Re-Qualification").click();
+  await tab(page, "Value Case Definition").click();
   const section = page.getByTestId("version-trajectory");
   await expect(section).toHaveAttribute("data-status", "basis_not_classified");
   const basis = page.getByTestId("version-basis-form");
