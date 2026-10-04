@@ -9,12 +9,15 @@ import {
   updateStakeholderAction,
 } from "@/server/actions/setup";
 import { getMobiliseWorkspace } from "@/server/queries/mobilise";
+import { getMobilisationStatus } from "@/server/queries/projects";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { PlainBadge } from "@/ui/components/badges";
 import { Checkbox, DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from "@/ui/components/fields";
-import { Empty, Expander, KeyValues, Missing, Notice, Section, Table } from "@/ui/components/layout";
-import { formatDate, formatPeriod } from "@/ui/format";
+import { Empty, Expander, KeyValues, Missing, Notice, Section, Table, TextLink } from "@/ui/components/layout";
+import { formatDate, formatMoneyShort, formatPeriod } from "@/ui/format";
 import { KEY_DATE_LABELS } from "@/ui/labels";
+import { DayOneRequest } from "@/ui/mobilisation/day-one";
+import { MobilisationStatusPanel } from "@/ui/mobilisation/status";
 import { requireProject } from "@/ui/require";
 
 export const metadata = { title: "Mobilisation" };
@@ -22,14 +25,56 @@ export const metadata = { title: "Mobilisation" };
 export default async function SetupPage({ params }: PageProps<"/projects/[projectId]/setup">) {
   const { projectId } = await params;
   const { project, valueCase, valueBasisLocked } = await requireProject(projectId);
-  const { stakeholders, keyDates, documents } = await getMobiliseWorkspace(projectId);
+  const [{ stakeholders, keyDates, documents }, m] = await Promise.all([
+    getMobiliseWorkspace(projectId),
+    getMobilisationStatus(projectId).then((r) => r!),
+  ]);
   const vco = stakeholders.find((s) => s.personId === valueCase.vcoPersonId);
+  const base = `/projects/${projectId}`;
+  const obc = m.originalBusinessCase;
 
   return (
     <>
       <p className="mb-4 max-w-3xl text-sm text-slate-600">
-        Mobilisation: just enough to establish the engagement and proceed to Value Case Definition.
+        Mobilisation: just enough to establish the engagement and proceed to Value Case Definition. Nothing here blocks
+        you — move to any part of Value Office at any time.
       </p>
+
+      <MobilisationStatusPanel status={m.status} base={base} />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Section
+          id="original-business-case"
+          title="Original Business Case"
+          description="The existing business case is the starting point for Value Case Definition: its headline value (and any drivers) is what the defined Value Case is compared against."
+          actions={
+            <TextLink href={obc ? `${base}/value-case/v/0` : `${base}/value-case`}>
+              {obc === null
+                ? "Capture the Original Business Case"
+                : obc.status === "draft"
+                  ? "Continue capturing"
+                  : "View Original Business Case"}
+            </TextLink>
+          }
+        >
+          <p className="text-sm" data-testid="mobilisation-obc">
+            {obc === null ? (
+              <Missing>Not captured</Missing>
+            ) : (
+              <>
+                <span className="font-medium">{obc.title}</span> ·{" "}
+                {obc.status === "draft" ? "being captured (not yet recorded)" : "recorded"} · stated{" "}
+                {formatMoneyShort(obc.headlineTotal, project.currency)}
+              </>
+            )}
+          </p>
+          <p className="mt-2 text-sm text-slate-600">
+            Then continue in <TextLink href={`${base}/requalification`}>Value Case Definition</TextLink>.
+          </p>
+        </Section>
+
+        <DayOneRequest projectId={projectId} request={m.dayOneRequest} />
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Project details">

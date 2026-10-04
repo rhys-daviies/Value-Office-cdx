@@ -8,9 +8,10 @@ import {
   VersionBadge,
 } from "@/ui/components/badges";
 import { Expander } from "@/ui/components/expander";
-import { KeyValues, Missing, Notice, Section, TextLink } from "@/ui/components/layout";
+import { KeyValues, Missing, Section, TextLink } from "@/ui/components/layout";
 import { formatDate, formatMoneyChange, formatMoneyShort, formatPeriod } from "@/ui/format";
 import { IR_STATUS_LABELS, KEY_DATE_LABELS } from "@/ui/labels";
+import { MobilisationStatusPanel } from "@/ui/mobilisation/status";
 import { LatestValueDecision } from "@/ui/overview/decision";
 import { ValueAttention } from "@/ui/overview/attention";
 import { ExecutivePosition } from "@/ui/overview/position";
@@ -33,14 +34,12 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
 
   return (
     <>
-      {o.nextStep && (
-        <Notice tone="info" title="Next step">
-          <TextLink href={`${base}/${o.nextStep.href}`}>{o.nextStep.label}</TextLink>
-        </Notice>
-      )}
-
       {!x.authorised ? (
-        <SetupRecord o={o} base={base} currency={currency} preAuthorisation />
+        <>
+          {/* 4D.10C: the same derived Mobilisation status as the Mobilisation page — one source of guidance. */}
+          <MobilisationStatusPanel status={o.mobilisation} base={base} />
+          <SetupRecord o={o} base={base} currency={currency} preAuthorisation />
+        </>
       ) : (
         <>
           <ExecutivePosition o={x} base={base} />

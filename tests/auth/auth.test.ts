@@ -197,7 +197,7 @@ describe("the authenticated consultant is the actor", () => {
 
   it("server mutations are refused without a session, and audited to the signed-in consultant with one", async () => {
     const name = `Auth Project ${uid()}`;
-    const fields = { clientId: "", newClientName: "Auth Client", name, currency: "USD" };
+    const fields = { clientMode: "new", clientId: "", newClientName: "Auth Client", name, currency: "USD" };
     const refused = await createProjectAction(IDLE, form(fields));
     expect(refused).toMatchObject({ status: "error", message: "Sign in to continue" });
     expect(await db().select().from(schema.project).where(eq(schema.project.name, name))).toHaveLength(0);

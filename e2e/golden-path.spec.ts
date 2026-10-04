@@ -26,6 +26,7 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   // ---- Create project ------------------------------------------------------------
   await page.goto("/projects/new");
   const create = page.getByTestId("create-project-form");
+  await create.getByLabel("Create a new client").check(); // 4D.10C: explicit existing / new client choice
   await create.getByLabel("New client name").fill(`Acme Utilities ${uid}`);
   await create.getByLabel("Project name").fill(`Golden Path ${uid}`);
   await create.getByLabel("Currency").fill("NZD");
@@ -35,7 +36,7 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await create.getByLabel("Kick-off").fill("2026-10-05");
   await create.getByRole("button", { name: "Create project" }).click();
   await expect(page.getByTestId("project-name")).toHaveText(`Golden Path ${uid}`);
-  await expect(page.getByText("Nominate the Value Case Owner")).toBeVisible();
+  await expect(page.getByTestId("mobilisation-next")).toContainText("Nominate the Value Case Owner");
 
   // ---- Mobilisation: stakeholders, VCO, document reference --------------------------------
   await tab(page, "Mobilisation").click();

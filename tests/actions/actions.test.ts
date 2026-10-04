@@ -35,7 +35,7 @@ describe("server actions adapt forms to commands", () => {
     const name = `Action Project ${uid()}`;
     const err = await createProjectAction(
       IDLE,
-      form({ clientId: "", newClientName: "Action Client", name, currency: "nzd" }),
+      form({ clientMode: "new", clientId: "", newClientName: "Action Client", name, currency: "nzd" }),
     ).then(
       () => null,
       (e: { url?: string }) => e,
@@ -46,7 +46,10 @@ describe("server actions adapt forms to commands", () => {
   });
 
   it("createProjectAction reports missing required fields per field", async () => {
-    const state = await createProjectAction(IDLE, form({ clientId: "", newClientName: "X", name: "", currency: "" }));
+    const state = await createProjectAction(
+      IDLE,
+      form({ clientMode: "new", clientId: "", newClientName: "X", name: "", currency: "" }),
+    );
     expect(state.status).toBe("error");
     expect(state.fieldErrors).toMatchObject({ name: "Required" });
     expect(state.fieldErrors?.currency).toBeDefined();

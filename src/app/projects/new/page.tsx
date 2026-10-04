@@ -2,8 +2,9 @@ import { requireConsultant } from "@/server/auth/actor";
 import { createProjectAction } from "@/server/actions/projects";
 import { listClients } from "@/server/queries/projects";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
-import { DateField, FormGrid, SelectField, TextArea, TextField } from "@/ui/components/fields";
+import { DateField, FormGrid, TextArea, TextField } from "@/ui/components/fields";
 import { PageHeader, Section, TextLink } from "@/ui/components/layout";
+import { ClientChoice } from "@/ui/projects/client-choice";
 
 export const metadata = { title: "Create project" };
 
@@ -24,13 +25,7 @@ export default async function NewProjectPage() {
       <ActionForm action={createProjectAction} testId="create-project-form">
         <Section title="Client and project">
           <FormGrid>
-            <SelectField
-              name="clientId"
-              label="Client"
-              placeholder="— New client (enter name) —"
-              options={clients.map((c) => ({ value: c.id, label: c.name }))}
-            />
-            <TextField name="newClientName" label="New client name" hint="Only if the client is not listed" />
+            <ClientChoice clients={clients.map((c) => ({ id: c.id, name: c.name }))} />
             <TextField name="name" label="Project name" required />
             <TextField name="code" label="Project code" hint="Optional — generated from the name if blank" />
           </FormGrid>

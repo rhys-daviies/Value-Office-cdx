@@ -1,5 +1,6 @@
 import { asc, count, eq, sql } from "drizzle-orm";
 
+import { deriveMobilisationStatus } from "@/domain/mobilisation";
 import { INFORMATION_REQUEST_ITEM_STATUSES } from "@/domain/statuses";
 import { db, schema } from "@/server/db/client";
 
@@ -115,6 +116,57 @@ export async function getProjectOverview(projectId: string) {
     (t) => t.version.kind === "value_case" && (t.version.status === "authorised" || t.version.status === "superseded"),
   );
 
+  // Mobilisation-purpose requests (legacy requests without a purpose read as Mobilisation), with their items.
+  const requestItems = await db()
+    .select({
+      requestId: schema.informationRequestItem.informationRequestId,
+      status: schema.informationRequestItem.status,
+      description: schema.informationRequestItem.description,
+    })
+    .from(schema.informationRequestItem)
+    .where(eq(schema.informationRequestItem.projectId, projectId));
+  const mobilisationRequests = requests
+    .filter((r) => r.purpose === null || r.purpose === "mobilisation")
+    .map((r) => {
+      const items = requestItems.filter((i) => i.requestId === r.id);
+      return {
+        id: r.id,
+        reference: r.reference,
+        title: r.title,
+        status: r.status,
+        items: items.length,
+        outstanding: items.filter((i) => i.status === "open" || i.status === "partially_received").length,
+        descriptions: items.map((i) => i.description),
+      };
+    });
+
+  const kickoff = keyDates.find((d) => d.kind === "kickoff") ?? null;
+  const goLive = keyDates.find((d) => d.kind === "go_live") ?? null;
+  const inForce = timeline.find((t) => t.version.kind === "value_case" && t.version.status === "authorised") ?? null;
+  const v1 = requalified;
+  const mobilisation = deriveMobilisationStatus({
+    everAuthorised,
+    inForceVersionNumber: inForce?.version.versionNumber ?? null,
+    hasValueBasis: Boolean(header.project.valueBasisDescription),
+    hasValuePeriod: Boolean(header.project.valuePeriodStart && header.project.valuePeriodEnd),
+    vcoName: vco?.name ?? null,
+    kickoffDate: kickoff?.date ?? null,
+    goLiveDate: goLive?.date ?? null,
+    requests: mobilisationRequests,
+    originalBusinessCase:
+      inherited?.version.status === "draft" || inherited?.version.status === "recorded"
+        ? inherited.version.status
+        : null,
+    v1: v1
+      ? {
+          status: v1.version.status,
+          driverCount: v1.summary.driverCount,
+          unqualified: v1.summary.qualification.unqualified,
+          unevidenced: v1.summary.evidence.unevidenced,
+        }
+      : null,
+  });
+
   return {
     header,
     stakeholders,
@@ -126,48 +178,30 @@ export async function getProjectOverview(projectId: string) {
     documentCount: documents?.n ?? 0,
     inherited,
     requalified,
-    nextStep: nextStep({
-      everAuthorised,
-      hasValueBasis: Boolean(header.project.valueBasisDescription),
-      hasVco: Boolean(vco),
-      hasInformationRequest: requests.length > 0,
-      inheritedStatus: inherited?.version.status ?? null,
-      requalifiedStatus: requalified?.version.status ?? null,
-      requalifiedDriverCount: requalified?.summary.driverCount ?? 0,
-    }),
+    /** Derived Mobilisation status (4D.10C): one source for the Mobilisation page and the pre-V1 Overview. */
+    mobilisation,
+    /** The first Mobilisation request — the Day-1 Information Request, if one exists. */
+    dayOneRequest: mobilisationRequests[0] ?? null,
+    nextStep: mobilisation.next,
   };
 }
 
 export type ProjectOverview = NonNullable<Awaited<ReturnType<typeof getProjectOverview>>>;
 
-/**
- * Workflow guidance only: the next thing the state machine needs, in journey order. The checklist covers getting to
- * the first Authorised Value Case; once any version has ever been authorised (even if since superseded by a Value
- * Change) the project never returns to it.
- */
-export function nextStep(s: {
-  everAuthorised: boolean;
-  hasValueBasis: boolean;
-  hasVco: boolean;
-  hasInformationRequest: boolean;
-  inheritedStatus: string | null;
-  requalifiedStatus: string | null;
-  requalifiedDriverCount: number;
-}): { label: string; href: string } | null {
-  if (s.everAuthorised || s.requalifiedStatus === "authorised") return null;
-  if (s.requalifiedStatus === "proposed") {
-    return s.hasVco
-      ? { label: "Record the VCO's authorisation of the proposed Value Case", href: "requalification#authorise" }
-      : { label: "Nominate the Value Case Owner (needed to record authorisation)", href: "setup#stakeholders" };
-  }
-  if (!s.hasValueBasis) return { label: "Define the Value Basis", href: "setup#value-basis" };
-  if (!s.hasVco) return { label: "Nominate the Value Case Owner", href: "setup#stakeholders" };
-  if (!s.hasInformationRequest) return { label: "Create the Information Request", href: "information-request" };
-  if (s.inheritedStatus === null) return { label: "Capture the Original Business Case", href: "value-case" };
-  if (s.inheritedStatus === "draft")
-    return { label: "Finish and record the Original Business Case", href: "value-case/v/0" };
-  if (s.requalifiedStatus === null)
-    return { label: "Start Value Case Definition: create the draft Value Case (V1)", href: "requalification" };
-  if (s.requalifiedDriverCount === 0) return { label: "Add Value Drivers to the draft V1", href: "requalification" };
-  return { label: "Complete Value Case Definition and propose V1", href: "requalification" };
+/** The derived Mobilisation status and the Day-1 request, for the Mobilisation page. */
+export async function getMobilisationStatus(projectId: string) {
+  const o = await getProjectOverview(projectId);
+  if (!o) return null;
+  return {
+    status: o.mobilisation,
+    dayOneRequest: o.dayOneRequest,
+    allReferences: o.requests.map((r) => r.reference),
+    originalBusinessCase: o.inherited
+      ? {
+          status: o.inherited.version.status,
+          title: o.inherited.version.title,
+          headlineTotal: o.inherited.headlineTotal,
+        }
+      : null,
+  };
 }
