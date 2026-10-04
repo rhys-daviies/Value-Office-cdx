@@ -11,6 +11,7 @@ import {
 } from "@/server/actions/response";
 import { createValueChangeAction } from "@/server/actions/value-change";
 import { listValueChanges, nextChangeCode, type ReviewResponse as Response } from "@/server/queries/response";
+import type { WorkspaceMatter } from "@/server/queries/workspace";
 
 import { ActionForm, SubmitButton } from "../components/action-form";
 import { PlainBadge } from "../components/badges";
@@ -18,6 +19,7 @@ import { DateField, FormGrid, Hidden, MoneyField, SelectField, TextArea, TextFie
 import { Empty, Expander, KeyValues, Notice, Section, Table, TextLink } from "../components/layout";
 import { formatDate, formatDateTime, formatMoneyChange, formatMoneyShort, moneyInputValue } from "../format";
 import { ASSURANCE_STAGE_LABELS, scenarioKindLabel } from "../labels";
+import { GapVsLeakage } from "./display";
 
 type Option = { value: string; label: string };
 type Driver = { driverId: string; code: string; name: string };
@@ -46,47 +48,49 @@ function DriverChecklist({ drivers, selected }: { drivers: Driver[]; selected?: 
   );
 }
 
-export async function ReviewResponse({
+type Base = {
+  projectId: string;
+  currency: string;
+  review: { id: string; sequence: number; status: "draft" | "finalised" };
+  response: Response;
+};
+
+function state({ review, response }: Base) {
+  const draft = review.status === "draft";
+  const issued = Boolean(response.recommendation?.issuedAt);
+  return { draft, issued, optionsEditable: draft && !issued };
+}
+
+/** D. Risks / Value Leakage: the review's Assurance matters with their evidence and remediation (Phase 4D.10F). */
+export function LeakageSection({
   projectId,
   currency,
   review,
   response,
   stakeholders,
   drivers,
-  evidence,
-  currentForecastTotal,
-  outcomes,
-  optionPaths,
-}: {
-  projectId: string;
-  currency: string;
-  review: { id: string; sequence: number; status: "draft" | "finalised" };
-  response: Response;
+  living,
+  reviewEvidence,
+}: Base & {
   stakeholders: Option[];
   drivers: Driver[];
-  evidence: Option[];
-  currentForecastTotal: string | null;
-  /** Phase 4D.6: the Alternative Value Outcomes visual (finalised reviews), placed after the decision. */
-  outcomes?: React.ReactNode;
-  /** Phase 4D.9D: each option's dated value milestones, placed with the options. */
-  optionPaths?: React.ReactNode;
+  /** Draft reviews: the living matter's evidence and request status from Continuous Assurance. */
+  living?: Map<string, WorkspaceMatter>;
+  /** The review's own formal evidence, shown with the matters it supports. */
+  reviewEvidence?: React.ReactNode;
 }) {
-  const draft = review.status === "draft";
-  const { leakage, leakageBasis, leakageSummary, scenarios, recommendation, decision } = response;
-  const issued = Boolean(recommendation?.issuedAt);
-  const optionsEditable = draft && !issued;
+  const { draft } = state({ projectId, currency, review, response });
+  const { leakage, leakageBasis, leakageSummary } = response;
   const base = `/projects/${projectId}`;
-  const changes = await listValueChanges(projectId);
-  const openChange = changes.find((c) => c.change.status === "draft" || c.change.status === "proposed");
-
   return (
     <>
-      {/* ---- Value Leakage ------------------------------------------------------------ */}
       <Section
         id="leakage"
-        title="Value Leakage"
-        description="Total potential value affected by identified issues. Recoverable = Total − Unrecoverable; value is treated as recoverable until evidence shows it is lost. Leakage is independent of Value Gap."
+        title="Risks / Value Leakage"
+        testId="review-matters"
+        description="The Assurance matters this review considers: the risk, its evidence, the Value Leakage assessed in this review and the remediation being managed. Recoverable = Total − Unrecoverable; value is treated as recoverable until evidence shows it is lost."
       >
+        <GapVsLeakage className="mb-3" />
         <div className="mb-4 grid gap-3 text-sm sm:grid-cols-4" data-testid="leakage-summary">
           <Stat
             label="Open items"
@@ -119,6 +123,7 @@ export async function ReviewResponse({
             return (
               <Expander
                 key={l.leakage.id}
+                id={`matter-${l.leakage.code}`}
                 testId={`leakage-${l.leakage.code}`}
                 summary={
                   <span className="inline-flex flex-wrap items-center gap-2">
@@ -145,6 +150,12 @@ export async function ReviewResponse({
                   </span>
                 }
               >
+                <MatterResponse
+                  entry={l}
+                  living={draft ? living?.get(l.leakage.id) : undefined}
+                  currency={currency}
+                  reviewSequence={review.sequence}
+                />
                 <KeyValues
                   items={[
                     [
@@ -305,9 +316,29 @@ export async function ReviewResponse({
             </Expander>
           )}
         </div>
+        {reviewEvidence}
       </Section>
+    </>
+  );
+}
 
-      {/* ---- Options / trajectories ------------------------------------------------------ */}
+/** F. Management options (presentation only; economics and the issue freeze are unchanged). */
+export function OptionsSection({
+  projectId,
+  currency,
+  review,
+  response,
+  currentForecastTotal,
+  optionPaths,
+}: Base & {
+  currentForecastTotal: string | null;
+  /** Phase 4D.9D: each option's dated value milestones, placed with the options. */
+  optionPaths?: React.ReactNode;
+}) {
+  const { draft, issued, optionsEditable } = state({ projectId, currency, review, response });
+  const { scenarios, recommendation, decision } = response;
+  return (
+    <>
       <Section
         id="options"
         title="Options / alternative outcomes"
@@ -415,8 +446,16 @@ export async function ReviewResponse({
         )}
         {optionPaths}
       </Section>
+    </>
+  );
+}
 
-      {/* ---- Recommendation ----------------------------------------------------------- */}
+/** G. Cardaxia recommendation: draft → issue (unchanged lifecycle). */
+export function RecommendationSection({ projectId, currency, review, response }: Base) {
+  const { draft } = state({ projectId, currency, review, response });
+  const { scenarios, recommendation } = response;
+  return (
+    <>
       <Section
         id="recommendation"
         title="Cardaxia recommendation"
@@ -473,8 +512,30 @@ export async function ReviewResponse({
           </div>
         )}
       </Section>
+    </>
+  );
+}
 
-      {/* ---- Decision ------------------------------------------------------------------ */}
+/** H. Client / AVO decision against the issued recommendation (unchanged rules). */
+export function DecisionSection({
+  projectId,
+  currency,
+  review,
+  response,
+  stakeholders,
+  evidence,
+  outcomes,
+}: Base & {
+  stakeholders: Option[];
+  evidence: Option[];
+  /** Phase 4D.6: the Alternative Value Outcomes visual (finalised reviews), placed after the decision. */
+  outcomes?: React.ReactNode;
+}) {
+  const { issued } = state({ projectId, currency, review, response });
+  const { scenarios, recommendation, decision } = response;
+  const base = `/projects/${projectId}`;
+  return (
+    <>
       <Section
         id="decision"
         title="Client / AVO decision"
@@ -577,13 +638,55 @@ export async function ReviewResponse({
       </Section>
 
       {outcomes}
+    </>
+  );
+}
 
-      {/* ---- Value Change --------------------------------------------------------------- */}
+/** I. Value Case impact: forecast movement never alters the Authorised Value Case; a Value Change is separate. */
+export async function ValueCaseImpactSection({
+  projectId,
+  currency,
+  review,
+  response,
+  authorised,
+}: Base & {
+  /** The Authorised Value Case this review measures against, and this review's (formal or draft) forecast. */
+  authorised: { versionNumber: number; total: string; forecastTotal: string | null; valueGap: string | null };
+}) {
+  const { decision } = response;
+  const base = `/projects/${projectId}`;
+  const changes = await listValueChanges(projectId);
+  const openChange = changes.find((c) => c.change.status === "draft" || c.change.status === "proposed");
+  return (
+    <>
       <Section
         id="value-change"
-        title="Value Change"
-        description="Only if the Authorised Value Case must change. Forecast movement alone never changes it."
+        title="Value Case impact"
+        testId="value-case-impact"
+        description="Forecast movement never alters the Authorised Value Case. A Value Change is a separate, explicit step."
       >
+        <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3" data-testid="value-case-impact-figures">
+          <Stat
+            label={`Authorised Value (V${authorised.versionNumber})`}
+            value={money(authorised.total, currency)}
+            note="Unchanged by this review"
+            testId="impact-authorised"
+          />
+          <Stat
+            label={`Review #${review.sequence} Current Forecast`}
+            value={authorised.forecastTotal === null ? "Incomplete" : money(authorised.forecastTotal, currency)}
+            note={review.status === "draft" ? "Working until finalised" : "Formal position"}
+          />
+          <Stat
+            label="Value Gap"
+            value={authorised.valueGap === null ? "Incomplete" : money(authorised.valueGap, currency)}
+            note="Authorised − Current Forecast"
+          />
+        </div>
+        <p className="mb-3 text-xs text-slate-600" data-testid="value-change-guidance">
+          After the management response and decision, a separate Value Change may be required. It is prepared explicitly
+          here and is never created automatically.
+        </p>
         {response.changes.length > 0 && (
           <ul className="mb-3 space-y-1 text-sm">
             {response.changes.map((c) => (
@@ -631,6 +734,70 @@ export async function ReviewResponse({
         )}
       </Section>
     </>
+  );
+}
+
+/**
+ * The matter as active management response: stage, owner, remediation, monitoring, evidence status and its working
+ * vs this review's Value Leakage. Finalised reviews show the snapshot's own fields; living status (evidence requests,
+ * working leakage) is shown on draft reviews only, labelled as working.
+ */
+function MatterResponse({
+  entry: l,
+  living,
+  currency,
+  reviewSequence,
+}: {
+  entry: Response["leakage"][number];
+  living: WorkspaceMatter | undefined;
+  currency: string;
+  reviewSequence: number;
+}) {
+  const formal = l.thisReview?.amounts;
+  return (
+    <div
+      className="mb-3 grid gap-x-4 gap-y-1 rounded border border-slate-200 bg-slate-50 p-2 text-xs sm:grid-cols-2 lg:grid-cols-3"
+      data-testid="matter-response"
+    >
+      <p>
+        <span className="text-slate-500">Stage: </span>
+        {l.leakage.status === "closed" ? "Closed" : l.leakage.stage ? ASSURANCE_STAGE_LABELS[l.leakage.stage] : "Open"}
+      </p>
+      <p>
+        <span className="text-slate-500">Owner: </span>
+        {l.ownerName ?? <span className="text-amber-700">Not assigned</span>}
+      </p>
+      <p data-testid="matter-response-monitor">
+        <span className="text-slate-500">Monitor until: </span>
+        {l.leakage.monitorUntil ? formatDate(l.leakage.monitorUntil) : "—"}
+      </p>
+      <p className="sm:col-span-2 lg:col-span-3" data-testid="matter-response-remediation">
+        <span className="text-slate-500">Remediation: </span>
+        {l.leakage.remediationPlan ?? <span className="text-amber-700">No plan recorded</span>}
+      </p>
+      {living && (
+        <p data-testid="matter-response-evidence">
+          <span className="text-slate-500">Evidence: </span>
+          {living.evidenceCount} supporting
+          {living.requestState && (
+            <span className={living.requestState.outstanding ? "text-amber-700" : undefined}>
+              {" "}
+              · {living.requestState.label}
+            </span>
+          )}
+        </p>
+      )}
+      {living && (
+        <p data-testid="matter-response-working">
+          <span className="text-slate-500">Working VL: </span>
+          {living.entry.working ? `${money(living.entry.working.total, currency)} (working)` : "Not yet quantified"}
+        </p>
+      )}
+      <p data-testid="matter-response-formal">
+        <span className="text-slate-500">Review #{reviewSequence} VL: </span>
+        {formal ? money(formal.total, currency) : <span className="text-amber-700">Not yet assessed</span>}
+      </p>
+    </div>
   );
 }
 

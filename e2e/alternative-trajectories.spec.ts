@@ -17,7 +17,7 @@ test("Alternative Value Trajectories: shared history → review → three explic
   const story = page.getByTestId("review-story");
   await expect(story).toHaveAttribute("data-governed", "true");
   await expect(story.getByRole("heading", { name: "Why the value position moved" })).toBeVisible();
-  await expect(story.getByTestId("story-what-changed")).toContainText("VL-001 Vendor sequencing risk");
+  await expect(story.getByTestId("story-value-affected")).toContainText("VL-001 Vendor sequencing risk");
   await expect(story.getByTestId("story-what-changed")).toContainText("E-002 Revised mobilisation plan (trigger)");
   await expect(story.getByTestId("story-value-affected")).toContainText(
     "VD-01 Procurement Savings: forecast $14.0m → $13.0m",
@@ -128,7 +128,7 @@ test("Draft review: working context and a Draft · Not governed trajectory previ
   const story = page.getByTestId("review-story");
   await expect(story).toHaveAttribute("data-governed", "false");
   await expect(story).toContainText("Working Assurance context");
-  await expect(story.getByTestId("story-governance")).toContainText("Not yet a formal position");
+  await expect(story.getByTestId("story-value-position")).toContainText("Not yet a formal position");
 
   const preview = page.getByTestId("alternative-value-trajectories-preview");
   await expect(preview).toHaveAttribute("data-governed", "false");

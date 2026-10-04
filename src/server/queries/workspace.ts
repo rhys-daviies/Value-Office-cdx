@@ -1,6 +1,7 @@
 import { and, count, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { type AttentionItem, deriveMatterAttention, todayIso } from "@/domain/attention";
+import { type EvidenceRequestState, evidenceRequestState, type RequestCounts } from "@/domain/assurance-workflow";
 import { summariseLeakage } from "@/domain/response";
 import { ASSURANCE_STAGES, type AssuranceStage } from "@/domain/statuses";
 import { db, schema } from "@/server/db/client";
@@ -19,6 +20,12 @@ export type WorkspaceMatter = {
   evidenceCount: number;
   requestsOutstanding: number;
   requestsTotal: number;
+  /** Phase 4D.10F: request items by status, and their summary (null when nothing was requested). */
+  requests: RequestCounts;
+  requestState: EvidenceRequestState | null;
+  /** Latest finalised review that recorded the matter, and whether the open draft review has assessed it. */
+  lastFormalSequence: number | null;
+  assessedInDraft: boolean;
   attention: AttentionItem[];
   /** Any attention condition other than "not yet quantified" (which is reported on its own). */
   needsAttention: boolean;
@@ -30,6 +37,10 @@ export type StageFilter = "all" | AssuranceStage;
 export async function getContinuousAssuranceWorkspace(projectId: string, today = todayIso()) {
   const continuous = await getContinuousAssurance(projectId);
   const ids = continuous.open.map((e) => e.leakage.id);
+  const [draftReview] = await db()
+    .select({ id: schema.assuranceReview.id, sequence: schema.assuranceReview.sequence })
+    .from(schema.assuranceReview)
+    .where(and(eq(schema.assuranceReview.projectId, projectId), eq(schema.assuranceReview.status, "draft")));
   const [evidence, requests] = ids.length
     ? await Promise.all([
         db()
@@ -52,6 +63,14 @@ export async function getContinuousAssuranceWorkspace(projectId: string, today =
   const matters: WorkspaceMatter[] = continuous.open.map((entry) => {
     const id = entry.leakage.id;
     const mine = requests.filter((r) => r.id === id);
+    const n = (status: string) => mine.filter((r) => r.status === status).reduce((sum, r) => sum + r.n, 0);
+    const counts: RequestCounts = {
+      open: n("open"),
+      partial: n("partially_received"),
+      received: n("received"),
+      unavailable: n("not_available"),
+    };
+    const finalised = entry.assessments.filter((a) => a.reviewStatus === "finalised");
     const attention = deriveMatterAttention(
       {
         stage: entry.leakage.stage,
@@ -69,6 +88,10 @@ export async function getContinuousAssuranceWorkspace(projectId: string, today =
         .filter((r) => r.status === "open" || r.status === "partially_received")
         .reduce((s, r) => s + r.n, 0),
       requestsTotal: mine.reduce((s, r) => s + r.n, 0),
+      requests: counts,
+      requestState: evidenceRequestState(counts),
+      lastFormalSequence: finalised.length ? Math.max(...finalised.map((a) => a.reviewSequence)) : null,
+      assessedInDraft: draftReview ? entry.assessments.some((a) => a.assuranceReviewId === draftReview.id) : false,
       attention,
       needsAttention: attention.some((a) => a.kind !== "unquantified"),
     };
@@ -81,6 +104,17 @@ export async function getContinuousAssuranceWorkspace(projectId: string, today =
   return {
     today,
     matters,
+    draftReview: draftReview ?? null,
+    /** Evidence still requested across open matters (visibility only — it never blocks a review). */
+    evidenceOutstanding: {
+      items: matters.reduce((sum, m) => sum + m.requestsOutstanding, 0),
+      matters: matters.filter((m) => m.requestsOutstanding > 0).length,
+    },
+    remediation: {
+      planned: matters.filter((m) => m.entry.leakage.remediationPlan).length,
+      unplanned: matters.filter((m) => !m.entry.leakage.remediationPlan).length,
+      monitored: matters.filter((m) => m.entry.leakage.monitorUntil || m.entry.leakage.stage === "monitoring").length,
+    },
     closedCount: continuous.closed.length,
     nextCode: continuous.nextCode,
     working: {

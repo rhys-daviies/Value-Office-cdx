@@ -49,7 +49,7 @@ test("daily Value Office: overview → assurance → matter → formal → drive
   const continuous = page.getByTestId("continuous-assurance");
   const formal = page.getByTestId("formal-assurance");
   await expect(continuous).toContainText("Live · working");
-  await expect(formal).toContainText("Formal Assurance Reviews preserve governed point-in-time Value Positions");
+  await expect(formal).toContainText("Governed snapshots and recommitment points");
   await expect(continuous.getByTestId("matter-row")).toHaveCount(2);
   await expect(formal.getByTestId("review-row")).toHaveCount(1);
   await expect(continuous.getByTestId("review-row")).toHaveCount(0);
@@ -69,7 +69,7 @@ test("daily Value Office: overview → assurance → matter → formal → drive
   await expect(row).toContainText("VL-102");
   await expect(row.getByTestId("working-amount")).toHaveText("Not yet quantified");
   await expect(row.getByTestId("matter-evidence-state")).toContainText("1 supporting");
-  await expect(row.getByTestId("matter-evidence-state")).toContainText("1 request outstanding");
+  await expect(row.getByTestId("matter-evidence-state")).toContainText("Evidence requested · 1 item outstanding");
   await expect(row.getByTestId("matter-attention")).toContainText("No Risk / Leakage Owner");
   await page
     .getByTestId("matter-filters")

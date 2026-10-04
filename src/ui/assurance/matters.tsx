@@ -137,8 +137,12 @@ export function ContinuousAssurance({
             Continuous Assurance <WorkingTag>Live · working</WorkingTag>
           </h2>
           <p className="mt-0.5 max-w-3xl text-sm text-slate-600">
-            What threatens the Authorised Value today and what is being done about it. Stages are flexible — a matter
-            moves between them as evidence changes. Working figures are not a formal position.
+            What threatens the Authorised Value today and what is being done about it. Working figures are not a formal
+            position.
+          </p>
+          <p className="mt-1 text-xs text-slate-500" data-testid="matter-workflow-guide">
+            Risk identified → evidence gathered / requested → Value Leakage assessed → remediation planned → monitored →
+            recorded in a formal review. Stages are flexible; you set them.
           </p>
         </div>
         <a
@@ -148,6 +152,29 @@ export function ContinuousAssurance({
           + Raise Assurance Matter
         </a>
       </div>
+
+      <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-700" data-testid="active-summary">
+        <li data-testid="active-evidence-outstanding">
+          Evidence outstanding:{" "}
+          <strong>
+            {workspace.evidenceOutstanding.items
+              ? `${workspace.evidenceOutstanding.items} item${workspace.evidenceOutstanding.items === 1 ? "" : "s"} across ${workspace.evidenceOutstanding.matters} matter${workspace.evidenceOutstanding.matters === 1 ? "" : "s"}`
+              : "none"}
+          </strong>
+        </li>
+        <li data-testid="active-remediation">
+          Remediation: <strong>{workspace.remediation.planned} planned</strong> · {workspace.remediation.unplanned}{" "}
+          without a plan · {workspace.remediation.monitored} monitored
+        </li>
+        {workspace.draftReview && (
+          <li data-testid="active-draft-review">
+            Formal review in progress:{" "}
+            <Link href={`${base}/${workspace.draftReview.id}`} className="text-sky-800 underline">
+              Review #{workspace.draftReview.sequence} (draft)
+            </Link>
+          </li>
+        )}
+      </ul>
 
       <nav aria-label="Filter Assurance matters" className="mb-3">
         <ul className="flex flex-wrap gap-1 text-sm" data-testid="matter-filters">
@@ -185,55 +212,83 @@ export function ContinuousAssurance({
               <th>Working Value Leakage</th>
               <th>Evidence</th>
               <th>Remediation / monitoring</th>
+              <th>Formal review</th>
               <th>Needs attention</th>
             </tr>
           </thead>
           <tbody>
-            {shown.map(({ entry: e, evidenceCount, requestsOutstanding, requestsTotal, attention: items }) => (
-              <tr key={e.leakage.id} data-testid="matter-row">
-                <td className="min-w-48">
-                  <Link
-                    href={`${base}/matters/${e.leakage.id}`}
-                    className="font-medium text-sky-800 underline decoration-sky-300"
-                  >
-                    <span className="font-mono text-slate-500">{e.leakage.code}</span> {e.leakage.title}
-                  </Link>
-                  <div className="text-xs text-slate-500">
-                    {e.identifiedInSequence !== null
-                      ? `Raised in Review #${e.identifiedInSequence}`
-                      : `Raised ${formatDate(e.leakage.identifiedOn)}`}
-                    {e.drivers.length > 0 && ` · ${e.drivers.map((d) => d.code).join(", ")}`}
-                  </div>
-                </td>
-                <td>
-                  <StageBadge entry={e} />
-                </td>
-                <td>{e.ownerName ?? <span className="text-amber-700">Not assigned</span>}</td>
-                <td>
-                  <WorkingAmount entry={e} currency={currency} />
-                </td>
-                <td className="text-xs whitespace-nowrap" data-testid="matter-evidence-state">
-                  {evidenceCount} supporting
-                  {requestsTotal > 0 && (
-                    <div className={requestsOutstanding ? "text-amber-700" : "text-slate-500"}>
-                      {requestsOutstanding
-                        ? `${requestsOutstanding} request${requestsOutstanding === 1 ? "" : "s"} outstanding`
-                        : "All requests answered"}
+            {shown.map(
+              ({ entry: e, evidenceCount, requestState, lastFormalSequence, assessedInDraft, attention: items }) => (
+                <tr key={e.leakage.id} data-testid="matter-row">
+                  <td className="min-w-48">
+                    <Link
+                      href={`${base}/matters/${e.leakage.id}`}
+                      className="font-medium text-sky-800 underline decoration-sky-300"
+                    >
+                      <span className="font-mono text-slate-500">{e.leakage.code}</span> {e.leakage.title}
+                    </Link>
+                    <div className="text-xs text-slate-500">
+                      {e.identifiedInSequence !== null
+                        ? `Raised in Review #${e.identifiedInSequence}`
+                        : `Raised ${formatDate(e.leakage.identifiedOn)}`}
+                      {e.drivers.length > 0 && ` · ${e.drivers.map((d) => d.code).join(", ")}`}
                     </div>
-                  )}
-                </td>
-                <td className="text-xs text-slate-600">
-                  {e.leakage.remediationPlan ? "Plan recorded" : "No plan"}
-                  {e.leakage.monitorUntil && <div>Monitor until {formatDate(e.leakage.monitorUntil)}</div>}
-                  {e.leakage.requiredDecisionDate && (
-                    <div>Decision by {formatDate(e.leakage.requiredDecisionDate)}</div>
-                  )}
-                </td>
-                <td>
-                  <AttentionBadges items={items} />
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td>
+                    <StageBadge entry={e} />
+                  </td>
+                  <td>{e.ownerName ?? <span className="text-amber-700">Not assigned</span>}</td>
+                  <td>
+                    <WorkingAmount entry={e} currency={currency} />
+                  </td>
+                  <td className="text-xs whitespace-nowrap" data-testid="matter-evidence-state">
+                    {evidenceCount} supporting
+                    {requestState && (
+                      <div
+                        className={requestState.outstanding ? "text-amber-700" : "text-slate-500"}
+                        data-testid="matter-request-state"
+                      >
+                        {requestState.label}
+                      </div>
+                    )}
+                  </td>
+                  <td className="max-w-56 text-xs text-slate-600" data-testid="matter-remediation">
+                    {e.leakage.remediationPlan ? (
+                      <span className="line-clamp-2" title={e.leakage.remediationPlan}>
+                        {e.leakage.remediationPlan}
+                      </span>
+                    ) : (
+                      <span className="text-amber-700">No plan</span>
+                    )}
+                    {e.leakage.monitorUntil && <div>Monitor until {formatDate(e.leakage.monitorUntil)}</div>}
+                    {e.leakage.requiredDecisionDate && (
+                      <div>Decision by {formatDate(e.leakage.requiredDecisionDate)}</div>
+                    )}
+                  </td>
+                  <td className="text-xs whitespace-nowrap text-slate-600" data-testid="matter-formal">
+                    {workspace.draftReview && (
+                      <div>
+                        <Link
+                          href={`${base}/${workspace.draftReview.id}#matter-${e.leakage.code}`}
+                          className="text-sky-800 underline"
+                        >
+                          Review #{workspace.draftReview.sequence}
+                        </Link>{" "}
+                        {assessedInDraft ? "· assessed" : "· to assess"}
+                      </div>
+                    )}
+                    {lastFormalSequence !== null ? (
+                      <div>Last recorded: Review #{lastFormalSequence}</div>
+                    ) : (
+                      !workspace.draftReview && <div>Not yet in a formal review</div>
+                    )}
+                  </td>
+                  <td>
+                    <AttentionBadges items={items} />
+                  </td>
+                </tr>
+              ),
+            )}
           </tbody>
         </Table>
       )}

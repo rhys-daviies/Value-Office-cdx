@@ -46,6 +46,7 @@ export const createReview = defineCommand(
     reviewDate: isoDate,
     triggerEvidenceId: uuid.optional(),
     whatChanged: optionalText,
+    whyItMatters: optionalText,
   }),
   async ({ tx, actor }, input) => {
     // Serialise review creation per project (sequence + previous-review choice).
@@ -111,6 +112,7 @@ export const createReview = defineCommand(
         previousReviewId: previous?.id,
         reviewDate: input.reviewDate,
         whatChanged: input.whatChanged,
+        whyItMatters: input.whyItMatters,
         createdBy: actor.userId,
       })
       .returning();

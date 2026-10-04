@@ -283,3 +283,31 @@ export async function listMatterOptions(projectId: string) {
     .orderBy(asc(schema.valueLeakage.code));
   return [...rows.filter((r) => r.status === "open"), ...rows.filter((r) => r.status !== "open")];
 }
+
+/**
+ * Phase 4D.10F matter → review handoff: the project's open draft review (if any) and which of the matter's working
+ * evidence it already relies on. Reliance is the existing formal review-evidence link; nothing is copied.
+ */
+export async function getMatterReviewHandoff(projectId: string, matterId: string) {
+  const [draft] = await db()
+    .select({ id: schema.assuranceReview.id, sequence: schema.assuranceReview.sequence })
+    .from(schema.assuranceReview)
+    .where(and(eq(schema.assuranceReview.projectId, projectId), eq(schema.assuranceReview.status, "draft")));
+  if (!draft) return { draft: null, reliedOn: new Set<string>(), assessed: false };
+  const [links, assessed] = await Promise.all([
+    db()
+      .select({ evidenceId: schema.evidenceLink.evidenceId })
+      .from(schema.evidenceLink)
+      .where(and(eq(schema.evidenceLink.projectId, projectId), eq(schema.evidenceLink.assuranceReviewId, draft.id))),
+    db()
+      .select({ id: schema.leakageAssessment.id })
+      .from(schema.leakageAssessment)
+      .where(
+        and(
+          eq(schema.leakageAssessment.assuranceReviewId, draft.id),
+          eq(schema.leakageAssessment.valueLeakageId, matterId),
+        ),
+      ),
+  ]);
+  return { draft, reliedOn: new Set(links.map((l) => l.evidenceId)), assessed: assessed.length > 0 };
+}

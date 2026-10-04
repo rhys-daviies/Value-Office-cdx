@@ -237,6 +237,30 @@ calculated). Actor, time, command and before/after come from `audit_event`; noth
   without rationale stay valid. Reports are unchanged (a rationale section would be a future versioned renderer).
   Migration record and reversal: `docs/release/4d10e-migration.md`.
 
+## Assurance operating workspace (Phase 4D.10F)
+
+Presentation and composition only: no schema, no migration, no new methodology.
+
+- **Landing** reads in three bands: _Current position_ (governed: Authorised Value, latest formal forecast, realised,
+  Value Gap, latest formal review, next derived requirement), _Active Assurance_ (working: open matters, attention,
+  evidence outstanding, working Value Leakage, remediation) and _Formal Assurance Reviews_ (latest, requirements,
+  create, history). Governed and working figures stay visually and numerically separate.
+- **Review page order:** context → What changed + Why it matters (one review-level step) → Risks / Value Leakage /
+  evidence / remediation → Forecast Value Position (4D.10E baseline → forecast → movement → why → related matter) →
+  options → recommendation → decision → Value Case impact → finalise. Option economics, the issue freeze and decision
+  rules are unchanged.
+- **Review creation** may record both What changed and Why it matters (`createReview` accepts `whyItMatters`; the
+  column already existed).
+- **Matter workflow** (`src/domain/assurance-workflow.ts`) is a read-time lens: risk identified → evidence → Value
+  Leakage → remediation → monitoring → formal review. It never sets a stage. Evidence request status is derived from
+  the matter's Information Request items and never blocks a review.
+- **Matter → review handoff** uses the existing relationships only: "Rely on in Review #N" creates the existing
+  review-evidence link; "Assess in Review #N" opens the review's existing leakage assessment; open matters are
+  snapshotted at finalisation as before. Nothing is copied outside finalisation.
+- **Value Gap vs Value Leakage** is stated wherever both appear and never reconciled. A forecast movement never alters
+  the Authorised Value Case; a Value Change stays explicit and manual.
+- The **in-app story** adds Why it matters after What changed. Issued report renderers and snapshots are unchanged.
+
 ## Value Drivers: identity, living record, versioned snapshot (Phase 4D.3)
 
 | Layer                  | Record                                         | Changes how                                                   |

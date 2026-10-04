@@ -20,8 +20,15 @@ import { listDriverOptions } from "@/server/queries/information-request";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getReviewResponse } from "@/server/queries/response";
 import { getReviewStory } from "@/server/queries/review-story";
+import { getContinuousAssuranceWorkspace } from "@/server/queries/workspace";
 import { getAlternativeValueTrajectories, getReviewTrajectoryAuthoring } from "@/server/queries/trajectory";
-import { ReviewResponse } from "@/ui/assurance/response";
+import {
+  DecisionSection,
+  LeakageSection,
+  OptionsSection,
+  RecommendationSection,
+  ValueCaseImpactSection,
+} from "@/ui/assurance/response";
 import { ReviewStory } from "@/ui/assurance/story";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { EvidenceBadge, NonFinancialBadge, PlainBadge, QualificationBadge } from "@/ui/components/badges";
@@ -88,6 +95,55 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   ]);
   const outcomes = alternatives?.outcomes ?? null;
 
+  const draftMatters = draft ? await getContinuousAssuranceWorkspace(projectId) : null;
+  const living = new Map(draftMatters?.matters.map((m) => [m.entry.leakage.id, m]) ?? []);
+  const openMatters = response.leakage.filter((l) => l.leakage.status === "open");
+  const responseProps = { projectId, currency, review, response };
+  const steps: { id: string; label: string; state?: string; done?: boolean }[] = [
+    { id: "context", label: "Review context" },
+    {
+      id: "reasoning",
+      label: "What changed · Why it matters",
+      done: Boolean(review.whatChanged && review.whyItMatters),
+      state: review.whatChanged && review.whyItMatters ? "recorded" : "to record",
+    },
+    {
+      id: "leakage",
+      label: "Risks / Value Leakage",
+      done: openMatters.length === 0 || openMatters.every((l) => l.thisReview),
+      state: `${openMatters.filter((l) => l.thisReview).length} of ${openMatters.length} open assessed`,
+    },
+    {
+      id: "position",
+      label: "Forecast Value Position",
+      done: ws.missingPositions === 0 && blankForecasts.length === 0 && unexplained.length === 0,
+      state:
+        ws.missingPositions > 0
+          ? `${ws.missingPositions} position(s) missing`
+          : unexplained.length > 0
+            ? `${unexplained.length} movement(s) to explain`
+            : "complete",
+    },
+    { id: "options", label: "Management options", state: `${response.scenarios.length} option(s)` },
+    {
+      id: "recommendation",
+      label: "Recommendation",
+      done: Boolean(response.recommendation?.issuedAt),
+      state: response.recommendation?.issuedAt ? "issued" : response.recommendation ? "draft" : "none",
+    },
+    {
+      id: "decision",
+      label: "Decision",
+      done: Boolean(response.decision),
+      state: response.decision ? "recorded" : "none",
+    },
+    {
+      id: "value-change",
+      label: "Value Case impact",
+      state: response.changes.length ? response.changes.map((c) => c.code).join(", ") : "no Value Change",
+    },
+  ];
+
   return (
     <>
       <p className="mb-3 text-sm">
@@ -98,7 +154,7 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
 
       {/* ---- Review header ---------------------------------------------------------- */}
       <div
-        className={`mb-6 rounded-lg border-2 px-4 py-3 ${draft ? "border-amber-300 bg-amber-50" : "border-emerald-400 bg-emerald-50"}`}
+        className={`mb-4 rounded-lg border-2 px-4 py-3 ${draft ? "border-amber-300 bg-amber-50" : "border-emerald-400 bg-emerald-50"}`}
         data-testid="review-state"
       >
         <div className="flex flex-wrap items-center gap-2">
@@ -107,166 +163,219 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
         </div>
         <p className="text-sm">
           {draft
-            ? "Draft — enter the current Value Position for every driver, then finalise."
+            ? "Draft — work through the review from context to Value Case impact, then finalise."
             : `Finalised ${formatDateTime(review.finalisedAt)} by ${ws.finalisedBy?.name ?? "—"} — read-only. Corrections require a new review.`}
         </p>
       </div>
 
       {story && <ReviewStory story={story} currency={currency} base={base} />}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title="Review">
-          <KeyValues
-            items={[
-              ["Review date", formatDate(review.reviewDate)],
-              ["Trigger", TRIGGER_LABELS[review.trigger]],
-              [
-                "Trigger evidence",
-                ws.triggerEvidence ? (
-                  <TextLink href={`${base}/evidence/${ws.triggerEvidence.id}`}>
-                    {ws.triggerEvidence.code} {ws.triggerEvidence.title}
-                  </TextLink>
-                ) : (
-                  "—"
-                ),
-              ],
-              [
-                "Against",
-                <TextLink key="v" href={`${base}/value-case/v/${ws.againstVersion.versionNumber}`}>
-                  Authorised V{ws.againstVersion.versionNumber}
-                </TextLink>,
-              ],
-              [
-                "Previous position",
-                <span key="p" data-testid="previous-position">
-                  {priorLabel}
-                </span>,
-              ],
-              ["Opened by", `${ws.createdByName ?? "—"} · ${formatDateTime(review.createdAt)}`],
-            ]}
-          />
-          {draft && (
-            <div className="mt-4 border-t border-slate-100 pt-3">
-              <ActionForm action={updateReviewAction}>
-                <Hidden name="projectId" value={projectId} />
-                <Hidden name="reviewId" value={review.id} />
-                <FormGrid>
-                  <DateField name="reviewDate" label="Review date" required defaultValue={review.reviewDate} />
-                  <SelectField
-                    name="trigger"
-                    label="Trigger"
-                    required
-                    defaultValue={review.trigger}
-                    options={ASSURANCE_TRIGGERS.map((t) => ({ value: t, label: TRIGGER_LABELS[t] }))}
-                  />
-                </FormGrid>
-                <div className="mt-3">
-                  <SelectField
-                    name="triggerEvidenceId"
-                    label="Trigger evidence"
-                    defaultValue={review.triggerEvidenceId}
-                    placeholder="— None —"
-                    options={evidenceOptions.map((e) => ({
-                      value: e.id,
-                      label: `${e.code} ${e.title}${e.isMaterialChange ? " · material change" : ""}`,
-                    }))}
-                  />
-                </div>
-                <div className="mt-3">
-                  <SubmitButton variant="secondary">Save review details</SubmitButton>
-                </div>
-              </ActionForm>
-            </div>
-          )}
-        </Section>
-
-        <Section title="What changed?" description="Since the previous value position.">
-          {draft ? (
-            <ActionForm action={updateReviewAction} testId="what-changed-form">
-              <Hidden name="projectId" value={projectId} />
-              <Hidden name="reviewId" value={review.id} />
-              <TextArea name="whatChanged" label="Consultant narrative" rows={5} defaultValue={review.whatChanged} />
-              <div className="mt-2">
-                <SubmitButton variant="secondary">Save</SubmitButton>
-              </div>
-            </ActionForm>
-          ) : (
-            <p className="text-sm whitespace-pre-wrap" data-testid="what-changed">
-              {review.whatChanged ?? "—"}
-            </p>
-          )}
-          <h3 className="mt-4 mb-2 text-sm font-semibold">Relevant evidence ({ws.evidence.length})</h3>
-          {ws.evidence.length === 0 && <p className="text-xs text-slate-500">No evidence linked to this review.</p>}
-          <ul className="space-y-1 text-sm">
-            {ws.evidence.map((e) => (
-              <li key={e.linkId} className="flex items-start justify-between gap-2">
-                <span>
-                  <TextLink href={`${base}/evidence/${e.evidenceId}`}>
-                    {e.code} {e.title}
-                  </TextLink>
-                  {e.isMaterialChange && (
-                    <>
-                      {" "}
-                      <PlainBadge tone="red">Material change</PlainBadge>
-                    </>
-                  )}
-                  {e.relevanceNote && <span className="block text-xs text-slate-500">{e.relevanceNote}</span>}
-                </span>
-                {draft && (
-                  <ActionForm action={unlinkReviewEvidenceAction} showSuccess={false}>
-                    <Hidden name="projectId" value={projectId} />
-                    <Hidden name="evidenceLinkId" value={e.linkId} />
-                    <SubmitButton variant="danger">Unlink</SubmitButton>
-                  </ActionForm>
+      <nav aria-label="Review sections" className="mb-6" data-testid="review-steps">
+        <ol className="flex flex-wrap gap-1 text-xs">
+          {steps.map((st, i) => (
+            <li key={st.id}>
+              <a
+                href={`#${st.id}`}
+                className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-slate-700 hover:border-slate-500"
+                data-testid={`review-step-${st.id}`}
+              >
+                <span className="font-semibold text-slate-400">{String.fromCharCode(65 + i)}</span>
+                {st.label}
+                {st.state && (
+                  <span className={st.done ? "text-emerald-700" : "text-slate-400"}>
+                    {st.done ? "✓" : "·"} {st.state}
+                  </span>
                 )}
-              </li>
-            ))}
-          </ul>
-          {draft && (
-            <div className="mt-3">
-              <ActionForm action={linkReviewEvidenceAction} resetOnSuccess testId="review-evidence-form">
-                <Hidden name="projectId" value={projectId} />
-                <Hidden name="reviewId" value={review.id} />
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="min-w-60 flex-1">
-                    <SelectField
-                      name="evidenceId"
-                      label="Link evidence"
-                      required
-                      placeholder="— Choose evidence —"
-                      options={evidenceOptions.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }))}
-                    />
-                  </div>
-                  <div className="min-w-48 flex-1">
-                    <TextField name="relevanceNote" label="Relevance" />
-                  </div>
-                  <SubmitButton variant="secondary">Link</SubmitButton>
-                </div>
-              </ActionForm>
-              <p className="mt-1 text-xs text-slate-500">
-                New evidence is recorded in the <TextLink href={`${base}/evidence`}>Evidence register</TextLink>.
-              </p>
-              <MatterEvidenceCandidates
-                projectId={projectId}
-                reviewId={review.id}
-                candidates={matterEvidence.filter((c) => !ws.evidence.some((e) => e.evidenceId === c.evidenceId))}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
+      {/* ---- A. Review context / current value position ------------------------------ */}
+      <Section
+        id="context"
+        title="Review context"
+        testId="review-context"
+        description="The Authorised Value Case this review measures against and the formal position it moves from."
+      >
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div>
+            <KeyValues
+              items={[
+                ["Review date", formatDate(review.reviewDate)],
+                ["Trigger", TRIGGER_LABELS[review.trigger]],
+                [
+                  "Trigger evidence",
+                  ws.triggerEvidence ? (
+                    <TextLink href={`${base}/evidence/${ws.triggerEvidence.id}`}>
+                      {ws.triggerEvidence.code} {ws.triggerEvidence.title}
+                    </TextLink>
+                  ) : (
+                    "—"
+                  ),
+                ],
+                [
+                  "Against",
+                  <TextLink key="v" href={`${base}/value-case/v/${ws.againstVersion.versionNumber}`}>
+                    Authorised V{ws.againstVersion.versionNumber}
+                  </TextLink>,
+                ],
+                [
+                  "Previous position",
+                  <span key="p" data-testid="previous-position">
+                    {priorLabel}
+                  </span>,
+                ],
+                ["Opened by", `${ws.createdByName ?? "—"} · ${formatDateTime(review.createdAt)}`],
+              ]}
+            />
+            <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="context-position">
+              <Figure
+                label={`Authorised Value (V${ws.againstVersion.versionNumber})`}
+                value={formatMoneyShort(totals.authorisedTotal, currency)}
+                testId="context-authorised"
+              />
+              <Figure
+                label={ws.previous ? `Review #${ws.previous.sequence} formal forecast` : "Previous formal forecast"}
+                testId="context-previous"
+                value={ws.previous ? headline(totals.previousTotal, currency, "Incomplete") : "None (first review)"}
+                note={ws.previous ? formatDate(ws.previous.reviewDate) : "Movement is measured from Authorised Value"}
               />
             </div>
+          </div>
+          {draft && (
+            <ActionForm action={updateReviewAction} testId="review-details-form">
+              <Hidden name="projectId" value={projectId} />
+              <Hidden name="reviewId" value={review.id} />
+              <FormGrid>
+                <DateField name="reviewDate" label="Review date" required defaultValue={review.reviewDate} />
+                <SelectField
+                  name="trigger"
+                  label="Trigger"
+                  required
+                  defaultValue={review.trigger}
+                  options={ASSURANCE_TRIGGERS.map((t) => ({ value: t, label: TRIGGER_LABELS[t] }))}
+                />
+              </FormGrid>
+              <div className="mt-3">
+                <SelectField
+                  name="triggerEvidenceId"
+                  label="Trigger evidence"
+                  defaultValue={review.triggerEvidenceId}
+                  placeholder="— None —"
+                  options={evidenceOptions.map((e) => ({
+                    value: e.id,
+                    label: `${e.code} ${e.title}${e.isMaterialChange ? " · material change" : ""}`,
+                  }))}
+                />
+              </div>
+              <div className="mt-3">
+                <SubmitButton variant="secondary">Save review details</SubmitButton>
+              </div>
+            </ActionForm>
           )}
-        </Section>
-      </div>
-
-      {/* ---- Value Position ------------------------------------------------------------ */}
-      <Section
-        title="Value Position"
-        description={`Per Value Driver. Movement is Current Forecast − ${ws.previous ? `Review #${ws.previous.sequence} forecast` : "Authorised Value (first review)"}; Value Gap is Authorised Value − Current Forecast.`}
-      >
-        <PositionTable ws={ws} currency={currency} matters={matters} draft={draft} />
-        {draft && <PositionEditor ws={ws} projectId={projectId} currency={currency} matters={matters} />}
+        </div>
       </Section>
 
-      {/* ---- Summary ------------------------------------------------------------------- */}
-      <Section title="Summary" description="Financial drivers only; non-financial drivers are excluded from totals.">
+      {/* ---- B + C. What changed? Why does it matter? ------------------------------------ */}
+      <Section
+        id="reasoning"
+        title="What changed and why it matters"
+        testId="review-reasoning"
+        description="Review-level reasoning about the Value Case. Driver movements are explained in the Forecast Value Position; matters carry their own descriptions."
+      >
+        {draft ? (
+          <ActionForm action={updateReviewAction} testId="reasoning-form">
+            <Hidden name="projectId" value={projectId} />
+            <Hidden name="reviewId" value={review.id} />
+            <div className="grid gap-3 lg:grid-cols-2">
+              <TextArea
+                name="whatChanged"
+                label="What changed?"
+                rows={4}
+                defaultValue={review.whatChanged}
+                hint="Since the previous value position."
+              />
+              <TextArea
+                name="whyItMatters"
+                label="Why does it matter?"
+                rows={4}
+                defaultValue={review.whyItMatters}
+                hint="The economic significance for the Authorised Value Case."
+              />
+            </div>
+            <div className="mt-3">
+              <TextArea
+                name="summary"
+                label="Review summary (optional — often written last)"
+                rows={2}
+                defaultValue={review.summary}
+              />
+            </div>
+            <div className="mt-2">
+              <SubmitButton variant="secondary">Save</SubmitButton>
+            </div>
+          </ActionForm>
+        ) : (
+          <div className="space-y-3 text-sm">
+            <div className="grid gap-3 lg:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase">What changed?</p>
+                <p className="whitespace-pre-wrap" data-testid="what-changed">
+                  {review.whatChanged ?? "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase">Why does it matter?</p>
+                <p className="whitespace-pre-wrap" data-testid="why-it-matters">
+                  {review.whyItMatters ?? "—"}
+                </p>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase">Summary</p>
+              <p className="whitespace-pre-wrap" data-testid="review-summary-text">
+                {review.summary ?? "—"}
+              </p>
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {/* ---- D. Risks / Value Leakage / Evidence / Remediation --------------------------- */}
+      <LeakageSection
+        {...responseProps}
+        stakeholders={stakeholders.map((p) => ({ value: p.personId, label: p.name }))}
+        drivers={driverOptions}
+        living={living}
+        reviewEvidence={
+          <ReviewEvidence
+            projectId={projectId}
+            base={base}
+            reviewId={review.id}
+            draft={draft}
+            evidence={ws.evidence}
+            evidenceOptions={evidenceOptions}
+            candidates={matterEvidence.filter((c) => !ws.evidence.some((e) => e.evidenceId === c.evidenceId))}
+          />
+        }
+      />
+
+      {/* ---- E. Forecast Value Position --------------------------------------------------- */}
+      <Section
+        id="position"
+        title="Forecast Value Position"
+        testId="forecast-position"
+        description={`Per Value Driver: formal baseline → Current Forecast → movement → why it changed. Movement is Current Forecast − ${ws.previous ? `Review #${ws.previous.sequence} forecast` : "Authorised Value (first review)"}; Value Gap is Authorised Value − Current Forecast.`}
+      >
+        <PositionTable ws={ws} currency={currency} matters={matters} draft={draft} base={base} />
+        {draft && <PositionEditor ws={ws} projectId={projectId} currency={currency} matters={matters} />}
+
+        <h3 className="mt-6 mb-2 text-sm font-semibold">Position summary</h3>
+        <p className="mb-2 text-xs text-slate-500">
+          Financial drivers only; non-financial drivers are excluded from totals.
+        </p>
         <div className="grid gap-3 sm:grid-cols-5" data-testid="review-summary">
           <Figure
             label={`Authorised (V${ws.againstVersion.versionNumber})`}
@@ -381,20 +490,10 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
         </Section>
       )}
 
-      <ReviewResponse
-        projectId={projectId}
-        currency={currency}
-        review={review}
-        response={response}
-        stakeholders={stakeholders.map((p) => ({ value: p.personId, label: p.name }))}
-        drivers={driverOptions}
-        evidence={evidenceOptions.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }))}
+      {/* ---- F–I. Options → Recommendation → Decision → Value Case impact ------------------ */}
+      <OptionsSection
+        {...responseProps}
         currentForecastTotal={totals.forecastTotal}
-        outcomes={
-          outcomes && outcomes.review.finalised && outcomes.outcomes.length > 0 ? (
-            <ReviewOptionsVisual data={alternatives!} />
-          ) : undefined
-        }
         optionPaths={
           trajectory && (
             <>
@@ -404,32 +503,26 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
           )
         }
       />
-
-      <Section title="Why it matters" description="The economic significance of this position.">
-        {draft ? (
-          <ActionForm action={updateReviewAction} testId="why-it-matters-form">
-            <Hidden name="projectId" value={projectId} />
-            <Hidden name="reviewId" value={review.id} />
-            <div className="space-y-3">
-              <TextArea name="whyItMatters" label="Why it matters" rows={4} defaultValue={review.whyItMatters} />
-              <TextArea name="summary" label="Review summary" rows={3} defaultValue={review.summary} />
-              <SubmitButton variant="secondary">Save</SubmitButton>
-            </div>
-          </ActionForm>
-        ) : (
-          <div className="space-y-3 text-sm">
-            <p className="whitespace-pre-wrap" data-testid="why-it-matters">
-              {review.whyItMatters ?? "—"}
-            </p>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase">Summary</p>
-              <p className="whitespace-pre-wrap" data-testid="review-summary-text">
-                {review.summary ?? "—"}
-              </p>
-            </div>
-          </div>
-        )}
-      </Section>
+      <RecommendationSection {...responseProps} />
+      <DecisionSection
+        {...responseProps}
+        stakeholders={stakeholders.map((p) => ({ value: p.personId, label: p.name }))}
+        evidence={evidenceOptions.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }))}
+        outcomes={
+          outcomes && outcomes.review.finalised && outcomes.outcomes.length > 0 ? (
+            <ReviewOptionsVisual data={alternatives!} />
+          ) : undefined
+        }
+      />
+      <ValueCaseImpactSection
+        {...responseProps}
+        authorised={{
+          versionNumber: ws.againstVersion.versionNumber,
+          total: totals.authorisedTotal,
+          forecastTotal: totals.forecastTotal,
+          valueGap: totals.valueGap,
+        }}
+      />
 
       {draft && (
         <Section id="finalise" title="Finalise review" tone="muted">
@@ -461,10 +554,16 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             <li className={review.whyItMatters ? "text-emerald-800" : "text-amber-800"}>
               {review.whyItMatters ? "✓ Why it matters recorded" : "⚠ Why it matters not recorded"}
             </li>
+            {draftMatters && draftMatters.evidenceOutstanding.items > 0 && (
+              <li className="text-amber-800" data-testid="finalise-evidence-outstanding">
+                ⚠ {draftMatters.evidenceOutstanding.items} evidence request item(s) outstanding on open matters — not
+                blocking
+              </li>
+            )}
           </ul>
           <p className="mb-3 text-sm text-slate-600">
-            Finalising makes this review and its Value Positions permanently read-only. The next review will measure
-            movement against this position.
+            Finalising makes this review and its Value Positions permanently read-only and records every open Assurance
+            matter as it stands. The next review will measure movement against this position.
           </p>
           <ActionForm
             action={finaliseReviewAction}
@@ -500,11 +599,13 @@ function PositionTable({
   currency,
   matters,
   draft,
+  base,
 }: {
   ws: AssuranceWorkspace;
   currency: string;
   matters: MatterOption[];
   draft: boolean;
+  base: string;
 }) {
   const money = (v: string | null) => (v === null ? "—" : formatMoneyShort(v, currency));
   return (
@@ -513,11 +614,10 @@ function PositionTable({
         <tr>
           <th>Driver</th>
           <th className="text-right">Authorised</th>
-          <th className="text-right">
-            {ws.previous ? `Review #${ws.previous.sequence} forecast` : "Previous position"}
-          </th>
+          <th className="text-right">Formal baseline</th>
           <th className="text-right">Current Forecast</th>
           <th className="text-right">Movement</th>
+          <th>Why it changed · related matter</th>
           <th className="text-right">Realised</th>
           <th className="text-right">Value Gap</th>
           <th>Qualification</th>
@@ -525,75 +625,181 @@ function PositionTable({
         </tr>
       </thead>
       <tbody>
-        {ws.rows.map((r) => (
-          <tr key={r.valueDriverId} data-testid="position-row">
-            <td>
-              <span className="font-mono text-slate-500">{r.code}</span> <span className="font-medium">{r.name}</span>
-              {!r.hasPosition && <span className="block text-xs text-red-700">No position saved</span>}
-              {r.forecastRationale && (
-                <span className="block text-xs text-slate-500" data-testid="position-why">
-                  {r.governed.moved ? "Why it moved" : r.forecastNotAssessed ? "Not Assessed" : "Forecast"}:{" "}
-                  {r.forecastRationale}
-                </span>
-              )}
-              {draft && r.governed.rationaleRequired && !hasRationale(r.forecastRationale) && (
-                <span className="block text-xs text-red-700" data-testid="position-why-missing">
-                  Forecast moved — a reason is required at finalisation
-                </span>
-              )}
-              {r.valueLeakageId && (
-                <span className="block text-xs text-slate-500">
-                  Related matter: {matters.find((m) => m.id === r.valueLeakageId)?.code ?? "—"}
-                </span>
-              )}
-              {r.realisedValueRationale && (
-                <span className="block text-xs text-slate-500">Realised: {r.realisedValueRationale}</span>
-              )}
-            </td>
-            {r.financial ? (
-              <>
-                <td className="text-right whitespace-nowrap">{money(r.authorisedValue)}</td>
-                <td className="text-right whitespace-nowrap text-slate-500" data-testid="position-previous">
-                  {money(r.previousForecast)}
-                </td>
-                <td className="text-right font-semibold whitespace-nowrap" data-testid="position-forecast">
-                  {r.currentForecast === null ? (
-                    <span className="font-normal text-amber-700">
-                      {r.forecastNotAssessed ? "Not Assessed (explicit)" : "Blank"}
-                    </span>
-                  ) : (
-                    money(r.currentForecast)
-                  )}
-                </td>
-                <td className="text-right whitespace-nowrap" data-testid="position-movement">
-                  {change(r.movement, currency)}
-                </td>
-                <td className="text-right whitespace-nowrap" data-testid="position-realised">
-                  {r.realisedValue === null ? (
-                    <span className="text-slate-400">Not assessed</span>
-                  ) : (
-                    money(r.realisedValue)
-                  )}
-                </td>
-                <td className="text-right whitespace-nowrap" data-testid="position-gap">
-                  {money(r.valueGap)}
-                </td>
-              </>
-            ) : (
-              <td colSpan={6} className="text-center">
-                <NonFinancialBadge /> <span className="text-xs text-slate-500">excluded from financial totals</span>
+        {ws.rows.map((r) => {
+          const matter = r.valueLeakageId ? matters.find((m) => m.id === r.valueLeakageId) : undefined;
+          return (
+            <tr key={r.valueDriverId} data-testid="position-row">
+              <td>
+                <span className="font-mono text-slate-500">{r.code}</span> <span className="font-medium">{r.name}</span>
+                {!r.hasPosition && <span className="block text-xs text-red-700">No position saved</span>}
               </td>
-            )}
-            <td>
-              <QualificationBadge status={r.qualificationStatus} />
-            </td>
-            <td>
-              <EvidenceBadge status={r.evidenceStatus} />
-            </td>
-          </tr>
-        ))}
+              {r.financial ? (
+                <>
+                  <td className="text-right whitespace-nowrap">{money(r.authorisedValue)}</td>
+                  <td className="text-right whitespace-nowrap text-slate-500" data-testid="position-baseline">
+                    {money(r.governed.baseline)}
+                    <span className="block text-[11px]" data-testid="position-baseline-source">
+                      {r.governed.source === "previous_review" ? `Review #${ws.previous!.sequence}` : "authorised"}
+                    </span>
+                  </td>
+                  <td className="text-right font-semibold whitespace-nowrap" data-testid="position-forecast">
+                    {r.currentForecast === null ? (
+                      <span className="font-normal text-amber-700">
+                        {r.forecastNotAssessed ? "Not Assessed (explicit)" : "Blank"}
+                      </span>
+                    ) : (
+                      money(r.currentForecast)
+                    )}
+                  </td>
+                  <td className="text-right whitespace-nowrap" data-testid="position-movement">
+                    {change(r.movement, currency)}
+                  </td>
+                </>
+              ) : (
+                <td colSpan={4} className="text-center">
+                  <NonFinancialBadge /> <span className="text-xs text-slate-500">excluded from financial totals</span>
+                </td>
+              )}
+              <td className="max-w-72 text-xs">
+                {r.forecastRationale && (
+                  <span className="block text-slate-700" data-testid="position-why">
+                    {r.governed.moved
+                      ? "Why it moved"
+                      : r.forecastNotAssessed
+                        ? "Not Assessed"
+                        : r.financial
+                          ? "Forecast"
+                          : "Outlook"}
+                    : {r.forecastRationale}
+                  </span>
+                )}
+                {draft && r.governed.rationaleRequired && !hasRationale(r.forecastRationale) && (
+                  <span className="block text-red-700" data-testid="position-why-missing">
+                    Forecast moved — a reason is required at finalisation
+                  </span>
+                )}
+                {r.financial && !r.governed.moved && !r.forecastRationale && r.currentForecast !== null && (
+                  <span className="block text-slate-400" data-testid="position-unchanged">
+                    Unchanged from baseline
+                  </span>
+                )}
+                {matter && (
+                  <span className="block text-slate-500" data-testid="position-matter">
+                    Related matter:{" "}
+                    <TextLink href={`${base}/assurance/matters/${matter.id}`}>
+                      {matter.code} {matter.title}
+                    </TextLink>
+                  </span>
+                )}
+                {r.realisedValueRationale && (
+                  <span className="block text-slate-500">Realised: {r.realisedValueRationale}</span>
+                )}
+              </td>
+              {r.financial ? (
+                <>
+                  <td className="text-right whitespace-nowrap" data-testid="position-realised">
+                    {r.realisedValue === null ? (
+                      <span className="text-slate-400">Not assessed</span>
+                    ) : (
+                      money(r.realisedValue)
+                    )}
+                  </td>
+                  <td className="text-right whitespace-nowrap" data-testid="position-gap">
+                    {money(r.valueGap)}
+                  </td>
+                </>
+              ) : (
+                <td colSpan={2} />
+              )}
+              <td>
+                <QualificationBadge status={r.qualificationStatus} />
+              </td>
+              <td>
+                <EvidenceBadge status={r.evidenceStatus} />
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </Table>
+  );
+}
+
+/** Evidence this review formally relies on, and open-matter evidence that can be relied on deliberately. */
+function ReviewEvidence({
+  projectId,
+  base,
+  reviewId,
+  draft,
+  evidence,
+  evidenceOptions,
+  candidates,
+}: {
+  projectId: string;
+  base: string;
+  reviewId: string;
+  draft: boolean;
+  evidence: AssuranceWorkspace["evidence"];
+  evidenceOptions: Awaited<ReturnType<typeof listReviewEvidenceOptions>>;
+  candidates: Awaited<ReturnType<typeof listOpenMatterEvidence>>;
+}) {
+  return (
+    <div className="mt-5 border-t border-slate-200 pt-4" id="review-evidence" data-testid="review-evidence">
+      <h3 className="mb-2 text-sm font-semibold">Evidence relied on in this review ({evidence.length})</h3>
+      {evidence.length === 0 && <p className="text-xs text-slate-500">No evidence linked to this review.</p>}
+      <ul className="space-y-1 text-sm">
+        {evidence.map((e) => (
+          <li key={e.linkId} className="flex items-start justify-between gap-2">
+            <span>
+              <TextLink href={`${base}/evidence/${e.evidenceId}`}>
+                {e.code} {e.title}
+              </TextLink>
+              {e.isMaterialChange && (
+                <>
+                  {" "}
+                  <PlainBadge tone="red">Material change</PlainBadge>
+                </>
+              )}
+              {e.relevanceNote && <span className="block text-xs text-slate-500">{e.relevanceNote}</span>}
+            </span>
+            {draft && (
+              <ActionForm action={unlinkReviewEvidenceAction} showSuccess={false}>
+                <Hidden name="projectId" value={projectId} />
+                <Hidden name="evidenceLinkId" value={e.linkId} />
+                <SubmitButton variant="danger">Unlink</SubmitButton>
+              </ActionForm>
+            )}
+          </li>
+        ))}
+      </ul>
+      {draft && (
+        <div className="mt-3">
+          <MatterEvidenceCandidates projectId={projectId} reviewId={reviewId} candidates={candidates} />
+          <ActionForm action={linkReviewEvidenceAction} resetOnSuccess testId="review-evidence-form">
+            <Hidden name="projectId" value={projectId} />
+            <Hidden name="reviewId" value={reviewId} />
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <div className="min-w-60 flex-1">
+                <SelectField
+                  name="evidenceId"
+                  label="Link evidence"
+                  required
+                  placeholder="— Choose evidence —"
+                  options={evidenceOptions.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }))}
+                />
+              </div>
+              <div className="min-w-48 flex-1">
+                <TextField name="relevanceNote" label="Relevance" />
+              </div>
+              <SubmitButton variant="secondary">Link</SubmitButton>
+            </div>
+          </ActionForm>
+          <p className="mt-1 text-xs text-slate-500">
+            New evidence is recorded in the <TextLink href={`${base}/evidence`}>Evidence register</TextLink>.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -739,7 +945,7 @@ function MatterEvidenceCandidates({
   if (byEvidence.size === 0) return null;
   return (
     <div
-      className="mt-4 rounded border border-dashed border-violet-300 bg-violet-50 p-3"
+      className="rounded border border-dashed border-violet-300 bg-violet-50 p-3"
       data-testid="matter-evidence-candidates"
     >
       <h4 className="text-sm font-semibold text-violet-900">Matter evidence — not relied on by this review</h4>

@@ -28,6 +28,7 @@ export function Section({
   actions,
   children,
   tone = "default",
+  testId,
 }: {
   title: ReactNode;
   id?: string;
@@ -35,10 +36,12 @@ export function Section({
   actions?: ReactNode;
   children: ReactNode;
   tone?: "default" | "muted";
+  testId?: string;
 }) {
   return (
     <section
       id={id}
+      data-testid={testId}
       className={`mb-6 scroll-mt-4 rounded-lg border border-slate-200 ${tone === "muted" ? "bg-slate-50" : "bg-white"} p-4 shadow-sm`}
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">

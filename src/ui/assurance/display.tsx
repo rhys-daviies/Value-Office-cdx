@@ -86,3 +86,14 @@ export function Figure({
     </div>
   );
 }
+
+/** Phase 4D.10F: the accepted distinction, stated once wherever both figures appear. Never a reconciliation. */
+export function GapVsLeakage({ className = "" }: { className?: string }) {
+  return (
+    <p className={`text-xs text-slate-600 ${className}`} data-testid="gap-vs-leakage">
+      <strong className="font-semibold">Value Gap</strong> is the Authorised Value minus the latest formal forecast.{" "}
+      <strong className="font-semibold">Value Leakage</strong> records identified potential or actual value loss being
+      managed. They are not reconciled: not every gap is leakage, and leakage need not have moved the forecast yet.
+    </p>
+  );
+}

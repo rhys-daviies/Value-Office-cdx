@@ -9,6 +9,8 @@ import {
   setMatterRemediationAction,
   setMatterStageAction,
 } from "@/server/actions/matters";
+import { matterWorkflow } from "@/domain/assurance-workflow";
+import { getMatterReviewHandoff } from "@/server/queries/assurance";
 import { getMatterEvidence } from "@/server/queries/evidence";
 import { listStakeholders } from "@/server/queries/mobilise";
 import { getAssuranceMatter } from "@/server/queries/response";
@@ -29,16 +31,34 @@ export default async function AssuranceMatterPage({
   const { projectId, matterId } = await params;
   const { project } = await requireProject(projectId);
   if (!isUuid(matterId)) notFound();
-  const [m, stakeholders, ev] = await Promise.all([
+  const [m, stakeholders, ev, handoff] = await Promise.all([
     getAssuranceMatter(projectId, matterId),
     listStakeholders(projectId),
     getMatterEvidence(projectId, matterId),
+    getMatterReviewHandoff(projectId, matterId),
   ]);
   if (!m) notFound();
   const { leakage } = m;
   const currency = project.currency;
   const open = leakage.status === "open";
   const base = `/projects/${projectId}`;
+  const count = (status: string) => ev.items.filter((i) => i.item.status === status).length;
+  const workflow = matterWorkflow({
+    status: leakage.status,
+    stage: leakage.stage,
+    evidenceLinked: ev.linked.length,
+    requests: {
+      open: count("open"),
+      partial: count("partially_received"),
+      received: count("received"),
+      unavailable: count("not_available"),
+    },
+    quantified: m.working !== null,
+    remediationPlan: leakage.remediationPlan,
+    monitorUntil: leakage.monitorUntil,
+    formalReviews: m.formal.length,
+    draftReviewSequence: handoff.draft?.sequence ?? null,
+  });
   const hidden = (
     <>
       <Hidden name="projectId" value={projectId} />
@@ -58,6 +78,30 @@ export default async function AssuranceMatterPage({
         <StageBadge entry={m} />
         <span className="text-sm text-slate-500">Assurance matter · living record</span>
       </div>
+
+      <ol
+        className="mb-6 grid gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6"
+        aria-label="Matter workflow"
+        data-testid="matter-workflow"
+      >
+        {workflow.map((step) => (
+          <li
+            key={step.key}
+            className={`rounded border px-2 py-1.5 ${step.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"}`}
+            data-testid={`workflow-${step.key}`}
+            data-done={step.done ? "true" : "false"}
+          >
+            <p className="font-semibold text-slate-800">
+              {step.done ? "✓ " : ""}
+              {step.label}
+            </p>
+            <p className="text-slate-600">
+              {step.detail}
+              {step.date && ` ${formatDate(step.date)}`}
+            </p>
+          </li>
+        ))}
+      </ol>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Matter">
@@ -144,6 +188,8 @@ export default async function AssuranceMatterPage({
         projectId={projectId}
         entry={m}
         ev={ev}
+        draftReview={handoff.draft}
+        reliedOn={handoff.reliedOn}
         stakeholders={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
       />
 
@@ -247,9 +293,45 @@ export default async function AssuranceMatterPage({
       </Section>
 
       <Section
-        title="Formal review records"
-        description="How each finalised Assurance Review recorded this matter. Later edits to the living matter never change these."
+        id="formal-review"
+        title="Formal review"
+        description="This matter is worked continuously. A formal Assurance Review records it as it stands when the review is finalised; later edits to the living matter never change that record."
       >
+        <div className="mb-3 rounded border border-slate-300 bg-slate-50 p-3 text-sm" data-testid="matter-handoff">
+          {handoff.draft && open ? (
+            <>
+              <p className="font-semibold">
+                Being assessed in Review #{handoff.draft.sequence} (draft){" "}
+                <span className="font-normal text-slate-600">
+                  · {handoff.assessed ? "Value Leakage assessed in this review" : "not yet assessed in this review"}
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-slate-600">
+                Evidence is relied on in the review only when you link it (see Evidence above). The matter is recorded
+                in Review #{handoff.draft.sequence} when it is finalised.
+              </p>
+              <p className="mt-2">
+                <TextLink href={`${base}/assurance/${handoff.draft.id}#matter-${leakage.code}`}>
+                  Assess in Review #{handoff.draft.sequence} →
+                </TextLink>
+              </p>
+            </>
+          ) : open ? (
+            <>
+              <p className="font-semibold">Worked continuously — no formal review is open</p>
+              <p className="mt-1 text-xs text-slate-600">
+                It will be recorded in the next formal Assurance Review when that review is finalised. A matter does not
+                require an immediate review.
+              </p>
+              <p className="mt-2">
+                <TextLink href={`${base}/assurance#formal`}>Formal Assurance Reviews</TextLink>
+              </p>
+            </>
+          ) : (
+            <p>Closed — later reviews no longer record it unless it is reopened.</p>
+          )}
+        </div>
+        <h3 className="mb-2 text-sm font-semibold">Formal review records</h3>
         {m.formal.length === 0 ? (
           <Empty>Not yet in a finalised Assurance Review.</Empty>
         ) : (

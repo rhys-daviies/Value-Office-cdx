@@ -68,16 +68,16 @@ test("Authorised V1 → review → positions → finalise → second review comp
   await expect(page.getByTestId("review-gap")).toHaveText("$0.2m");
   await expect(page.getByTestId("review-movement")).toHaveText("-$0.2m");
 
-  await page.getByTestId("what-changed-form").getByLabel("Consultant narrative").fill("Beta volumes below plan in Q3.");
-  await page.getByTestId("what-changed-form").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("what-changed-form").getByRole("status")).toContainText("Review saved");
+  // 4D.10F: What changed and Why it matters are one reasoning step.
+  const reasoning = page.getByTestId("reasoning-form");
+  await reasoning.getByLabel("What changed?").fill("Beta volumes below plan in Q3.");
+  await reasoning.getByLabel("Why does it matter?").fill("$0.2m below Authorised Value.");
+  await reasoning.getByRole("button", { name: "Save" }).click();
+  await expect(reasoning.getByRole("status")).toContainText("Review saved");
   const link = page.getByTestId("review-evidence-form");
   await link.getByLabel("Link evidence").selectOption({ label: "E-002 Quarterly benefits report" });
   await link.getByRole("button", { name: "Link" }).click();
-  await expect(page.getByText("Relevant evidence (1)")).toBeVisible();
-  await page.getByTestId("why-it-matters-form").getByLabel("Why it matters").fill("$0.2m below Authorised Value.");
-  await page.getByTestId("why-it-matters-form").getByRole("button", { name: "Save" }).click();
-  await expect(page.getByTestId("why-it-matters-form").getByRole("status")).toContainText("Review saved");
+  await expect(page.getByText("Evidence relied on in this review (1)")).toBeVisible();
 
   // 4D.10E: both forecasts moved from the authorised value — finalisation needs the governed "why".
   await expect(page.getByTestId("finalise-why")).toContainText("VD-01, VD-02: forecast moved from its formal baseline");
@@ -95,6 +95,7 @@ test("Authorised V1 → review → positions → finalise → second review comp
   await expect(page.getByTestId("review-state")).toContainText("Finalised");
   await expect(page.getByTestId("positions-form")).toHaveCount(0);
   await expect(page.getByTestId("what-changed")).toHaveText("Beta volumes below plan in Q3.");
+  await expect(page.getByTestId("why-it-matters")).toHaveText("$0.2m below Authorised Value.");
 
   // ---- Assurance overview reflects Review #1 --------------------------------------
   await tab(page, "Assurance").click();
@@ -116,7 +117,8 @@ test("Authorised V1 → review → positions → finalise → second review comp
     "VD-03": { note: "Unchanged" },
   });
   // VD-01: 1.0m vs Review #1's 0.9m = +$0.1m (vs V1 it would have been $0)
-  await expect(row(page, "VD-01").getByTestId("position-previous")).toHaveText("$0.9m");
+  await expect(row(page, "VD-01").getByTestId("position-baseline")).toContainText("$0.9m");
+  await expect(row(page, "VD-01").getByTestId("position-baseline-source")).toHaveText("Review #1");
   await expect(row(page, "VD-01").getByTestId("position-movement")).toHaveText("+$0.1m");
   await expect(row(page, "VD-01").getByTestId("position-gap")).toHaveText("$0");
   await expect(row(page, "VD-02").getByTestId("position-movement")).toHaveText("$0");

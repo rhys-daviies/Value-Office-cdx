@@ -1,3 +1,5 @@
+import { evidenceRequestState } from "@/domain/assurance-workflow";
+import { linkReviewEvidenceAction } from "@/server/actions/assurance";
 import {
   documentMatterEvidenceAction,
   fulfilRequestItemAction,
@@ -29,11 +31,17 @@ export function MatterEvidenceSections({
   entry,
   ev,
   stakeholders,
+  draftReview = null,
+  reliedOn = new Set<string>(),
 }: {
   projectId: string;
   entry: LeakageEntry;
   ev: MatterEvidence;
   stakeholders: Option[];
+  /** Phase 4D.10F: the open draft review, so working evidence can be relied on in it deliberately. */
+  draftReview?: { id: string; sequence: number } | null;
+  /** Evidence the open draft review already relies on. */
+  reliedOn?: ReadonlySet<string>;
 }) {
   const { leakage } = entry;
   const open = leakage.status === "open";
@@ -51,6 +59,13 @@ export function MatterEvidenceSections({
   );
   const outstanding = ev.items.filter((i) => i.item.status === "open" || i.item.status === "partially_received");
   const arrived = ev.items.filter((i) => i.item.status === "received");
+  const count = (status: string) => ev.items.filter((i) => i.item.status === status).length;
+  const requestState = evidenceRequestState({
+    open: count("open"),
+    partial: count("partially_received"),
+    received: count("received"),
+    unavailable: count("not_available"),
+  });
 
   return (
     <>
@@ -90,7 +105,21 @@ export function MatterEvidenceSections({
                       .join(" · ") || "No dates recorded"}
                   </span>
                   {l.relevanceNote && <span className="block text-xs text-slate-600">{l.relevanceNote}</span>}
+                  {draftReview && reliedOn.has(l.evidence.id) && (
+                    <span className="block text-xs text-emerald-800" data-testid="relied-on-in-review">
+                      Relied on in Review #{draftReview.sequence}
+                    </span>
+                  )}
                 </span>
+                {open && draftReview && !reliedOn.has(l.evidence.id) && (
+                  <ActionForm action={linkReviewEvidenceAction} showSuccess={false} testId="rely-on-review-form">
+                    <Hidden name="projectId" value={projectId} />
+                    <Hidden name="reviewId" value={draftReview.id} />
+                    <Hidden name="evidenceId" value={l.evidence.id} />
+                    <Hidden name="relevanceNote" value={`Supports Assurance matter ${leakage.code}`} />
+                    <SubmitButton variant="secondary">Rely on in Review #{draftReview.sequence}</SubmitButton>
+                  </ActionForm>
+                )}
                 {open && (
                   <ActionForm
                     action={unlinkMatterEvidenceAction}
@@ -163,6 +192,15 @@ export function MatterEvidenceSections({
         title="Evidence required"
         description="Evidence still to come, requested on an Assurance Information Request. When it arrives, record it and mark the item received with the evidence that satisfied it."
       >
+        {requestState && (
+          <p
+            className={`mb-2 text-sm font-medium ${requestState.outstanding ? "text-amber-800" : "text-slate-700"}`}
+            data-testid="matter-request-summary"
+            data-state={requestState.state}
+          >
+            {requestState.label}
+          </p>
+        )}
         {ev.items.length === 0 ? (
           <Empty>No evidence requested for this matter.</Empty>
         ) : (

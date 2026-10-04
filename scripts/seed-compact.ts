@@ -29,6 +29,7 @@ try {
     ["EVIDENCE", "Evidence Compact"],
     ["DRIVERS", "Drivers Compact"],
     ["OFFICE", "Office Compact"],
+    ["WORKSPACE", "Workspace Compact"],
     ["EVOLVE", "Evolution Compact"],
     ["DECIDE", "Decision Compact"],
     ["TRAJ", "Trajectory Compact"],
@@ -64,7 +65,7 @@ try {
       } else if (code === "EVOLVE") {
         await seedCompactEvolution(actor, { code, name });
         console.log(`Seeded ${name}: V0, Authorised V1 → V2, three finalised reviews, pending VC-002`);
-      } else if (code === "OFFICE") {
+      } else if (code === "OFFICE" || code === "WORKSPACE") {
         await seedCompactOperating(actor, { code, name });
         console.log(`Seeded ${name}: Authorised V1, Review #1 finalised, live Continuous Assurance`);
       } else if (code === "DRIVERS") {

@@ -48,6 +48,7 @@ export type ReviewStory = {
     date: string;
     trigger: AssuranceTrigger;
     whatChanged: string | null;
+    whyItMatters: string | null;
     againstVersionNumber: number;
   };
   /** The review's formal (or, on a draft, working) value position. Value Gap stays distinct from Value Leakage. */
@@ -182,6 +183,7 @@ export async function getReviewStory(projectId: string, reviewId: string): Promi
       date: ws.review.reviewDate,
       trigger: ws.review.trigger,
       whatChanged: ws.review.whatChanged,
+      whyItMatters: ws.review.whyItMatters,
       againstVersionNumber: ws.againstVersion.versionNumber,
     },
     position: {

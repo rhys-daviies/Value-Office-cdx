@@ -5,8 +5,9 @@ import { formatDate, formatMoneyChange, formatMoneyPlain, formatMoneyShort } fro
 import { ASSURANCE_STAGE_LABELS, TRIGGER_LABELS } from "@/ui/labels";
 import { RECOMMENDATION_LABEL, SELECTED_LABEL } from "@/ui/outcomes/outcomes";
 
-// Review story (Phase 4D.9G): a compact, ordered management narrative around one Assurance Review —
-// what changed → value affected → Cardaxia's response → the management decision → governance. Text only (no colour
+// Review story (Phase 4D.9G; reordered in 4D.10F): a compact, ordered management narrative around one Assurance
+// Review — context → what changed → why it matters → formal value position → Assurance matters → Cardaxia's response →
+// the management decision → Value Case impact. In-app only; issued report renderers are unaffected. Text only (no colour
 // coding); each step links to the section holding the detail. Built from the explicit relationships in getReviewStory.
 
 const VALUE_CHANGE_STATUS: Record<string, string> = {
@@ -33,7 +34,7 @@ function Step({
 }) {
   return (
     <li
-      className={`min-w-0 rounded border border-slate-200 bg-white px-3 py-2 ${wide ? "md:col-span-2 xl:col-span-1" : ""}`}
+      className={`min-w-0 rounded border border-slate-200 bg-white px-3 py-2 ${wide ? "md:col-span-2" : ""}`}
       data-testid={testId}
     >
       <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-slate-500 uppercase">
@@ -45,14 +46,36 @@ function Step({
   );
 }
 
-function MatterLines({ m, currency, governed }: { m: StoryMatter; currency: string; governed: boolean }) {
+function MatterLines({
+  m,
+  currency,
+  governed,
+  base,
+}: {
+  m: StoryMatter;
+  currency: string;
+  governed: boolean;
+  base: string;
+}) {
   const money = (v: string | null) => formatMoneyShort(v, currency);
   // Exact amounts: the identity Total = Recoverable + Unrecoverable must read true (no rounding).
   const exact = (v: string) => formatMoneyPlain(v, currency);
   return (
     <div data-testid="story-matter-value">
       <p className="font-medium">
-        {m.code} {m.title}
+        <TextLink href={`${base}/assurance/matters/${m.id}`}>
+          {m.code} {m.title}
+        </TextLink>
+      </p>
+      <p className="text-xs text-slate-500">
+        {[
+          m.status === "closed" ? "Resolved" : "Open",
+          m.stage && ASSURANCE_STAGE_LABELS[m.stage],
+          m.ownerName && `Owner ${m.ownerName}`,
+          m.raisedInThisReview && "raised in this review",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
       </p>
       {m.drivers.length === 0 ? (
         <p className="text-xs text-slate-500">No Value Driver linked.</p>
@@ -99,34 +122,16 @@ export function ReviewStory({ story: s, currency, base }: { story: Story; curren
           <WorkingTag>Working · not formally reviewed</WorkingTag>
         )}
       </div>
-      <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+      <p className="mb-2 text-xs text-slate-600" data-testid="story-context">
+        Review #{s.review.sequence} · {formatDate(s.review.date)} · {TRIGGER_LABELS[s.review.trigger]} · against
+        Authorised V{s.review.againstVersionNumber}
+      </p>
+      <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
         <Step n={1} title="What changed" testId="story-what-changed">
-          <p className="text-xs text-slate-500">Trigger: {TRIGGER_LABELS[s.review.trigger]}</p>
-          {s.review.whatChanged && <p className="line-clamp-3">{s.review.whatChanged}</p>}
-          {s.matters.length === 0 ? (
-            <p className="text-xs text-slate-500" data-testid="story-no-matters">
-              {g ? "No Assurance matter recorded in this review." : "No open Assurance matter."}
-            </p>
+          {s.review.whatChanged ? (
+            <p className="line-clamp-4">{s.review.whatChanged}</p>
           ) : (
-            <ul className="space-y-0.5" data-testid="story-matters">
-              {s.matters.map((m) => (
-                <li key={m.id} data-testid="story-matter">
-                  <TextLink href={`${base}/assurance/matters/${m.id}`}>
-                    {m.code} {m.title}
-                  </TextLink>
-                  <span className="block text-xs text-slate-500">
-                    {[
-                      m.status === "closed" ? "Resolved" : "Open",
-                      m.stage && ASSURANCE_STAGE_LABELS[m.stage],
-                      m.ownerName && `Owner ${m.ownerName}`,
-                      m.raisedInThisReview && "raised in this review",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <p className="text-xs text-slate-500">Not recorded.</p>
           )}
           {s.evidence.length > 0 && (
             <p className="text-xs text-slate-600" data-testid="story-evidence">
@@ -135,16 +140,53 @@ export function ReviewStory({ story: s, currency, base }: { story: Story; curren
           )}
         </Step>
 
-        <Step n={2} title="Value affected" testId="story-value-affected">
-          {s.matters.length === 0 ? (
-            <p className="text-xs text-slate-500">No matter-level exposure recorded.</p>
+        <Step n={2} title="Why it matters" testId="story-why-it-matters">
+          {s.review.whyItMatters ? (
+            <p className="line-clamp-4">{s.review.whyItMatters}</p>
           ) : (
-            s.matters.map((m) => <MatterLines key={m.id} m={m} currency={currency} governed={g} />)
+            <p className="text-xs text-slate-500">Not recorded.</p>
+          )}
+        </Step>
+
+        <Step n={3} title={g ? "Formal value position" : "Value position"} testId="story-value-position">
+          {g ? (
+            <p className="text-xs text-slate-700" data-testid="story-position">
+              Formal position as at {formatDate(s.review.date)} against V{s.review.againstVersionNumber}: forecast{" "}
+              {s.position.forecastTotal === null ? "incomplete" : money(s.position.forecastTotal)} · Value Gap{" "}
+              {s.position.valueGap === null ? "—" : money(s.position.valueGap)} · realised{" "}
+              {s.position.realisedTotal === null
+                ? "not recorded"
+                : `${money(s.position.realisedTotal)}${s.position.realisedComplete ? "" : " (partial)"}`}
+            </p>
+          ) : (
+            <p className="text-xs text-slate-700" data-testid="story-position">
+              Not yet a formal position — finalising the review records it. Authorised{" "}
+              {money(s.position.authorisedTotal)}.
+            </p>
+          )}
+          <p className="text-xs">
+            <TextLink href="#position">Forecast Value Position →</TextLink>
+          </p>
+        </Step>
+
+        <Step n={4} title="Assurance matters" testId="story-value-affected">
+          {s.matters.length === 0 ? (
+            <p className="text-xs text-slate-500" data-testid="story-no-matters">
+              {g ? "No Assurance matter recorded in this review." : "No open Assurance matter."}
+            </p>
+          ) : (
+            <ul className="space-y-1" data-testid="story-matters">
+              {s.matters.map((m) => (
+                <li key={m.id} data-testid="story-matter">
+                  <MatterLines m={m} currency={currency} governed={g} base={base} />
+                </li>
+              ))}
+            </ul>
           )}
           <p className="text-xs text-slate-500">Value Leakage is assessed per matter; it is not the Value Gap.</p>
         </Step>
 
-        <Step n={3} title="Cardaxia response" testId="story-response">
+        <Step n={5} title="Cardaxia response" testId="story-response">
           {s.recommendation ? (
             <>
               <p>
@@ -164,7 +206,7 @@ export function ReviewStory({ story: s, currency, base }: { story: Story; curren
           </p>
         </Step>
 
-        <Step n={4} title="Management decision" testId="story-decision">
+        <Step n={6} title="Management decision" testId="story-decision">
           {s.decision ? (
             <>
               <p>
@@ -192,21 +234,7 @@ export function ReviewStory({ story: s, currency, base }: { story: Story; curren
           )}
         </Step>
 
-        <Step n={5} title="Governance" testId="story-governance" wide>
-          {g ? (
-            <p className="text-xs text-slate-700" data-testid="story-position">
-              Formal position as at {formatDate(s.review.date)} against V{s.review.againstVersionNumber}: forecast{" "}
-              {s.position.forecastTotal === null ? "incomplete" : money(s.position.forecastTotal)} · Value Gap{" "}
-              {s.position.valueGap === null ? "—" : money(s.position.valueGap)} · realised{" "}
-              {s.position.realisedTotal === null
-                ? "not recorded"
-                : `${money(s.position.realisedTotal)}${s.position.realisedComplete ? "" : " (partial)"}`}
-            </p>
-          ) : (
-            <p className="text-xs text-slate-700" data-testid="story-position">
-              Not yet a formal position — finalising the review records it.
-            </p>
-          )}
+        <Step n={7} title="Value Case impact" testId="story-governance" wide>
           {s.valueChanges.length > 0 ? (
             <ul className="space-y-0.5" data-testid="story-value-changes">
               {s.valueChanges.map((c) => (

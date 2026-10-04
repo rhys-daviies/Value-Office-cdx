@@ -32,6 +32,7 @@ export async function createReviewAction(_prev: ActionState, fd: FormData): Prom
       reviewDate: required(fd, "reviewDate"),
       triggerEvidenceId: opt(fd, "triggerEvidenceId"),
       whatChanged: opt(fd, "whatChanged"),
+      whyItMatters: opt(fd, "whyItMatters"),
     });
     reviewId = review.id;
   });

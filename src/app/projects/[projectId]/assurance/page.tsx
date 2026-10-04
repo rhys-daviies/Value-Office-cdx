@@ -14,6 +14,7 @@ import {
   change,
   Figure,
   forecastHeadline,
+  GapVsLeakage,
   headline,
   NOT_ASSESSED,
   realisedHeadline,
@@ -65,20 +66,58 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
 
   return (
     <>
-      <h2 className="sr-only">Operating picture</h2>
-      <div className="mb-6 grid gap-3" data-testid="assurance-headline">
-        <GovernedPosition
-          authorisedVersion={summary.authorised.versionNumber}
-          authorisedTotal={summary.authorisedTotal}
-          totals={latest?.totals ?? null}
-          reviewSequence={latest?.review.sequence ?? null}
-          againstVersion={latest?.againstVersionNumber ?? null}
-          currency={currency}
-          prefix="assurance"
-        />
+      {/* ---- Current position (governed) --------------------------------------------- */}
+      <section aria-labelledby="position-heading" className="mb-6" data-testid="assurance-current">
+        <h2 id="position-heading" className="mb-2 text-base font-semibold text-slate-900">
+          Current position
+        </h2>
+        <div className="grid gap-3" data-testid="assurance-headline">
+          <GovernedPosition
+            authorisedVersion={summary.authorised.versionNumber}
+            authorisedTotal={summary.authorisedTotal}
+            totals={latest?.totals ?? null}
+            reviewSequence={latest?.review.sequence ?? null}
+            againstVersion={latest?.againstVersionNumber ?? null}
+            currency={currency}
+            prefix="assurance"
+          />
+          <div className="grid gap-3 text-sm sm:grid-cols-2">
+            <p className="rounded border border-slate-200 bg-white px-3 py-2" data-testid="current-latest">
+              <span className="block text-xs text-slate-500">Latest formal position</span>
+              {latest ? (
+                <TextLink href={`${base}/assurance/${latest.review.id}`}>
+                  Review #{latest.review.sequence} · {formatDate(latest.review.reviewDate)}
+                </TextLink>
+              ) : (
+                <span className="text-slate-700">No formal review yet — only the Authorised Value is known</span>
+              )}
+              {draft && (
+                <span className="block text-xs text-slate-500">
+                  Review #{draft.review.sequence} is in draft (working, not yet formal)
+                </span>
+              )}
+            </p>
+            <p className="rounded border border-slate-200 bg-white px-3 py-2" data-testid="current-next-requirement">
+              <span className="block text-xs text-slate-500">Next formal Assurance requirement</span>
+              {cadence.next ? (
+                <a href="#requirements" className="inline-flex flex-wrap items-center gap-2 text-sky-800 underline">
+                  {cadence.next.label} <RequirementBadge status={cadence.next.status} />
+                  {cadence.next.date && <span>{formatDate(cadence.next.date)}</span>}
+                </a>
+              ) : (
+                <span className="text-slate-700">None derivable from current data</span>
+              )}
+            </p>
+          </div>
+          <GapVsLeakage />
+        </div>
+      </section>
+
+      {/* ---- Active Assurance (working) ---------------------------------------------- */}
+      <h2 className="sr-only">Active Assurance</h2>
+      <div className="mb-4">
         <WorkingPicture workspace={workspace} currency={currency} />
       </div>
-
       <ContinuousAssurance
         projectId={projectId}
         currency={currency}
@@ -96,11 +135,11 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
         data-testid="formal-assurance"
       >
         <h2 id="formal-heading" className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
-          Formal Assurance <GovernedTag>Point in time</GovernedTag>
+          Formal Assurance Reviews <GovernedTag>Point in time</GovernedTag>
         </h2>
         <p className="mt-0.5 mb-4 max-w-3xl text-sm text-slate-600">
-          Formal Assurance Reviews preserve governed point-in-time Value Positions. Continuous Assurance activity
-          remains live between reviews.
+          Governed snapshots and recommitment points. Open matters are recorded in a review when it is finalised;
+          Continuous Assurance stays live between reviews.
         </p>
 
         <Section
@@ -232,7 +271,13 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
                       label: `${e.code} ${e.title}${e.isMaterialChange ? " · material change" : ""}`,
                     }))}
                   />
-                  <TextArea name="whatChanged" label="What changed? (can be completed in the review)" rows={2} />
+                  <fieldset className="space-y-2" data-testid="create-review-reasoning">
+                    <legend className="text-sm font-medium text-slate-700">
+                      The review records what changed and why it matters (both can be completed in the review)
+                    </legend>
+                    <TextArea name="whatChanged" label="What changed?" rows={2} />
+                    <TextArea name="whyItMatters" label="Why does it matter?" rows={2} />
+                  </fieldset>
                   <p className="text-xs text-slate-500">
                     Measured against Authorised V{summary.authorised.versionNumber}
                     {latest

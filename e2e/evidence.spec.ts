@@ -89,11 +89,11 @@ test("matter → request evidence → document and fulfil → stage stays → de
   await open.getByLabel("Why is this review happening?").selectOption({ label: "Ad hoc" });
   await open.getByRole("button", { name: "Open review" }).click();
   await expect(page.getByTestId("review-state")).toContainText("Assurance Review #1");
-  await expect(page.getByText("Relevant evidence (0)")).toBeVisible();
+  await expect(page.getByText("Evidence relied on in this review (0)")).toBeVisible();
   const candidate = page.getByTestId("matter-evidence-candidate").filter({ hasText: "E-301" });
   await expect(candidate).toContainText("matter VL-301");
   await candidate.getByRole("button", { name: "Rely on in this review" }).click();
-  await expect(page.getByText("Relevant evidence (1)")).toBeVisible();
+  await expect(page.getByText("Evidence relied on in this review (1)")).toBeVisible();
   await expect(page.getByTestId("matter-evidence-candidates")).toHaveCount(0);
 
   const positions = page.getByTestId("positions-form");
