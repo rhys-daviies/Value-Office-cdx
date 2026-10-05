@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 
-import { issueAfterInternalReview } from "./recommendation";
+import { issueAfterInternalReview, proposeValueChangeFromDecision } from "./recommendation";
 import { createReview, finaliseReview, updateReview, upsertValuePositions } from "@/server/commands/assurance";
 import { createLeakage } from "@/server/commands/leakage";
 import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
@@ -293,6 +293,7 @@ export async function seedHorizon(
 
   // VC-002 — proposed only. Per-driver allocation of −$0.6m is unknown, so V2 is
   // left as an unadjusted copy of V1 and cannot be authorised until reconciled.
+  await proposeValueChangeFromDecision(actor, { reviewId: review.id });
   const { change } = await createValueChange(actor, {
     projectId: project.id,
     code: HORIZON.response.valueChange.code,

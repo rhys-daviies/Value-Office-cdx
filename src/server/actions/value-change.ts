@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import {
   authoriseValueChange,
   createValueChange,
+  determineValueCaseImpact,
   includeDriverInValueChange,
   proposeValueChange,
   rejectValueChange,
@@ -13,12 +14,32 @@ import {
   withdrawValueChange,
 } from "@/server/commands/value-change";
 
+import { VALUE_CHANGE_DETERMINATIONS, type ValueChangeDetermination } from "@/domain/statuses";
+
 import { clear, moneyField, opt, required } from "./form";
 import { perform } from "./perform";
 import type { ActionState } from "./state";
 
 const projectOf = (fd: FormData) => required(fd, "projectId");
 const changeOf = (fd: FormData) => required(fd, "changeId");
+
+/** Phase 4D.10H: the Value Case impact of a management decision (never creates a Value Change). */
+export async function determineValueCaseImpactAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    const v = required(fd, "determination");
+    const determination = (VALUE_CHANGE_DETERMINATIONS as readonly string[]).includes(v)
+      ? (v as ValueChangeDetermination)
+      : ("" as ValueChangeDetermination);
+    await determineValueCaseImpact(actor, {
+      reviewId: required(fd, "reviewId"),
+      determination,
+      rationale: required(fd, "rationale"),
+    });
+    return determination === "no_value_change_required"
+      ? "Recorded: No Value Change Required — the Authorised Value Case is unchanged"
+      : "Recorded: Value Change Proposed — prepare the Value Change to propose the authorised change";
+  });
+}
 
 export async function createValueChangeAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   let changeId: string | undefined;

@@ -80,6 +80,12 @@ test("living driver edits leave V1 alone; an emerging driver joins V2 only throu
     .getByRole("link", { name: /Review #1/ })
     .first()
     .click();
+  // 4D.10H: the decision's Value Case impact is determined explicitly before a Value Change is prepared.
+  const det = page.getByTestId("determination-form");
+  await det.getByLabel("Value Change Proposed").check();
+  await det.getByLabel("Rationale").fill("The automation opportunity changes the authorised commitment");
+  await det.getByRole("button", { name: "Record determination" }).click();
+  await expect(page.getByTestId("determination")).toContainText("Value Change Proposed");
   const vc = page.getByTestId("create-change-form");
   await vc.getByLabel("Stated change to Authorised Value").fill("0.3m");
   await vc.getByLabel("Reason").fill("Automation opportunity identified in Assurance");

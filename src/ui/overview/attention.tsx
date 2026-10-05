@@ -89,6 +89,15 @@ export function ValueAttention({ o, base }: { o: ExecutiveOverview; base: string
           </span>{" "}
           ({t.formalLeakage.assessedCount} of {t.openLeakageCount} assessed in a finalised review). Value Leakage is per
           matter and is not the Value Gap.
+          <span className="mt-1 block" data-testid="attention-working">
+            Working Value Leakage{" "}
+            {t.working.total === null ? "not yet quantified" : formatMoneyPlain(t.working.total, o.currency)} · evidence
+            outstanding:{" "}
+            <span data-testid="attention-evidence-outstanding">
+              {t.evidenceOutstanding.items === 0 ? "none" : plural(t.evidenceOutstanding.items, "request item")}
+            </span>{" "}
+            · {plural(t.remediation.unplanned, "matter")} without a remediation plan
+          </span>
         </p>
       )}
     </section>

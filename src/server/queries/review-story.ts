@@ -1,7 +1,7 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import type { AssuranceStage, AssuranceTrigger, LeakageStatus } from "@/domain/statuses";
+import type { AssuranceStage, AssuranceTrigger, LeakageStatus, ValueChangeDetermination } from "@/domain/statuses";
 import type { LeakageAmounts } from "@/domain/response";
 import type { RecommendationState } from "@/domain/recommendation";
 import { realisedPositionComplete } from "@/domain/trajectory";
@@ -86,6 +86,8 @@ export type ReviewStory = {
     /** Selected − recommended stored totals (exact decimal); null without a recommendation. */
     differenceFromRecommendation: string | null;
   } | null;
+  /** Phase 4D.10H: the decision's Value Case impact determination, if recorded. */
+  determination: { determination: ValueChangeDetermination; rationale: string } | null;
   valueChanges: {
     id: string;
     code: string;
@@ -222,6 +224,9 @@ export async function getReviewStory(projectId: string, reviewId: string): Promi
             differenceFromRecommendation: dec.clientElectedDifference,
           }
         : null,
+    determination: response.determination
+      ? { determination: response.determination.determination, rationale: response.determination.rationale }
+      : null,
     valueChanges: changes.map(({ change, fromNumber, toNumber }) => ({
       id: change.id,
       code: change.code,

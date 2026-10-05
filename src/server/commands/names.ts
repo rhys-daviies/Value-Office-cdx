@@ -89,6 +89,7 @@ export const COMMANDS = {
   approveRecommendation: "options.approveRecommendation", // trigger-checked
   issueRecommendation: "options.issueRecommendation", // trigger-checked
   recordDecision: "options.recordDecision",
+  determineValueCaseImpact: "valueChange.determineImpact", // trigger-checked
   createValueChange: "valueChange.create", // trigger-checked
   updateValueChange: "valueChange.update",
   proposeValueChange: "valueChange.propose", // trigger-checked

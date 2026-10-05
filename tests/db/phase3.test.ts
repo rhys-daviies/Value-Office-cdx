@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { issueAfterInternalReview } from "@/fixtures/recommendation";
+import { issueAfterInternalReview, proposeValueChangeFromDecision } from "@/fixtures/recommendation";
 import { describe, expect, it } from "vitest";
 
 import { clientElectedDifference, leakageAmounts } from "@/domain/response";
@@ -521,6 +521,7 @@ describe("options, recommendation and decision", () => {
 describe("Value Change → V2", () => {
   async function changeReady(ctx: Ctx) {
     const { review, decision } = await decided(ctx);
+    await proposeValueChangeFromDecision(ctx.actor, { reviewId: review.id });
     const { change, version } = await createValueChange(ctx.actor, {
       projectId: ctx.project.id,
       code: "VC-001",

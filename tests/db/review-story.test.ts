@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { proposeValueChangeFromDecision } from "@/fixtures/recommendation";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -169,6 +170,7 @@ describe("review story", () => {
       .select()
       .from(schema.decision)
       .where(eq(schema.decision.assuranceReviewId, x.review.id));
+    await proposeValueChangeFromDecision(x.actor, { reviewId: x.review.id });
     const { change } = await createValueChange(x.actor, {
       projectId: x.project.id,
       code: "VC-001",

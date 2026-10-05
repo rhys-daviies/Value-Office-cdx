@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { issueAfterInternalReview } from "@/fixtures/recommendation";
+import { issueAfterInternalReview, proposeValueChangeFromDecision } from "@/fixtures/recommendation";
 import path from "node:path";
 
 import { and, eq } from "drizzle-orm";
@@ -495,6 +495,7 @@ describe("issuing reports", () => {
 
   it("issues a proposed VC Notice as PROPOSED, and an authorised one after VCO authorisation", async () => {
     const ctx = await compactDecided();
+    await proposeValueChangeFromDecision(ctx.actor, { reviewId: ctx.review.id });
     const { change, version } = await createValueChange(ctx.actor, {
       projectId: ctx.project.id,
       code: "VC-001",

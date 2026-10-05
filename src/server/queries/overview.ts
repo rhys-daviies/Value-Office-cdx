@@ -5,6 +5,7 @@ import type { LeakageAmounts, LeakageSummary } from "@/domain/response";
 import type { AssuranceStage } from "@/domain/statuses";
 
 import { getValueCaseEvolution } from "./evolution";
+import { getGovernanceState, type GovernanceState } from "./governance";
 import { getLatestValueDecision, type LatestValueDecision } from "./outcomes";
 import { getValueTrajectoryChart, type ValueTrajectoryChart } from "./trajectory";
 import { loadVersionDrivers } from "./value-case";
@@ -51,18 +52,25 @@ export type ExecutiveOverview = {
     /** Existing governed summary: open matters' latest finalised assessments (independent of Value Gap). */
     formalLeakage: LeakageSummary;
     openLeakageCount: number;
+    /** Phase 4D.10H: working (never formal) view and visibility of what is outstanding. */
+    working: { total: string | null };
+    evidenceOutstanding: { items: number; matters: number };
+    remediation: { planned: number; unplanned: number; monitored: number };
   };
+  /** Phase 4D.10H: what is happening in governance, and the one next governed action. */
+  governance: GovernanceState;
   /** Latest recorded management value decision (any finalised review) and any recommendation awaiting decision. */
   decision: LatestValueDecision;
   valueCase: ValueCaseSummary;
 };
 
 export async function getExecutiveOverview(projectId: string, today = todayIso()): Promise<ExecutiveOverview> {
-  const [state, evolution, decision, trajectory] = await Promise.all([
+  const [state, evolution, decision, trajectory, governance] = await Promise.all([
     getOverviewValueOfficeState(projectId, today),
     getValueCaseEvolution(projectId),
     getLatestValueDecision(projectId),
     getValueTrajectoryChart(projectId, { today }),
+    getGovernanceState(projectId),
   ]);
   const { position, cadence, response, workspace } = state;
   const valueCase = await getValueCaseSummary(projectId, evolution);
@@ -112,7 +120,11 @@ export async function getExecutiveOverview(projectId: string, today = todayIso()
       matter,
       formalLeakage: response.leakage,
       openLeakageCount: response.openLeakageCount,
+      working: { total: workspace.working.total },
+      evidenceOutstanding: workspace.evidenceOutstanding,
+      remediation: workspace.remediation,
     },
+    governance,
     decision,
     valueCase,
   };

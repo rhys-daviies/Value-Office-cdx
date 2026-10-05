@@ -285,6 +285,28 @@ VCO.
 - Prospective: recommendations issued before this phase read as Issued with no history. Reports are unchanged.
 - Migration record: `docs/release/4d10g-migration.md`.
 
+## Value Change determination (Phase 4D.10H)
+
+Closes the loop Formal Assurance → recommendation → management decision → Authorised Value Case. Neither a forecast
+movement nor a decision changes the Authorised Value Case by itself.
+
+- After a management decision the consultant answers, once and with a rationale: **No Value Change Required** or
+  **Value Change Proposed** (`value_change_determination`, insert-only, one per decision, `valueChange.determineImpact`).
+  A correction would need a later governance feature (superseding determination); none exists yet.
+- The determination writes nothing to the Value Case, versions, positions, leakage or the decision, and never creates
+  a Value Change. Value Change Proposed leads to **Prepare Value Change** in the existing workflow; the resulting
+  change is linked through `value_change.decision_id`, and the database requires the decision's determination to be
+  Value Change Proposed. The determination rationale (why the Authorised Value Case must change) and
+  `value_change.reason` (what change is proposed) stay separate.
+- A review cannot be finalised while its recommendation is in internal review or ready to issue (PMO, 4D.10G);
+  no / draft / returned / issued recommendations finalise as before. A draft or returned recommendation on a finalised
+  review can no longer progress (existing draft-review rule for recommendations).
+- Overview adds a governance strip (draft review, recommendation, decision, Value Case impact, open Value Change) and
+  one derived next governed action (`postAuthorisationNextAction`). The pre-V1 Mobilisation checklist still ends at
+  authorisation.
+- Prospective only: earlier decisions have no determination and stay valid. Reports are unchanged.
+- Migration record: `docs/release/4d10h-migration.md`.
+
 ## Value Drivers: identity, living record, versioned snapshot (Phase 4D.3)
 
 | Layer                  | Record                                         | Changes how                                                   |

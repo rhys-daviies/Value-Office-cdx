@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { issueAfterInternalReview } from "./recommendation";
+import { issueAfterInternalReview, proposeValueChangeFromDecision } from "./recommendation";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { createEmergingDriver } from "@/server/commands/drivers";
 import { recordEvidence } from "@/server/commands/evidence";
@@ -313,6 +313,7 @@ export async function seedCompactEvolution(actor: Actor, opts: { code: string; n
     rationale: "Synthetic decision",
   });
 
+  await proposeValueChangeFromDecision(actor, { reviewId: review2.id });
   const { change, version: v2 } = await createValueChange(actor, {
     projectId: project.id,
     code: "VC-001",
@@ -427,6 +428,7 @@ export async function seedCompactDecision(actor: Actor, opts: { code: string; na
     decidedOn: today,
     rationale: "Budget phasing",
   });
+  await proposeValueChangeFromDecision(actor, { reviewId: review.id });
   await createValueChange(actor, {
     projectId: project.id,
     code: "VC-001",

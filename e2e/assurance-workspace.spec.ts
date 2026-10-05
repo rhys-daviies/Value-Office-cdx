@@ -121,7 +121,7 @@ test("landing → review reasoning → matter handoff → forecast movement → 
   const impact = page.getByTestId("value-case-impact");
   await expect(impact.getByTestId("impact-authorised")).toHaveText("$1.5m");
   await expect(impact.getByTestId("value-change-guidance")).toContainText("never created automatically");
-  await expect(impact).toContainText("A Value Change is prepared after the client decision.");
+  await expect(impact.getByTestId("impact-stage")).toHaveAttribute("data-stage", "no_decision");
 
   await page.getByRole("button", { name: "Finalise review" }).click();
   await expect(page.getByTestId("review-state")).toContainText("Finalised");

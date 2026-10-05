@@ -309,6 +309,16 @@ export async function getReviewResponse(projectId: string, reviewId: string) {
     .from(schema.valueChange)
     .where(and(eq(schema.valueChange.projectId, projectId), eq(schema.valueChange.assuranceReviewId, reviewId)));
 
+  // Phase 4D.10H: the decision's Value Case impact determination (one per decision; absent for historical decisions).
+  const determiner = alias(schema.appUser, "determiner");
+  const [determination] = dec
+    ? await db()
+        .select({ row: schema.valueChangeDetermination, actorName: determiner.displayName })
+        .from(schema.valueChangeDetermination)
+        .innerJoin(determiner, eq(determiner.id, schema.valueChangeDetermination.createdBy))
+        .where(eq(schema.valueChangeDetermination.decisionId, dec.decision.id))
+    : [];
+
   return {
     leakage,
     leakageBasis,
@@ -338,6 +348,7 @@ export async function getReviewResponse(projectId: string, reviewId: string) {
         }
       : null,
     changes,
+    determination: determination ? { ...determination.row, actorName: determination.actorName } : null,
   };
 }
 
@@ -464,6 +475,17 @@ export async function getValueChangeDetail(projectId: string, changeId: string) 
         .from(schema.assuranceReview)
         .where(eq(schema.assuranceReview.id, row.assuranceReviewId))
     : [];
+  // Phase 4D.10H: the determination that proposed this change (when it cites a decision that has one).
+  const [determination] = row.decisionId
+    ? await db()
+        .select({
+          determination: schema.valueChangeDetermination.determination,
+          rationale: schema.valueChangeDetermination.rationale,
+          createdAt: schema.valueChangeDetermination.createdAt,
+        })
+        .from(schema.valueChangeDetermination)
+        .where(eq(schema.valueChangeDetermination.decisionId, row.decisionId))
+    : [];
   const users = await db()
     .select({ id: schema.appUser.id, name: schema.appUser.displayName, email: schema.appUser.email })
     .from(schema.appUser)
@@ -490,6 +512,7 @@ export async function getValueChangeDetail(projectId: string, changeId: string) 
     authoriser: authoriser ?? null,
     evidence: evidence ?? null,
     review: review ?? null,
+    determination: determination ?? null,
     createdBy: user(row.createdBy),
     proposedBy: user(row.proposedBy),
     recordedBy: user(row.authorisationRecordedBy),

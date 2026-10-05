@@ -1,4 +1,5 @@
 import { RECOMMENDATION_STATE_LABELS } from "@/domain/recommendation";
+import { DETERMINATION_LABELS } from "@/domain/value-case-impact";
 import type { ReviewStory as Story, StoryMatter } from "@/server/queries/review-story";
 import { GovernedTag, WorkingTag } from "@/ui/components/badges";
 import { TextLink } from "@/ui/components/layout";
@@ -240,6 +241,12 @@ export function ReviewStory({ story: s, currency, base }: { story: Story; curren
         </Step>
 
         <Step n={7} title="Value Case impact" testId="story-governance" wide>
+          {s.determination && (
+            <p className="text-xs" data-testid="story-determination">
+              <span className="font-medium">{DETERMINATION_LABELS[s.determination.determination]}</span>:{" "}
+              {s.determination.rationale}
+            </p>
+          )}
           {s.valueChanges.length > 0 ? (
             <ul className="space-y-0.5" data-testid="story-value-changes">
               {s.valueChanges.map((c) => (

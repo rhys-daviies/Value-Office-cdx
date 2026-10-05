@@ -31,6 +31,7 @@ try {
     ["OFFICE", "Office Compact"],
     ["WORKSPACE", "Workspace Compact"],
     ["RECOMMEND", "Recommendation Compact"],
+    ["IMPACT", "Impact Compact"],
     ["EVOLVE", "Evolution Compact"],
     ["DECIDE", "Decision Compact"],
     ["TRAJ", "Trajectory Compact"],
@@ -69,7 +70,7 @@ try {
       } else if (code === "OFFICE" || code === "WORKSPACE") {
         await seedCompactOperating(actor, { code, name });
         console.log(`Seeded ${name}: Authorised V1, Review #1 finalised, live Continuous Assurance`);
-      } else if (code === "DRIVERS") {
+      } else if (code === "DRIVERS" || code === "IMPACT") {
         await seedCompactDecided(actor, { code, name });
         console.log(`Seeded ${name}: Authorised V1, Review #1 finalised with a client decision`);
       } else {

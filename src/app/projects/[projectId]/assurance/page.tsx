@@ -62,6 +62,10 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
 
   const latest = summary.latest;
   const draft = summary.reviews.find((r) => r.review.status === "draft");
+  // 4D.10H: a matching draft already reads "In progress" (cadence rule); say so when the open draft is a different kind.
+  const draftMismatch = Boolean(
+    draft && cadence.next?.status === "due" && cadence.next.trigger !== draft.review.trigger,
+  );
   const materialFirst = [...evidence].sort((a, b) => Number(b.isMaterialChange) - Number(a.isMaterialChange));
 
   return (
@@ -106,6 +110,12 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
                 </a>
               ) : (
                 <span className="text-slate-700">None derivable from current data</span>
+              )}
+              {draftMismatch && (
+                <span className="mt-1 block text-xs text-amber-800" data-testid="requirement-draft-mismatch">
+                  Review #{draft!.review.sequence} is open as {TRIGGER_LABELS[draft!.review.trigger]}; it counts towards
+                  the {cadence.next!.label.toLowerCase()} only if its trigger is changed to match.
+                </span>
               )}
             </p>
           </div>

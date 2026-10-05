@@ -2,6 +2,7 @@ import { and, eq, max } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
+import { VALUE_CHANGE_DETERMINATIONS } from "@/domain/statuses";
 import { schema, type Tx } from "@/server/db/client";
 
 import { COMMANDS } from "./names";
@@ -43,6 +44,47 @@ async function setVersionStatus(
     .returning();
   return row!;
 }
+
+/**
+ * Phase 4D.10H: after the management decision, records whether the Authorised Value Case must change — No Value
+ * Change Required or Value Change Proposed — with a rationale. Once per decision; it never creates, calculates or
+ * authorises a Value Change and never writes to the Value Case.
+ */
+export const determineValueCaseImpact = defineCommand(
+  COMMANDS.determineValueCaseImpact,
+  z.object({ reviewId: uuid, determination: z.enum(VALUE_CHANGE_DETERMINATIONS), rationale: nonBlank }),
+  async ({ tx, actor }, input) => {
+    const [decision] = await tx
+      .select()
+      .from(schema.decision)
+      .where(eq(schema.decision.assuranceReviewId, input.reviewId));
+    if (!decision) {
+      throw new DomainError(
+        "VO_DECISION_REQUIRED",
+        "Record the management decision before determining its Value Case impact",
+      );
+    }
+    const [existing] = await tx
+      .select({ id: schema.valueChangeDetermination.id })
+      .from(schema.valueChangeDetermination)
+      .where(eq(schema.valueChangeDetermination.decisionId, decision.id));
+    if (existing) {
+      throw new DomainError("VO_DETERMINATION_EXISTS", "The Value Case impact of this decision is already determined");
+    }
+    const [row] = await tx
+      .insert(schema.valueChangeDetermination)
+      .values({
+        projectId: decision.projectId,
+        assuranceReviewId: decision.assuranceReviewId,
+        decisionId: decision.id,
+        determination: input.determination,
+        rationale: input.rationale,
+        createdBy: actor.userId,
+      })
+      .returning();
+    return row!;
+  },
+);
 
 /** Opens a draft Value Change and its copy-forward draft version (V<n+1>). */
 export const createValueChange = defineCommand(

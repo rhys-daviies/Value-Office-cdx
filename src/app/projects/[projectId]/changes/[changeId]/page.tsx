@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 
+import { DETERMINATION_LABELS } from "@/domain/value-case-impact";
+
 import { recordEvidenceAction } from "@/server/actions/evidence";
 import {
   authoriseValueChangeAction,
@@ -183,6 +185,16 @@ export default async function ValueChangePage({ params }: PageProps<"/projects/[
                   "—"
                 ),
               ],
+              ...(d.determination
+                ? ([
+                    [
+                      "Value Case impact",
+                      <span key="det" data-testid="change-determination">
+                        {DETERMINATION_LABELS[d.determination.determination]} — {d.determination.rationale}
+                      </span>,
+                    ],
+                  ] as [string, React.ReactNode][])
+                : []),
               ["Value Case Owner", d.vco?.name ?? "Not nominated"],
               ["Prepared by", `${d.createdBy?.name ?? "—"} · ${formatDateTime(change.createdAt)}`],
               ...(change.proposedAt

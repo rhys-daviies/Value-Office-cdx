@@ -31,6 +31,7 @@ import {
   RECOMMENDATION_REVIEW_EVENT_KINDS,
   RECOMMENDATION_REVIEW_STATUSES,
   SCENARIO_KINDS,
+  VALUE_CHANGE_DETERMINATIONS,
   VALUE_BASIS_KINDS,
   VALUE_CHANGE_STATUSES,
   INFORMATION_REQUEST_PURPOSES,
@@ -68,6 +69,7 @@ export const recommendationReviewEventKind = pgEnum(
   RECOMMENDATION_REVIEW_EVENT_KINDS,
 );
 export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
+export const valueChangeDeterminationKind = pgEnum("value_change_determination_kind", VALUE_CHANGE_DETERMINATIONS);
 export const valueBasisKind = pgEnum("value_basis_kind", VALUE_BASIS_KINDS);
 export const reportType = pgEnum("report_type", REPORT_TYPES);
 export const informationRequestStatus = pgEnum("information_request_status", INFORMATION_REQUEST_STATUSES);
@@ -1042,6 +1044,7 @@ export const decision = pgTable(
   (t) => [
     unique("decision_review_uq").on(t.assuranceReviewId),
     unique("decision_id_project_uq").on(t.id, t.projectId),
+    unique("decision_id_review_uq").on(t.id, t.assuranceReviewId),
     foreignKey({
       name: "decision_review_fk",
       columns: [t.assuranceReviewId, t.projectId],
@@ -1062,6 +1065,42 @@ export const decision = pgTable(
       columns: [t.supportingEvidenceId, t.projectId],
       foreignColumns: [evidence.id, evidence.projectId],
     }),
+  ],
+);
+
+/**
+ * Phase 4D.10H: Value Case impact of a management decision — No Value Change Required, or Value Change Proposed —
+ * with the consultant's rationale. One per decision; insert-only (a correction needs a later governance feature).
+ * Neither answer changes the Authorised Value Case; a resulting Value Change is linked through
+ * value_change.decision_id and stays separately authorised.
+ */
+export const valueChangeDetermination = pgTable(
+  "value_change_determination",
+  {
+    id: id(),
+    projectId: uuid().notNull(),
+    assuranceReviewId: uuid().notNull(),
+    decisionId: uuid().notNull(),
+    determination: valueChangeDeterminationKind().notNull(),
+    rationale: text().notNull(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("value_change_determination_decision_uq").on(t.decisionId),
+    foreignKey({
+      name: "value_change_determination_decision_fk",
+      columns: [t.decisionId, t.assuranceReviewId],
+      foreignColumns: [decision.id, decision.assuranceReviewId],
+    }),
+    foreignKey({
+      name: "value_change_determination_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    check("value_change_determination_rationale", sql`btrim(${t.rationale}) <> ''`),
   ],
 );
 

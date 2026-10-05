@@ -14,6 +14,7 @@ import { IR_STATUS_LABELS, KEY_DATE_LABELS } from "@/ui/labels";
 import { MobilisationStatusPanel } from "@/ui/mobilisation/status";
 import { LatestValueDecision } from "@/ui/overview/decision";
 import { ValueAttention } from "@/ui/overview/attention";
+import { ExecutiveGovernance } from "@/ui/overview/governance";
 import { ExecutivePosition } from "@/ui/overview/position";
 import { ValueTrajectory } from "@/ui/trajectory/trajectory";
 import { ValueCaseSummary } from "@/ui/value-case/summary";
@@ -43,6 +44,7 @@ export default async function ProjectOverviewPage({ params }: PageProps<"/projec
       ) : (
         <>
           <ExecutivePosition o={x} base={base} />
+          <ExecutiveGovernance o={x} base={base} />
           <ValueTrajectory chart={x.trajectory} currency={currency} id="trajectory" headline={false} />
           <div className={`mb-6 grid gap-4 ${x.decision.recorded || x.decision.awaiting ? "xl:grid-cols-2" : ""}`}>
             <ValueAttention o={x} base={base} />

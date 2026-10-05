@@ -113,11 +113,18 @@ test("position → leakage → options → recommendation → decision → Value
   await expect(page.getByTestId("recommendation")).toContainText("Act now: $1.5m"); // never rewritten
 
   // ---- Value Change -> V2 ---------------------------------------------------------------------
+  // 4D.10H: the decision's Value Case impact is determined explicitly before a Value Change is prepared.
+  const det = page.getByTestId("determination-form");
+  await det.getByLabel("Value Change Proposed").check();
+  await det.getByLabel("Rationale").fill("The delay changes the authorised commitment");
+  await det.getByRole("button", { name: "Record determination" }).click();
+  await expect(page.getByTestId("determination")).toContainText("Value Change Proposed");
   const vc = page.getByTestId("create-change-form");
   await vc.getByLabel("Stated change to Authorised Value").fill("-0.1m");
   await vc.getByLabel("Reason").fill("Client elected to delay one quarter");
   await vc.getByRole("button", { name: "Prepare Value Change" }).click();
   await expect(page.getByTestId("change-state")).toContainText("VC-001");
+  await expect(page.getByTestId("change-determination")).toContainText("The delay changes the authorised commitment");
   await expect(page.getByText("Not reconciled")).toBeVisible();
   const alpha = page.getByTestId("driver-VD-01");
   await open(alpha);

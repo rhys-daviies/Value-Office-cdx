@@ -100,6 +100,9 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
   const living = new Map(draftMatters?.matters.map((m) => [m.entry.leakage.id, m]) ?? []);
   const openMatters = response.leakage.filter((l) => l.leakage.status === "open");
   const responseProps = { projectId, currency, review, response };
+  // 4D.10H: a governed recommendation process in progress must complete before the review is finalised.
+  const recInReview =
+    response.recommendation?.state === "in_internal_review" || response.recommendation?.state === "ready_to_issue";
   const steps: { id: string; label: string; state?: string; done?: boolean }[] = [
     { id: "context", label: "Review context" },
     {
@@ -555,6 +558,12 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             <li className={review.whyItMatters ? "text-emerald-800" : "text-amber-800"}>
               {review.whyItMatters ? "✓ Why it matters recorded" : "⚠ Why it matters not recorded"}
             </li>
+            {recInReview && (
+              <li className="text-red-700" data-testid="finalise-recommendation">
+                ✗ The recommendation is {RECOMMENDATION_STATE_LABELS[response.recommendation!.state]} — issue it, or
+                return it for revision, before finalising (required)
+              </li>
+            )}
             {draftMatters && draftMatters.evidenceOutstanding.items > 0 && (
               <li className="text-amber-800" data-testid="finalise-evidence-outstanding">
                 ⚠ {draftMatters.evidenceOutstanding.items} evidence request item(s) outstanding on open matters — not
@@ -573,15 +582,17 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
             <Hidden name="projectId" value={projectId} />
             <Hidden name="reviewId" value={review.id} />
             <SubmitButton
-              disabled={ws.missingPositions > 0 || blankForecasts.length > 0 || unexplained.length > 0}
+              disabled={ws.missingPositions > 0 || blankForecasts.length > 0 || unexplained.length > 0 || recInReview}
               title={
-                ws.missingPositions > 0
-                  ? "Save a position for every driver first"
-                  : blankForecasts.length > 0
-                    ? "Every financial driver needs a forecast or an explicit Not Assessed"
-                    : unexplained.length > 0
-                      ? "Record why each moved forecast changed"
-                      : undefined
+                recInReview
+                  ? "Complete the internal recommendation review first"
+                  : ws.missingPositions > 0
+                    ? "Save a position for every driver first"
+                    : blankForecasts.length > 0
+                      ? "Every financial driver needs a forecast or an explicit Not Assessed"
+                      : unexplained.length > 0
+                        ? "Record why each moved forecast changed"
+                        : undefined
               }
             >
               Finalise review

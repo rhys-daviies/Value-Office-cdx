@@ -103,6 +103,13 @@ export type RecommendationReviewStatus = (typeof RECOMMENDATION_REVIEW_STATUSES)
 export const RECOMMENDATION_REVIEW_EVENT_KINDS = ["submitted", "returned", "approved"] as const;
 export type RecommendationReviewEventKind = (typeof RECOMMENDATION_REVIEW_EVENT_KINDS)[number];
 
+/**
+ * Phase 4D.10H: after a management decision, does the Authorised Value Case need to change? Recorded once per
+ * decision (insert-only). Neither answer changes the Value Case; a Value Change stays a separate governed step.
+ */
+export const VALUE_CHANGE_DETERMINATIONS = ["no_value_change_required", "value_change_proposed"] as const;
+export type ValueChangeDetermination = (typeof VALUE_CHANGE_DETERMINATIONS)[number];
+
 /** draft ⇄ proposed → authorised | rejected; draft/proposed → withdrawn. */
 export const VALUE_CHANGE_STATUSES = ["draft", "proposed", "authorised", "rejected", "withdrawn"] as const;
 export type ValueChangeStatus = (typeof VALUE_CHANGE_STATUSES)[number];

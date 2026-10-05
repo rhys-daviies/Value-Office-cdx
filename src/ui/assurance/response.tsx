@@ -1,4 +1,5 @@
-import { SCENARIO_KINDS } from "@/domain/statuses";
+import { SCENARIO_KINDS, VALUE_CHANGE_DETERMINATIONS } from "@/domain/statuses";
+import { DETERMINATION_LABELS, valueCaseImpactStage } from "@/domain/value-case-impact";
 import { RECOMMENDATION_STATE_LABELS, recommendationEditable } from "@/domain/recommendation";
 import {
   approveRecommendationAction,
@@ -13,7 +14,7 @@ import {
   updateLeakageAction,
   upsertScenarioAction,
 } from "@/server/actions/response";
-import { createValueChangeAction } from "@/server/actions/value-change";
+import { createValueChangeAction, determineValueCaseImpactAction } from "@/server/actions/value-change";
 import { listValueChanges, nextChangeCode, type ReviewResponse as Response } from "@/server/queries/response";
 import type { WorkspaceMatter } from "@/server/queries/workspace";
 
@@ -778,7 +779,11 @@ export function DecisionSection({
   );
 }
 
-/** I. Value Case impact: forecast movement never alters the Authorised Value Case; a Value Change is separate. */
+/**
+ * I. Value Case impact (Phase 4D.10H): forecast movement never alters the Authorised Value Case. After the management
+ * decision the consultant determines — once, with a rationale — whether the Authorised Value Case must change. Neither
+ * answer changes it; a proposed change goes through the existing Value Change workflow and its own authorisation.
+ */
 export async function ValueCaseImpactSection({
   projectId,
   currency,
@@ -789,17 +794,29 @@ export async function ValueCaseImpactSection({
   /** The Authorised Value Case this review measures against, and this review's (formal or draft) forecast. */
   authorised: { versionNumber: number; total: string; forecastTotal: string | null; valueGap: string | null };
 }) {
-  const { decision } = response;
+  const { decision, determination } = response;
   const base = `/projects/${projectId}`;
   const changes = await listValueChanges(projectId);
   const openChange = changes.find((c) => c.change.status === "draft" || c.change.status === "proposed");
+  const resulting = decision ? (changes.find((c) => c.change.decisionId === decision.id) ?? null) : null;
+  const stage = valueCaseImpactStage({
+    decided: Boolean(decision),
+    determination: determination?.determination ?? null,
+    change: resulting ? { status: resulting.change.status } : null,
+  });
+  const hidden = (
+    <>
+      <Hidden name="projectId" value={projectId} />
+      <Hidden name="reviewId" value={review.id} />
+    </>
+  );
   return (
     <>
       <Section
         id="value-change"
         title="Value Case impact"
         testId="value-case-impact"
-        description="Forecast movement never alters the Authorised Value Case. A Value Change is a separate, explicit step."
+        description="Does the management decision require a change to the Authorised Value Case? Forecast movement and the decision never change it by themselves."
       >
         <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3" data-testid="value-case-impact-figures">
           <Stat
@@ -819,54 +836,148 @@ export async function ValueCaseImpactSection({
             note="Authorised − Current Forecast"
           />
         </div>
-        <p className="mb-3 text-xs text-slate-600" data-testid="value-change-guidance">
-          After the management response and decision, a separate Value Change may be required. It is prepared explicitly
-          here and is never created automatically.
-        </p>
-        {response.changes.length > 0 && (
-          <ul className="mb-3 space-y-1 text-sm">
-            {response.changes.map((c) => (
-              <li key={c.id}>
-                <TextLink href={`${base}/changes/${c.id}`}>{c.code}</TextLink> <PlainBadge>{c.status}</PlainBadge>
-              </li>
-            ))}
-          </ul>
-        )}
-        {!decision ? (
-          <p className="text-sm text-slate-600">A Value Change is prepared after the client decision.</p>
-        ) : openChange ? (
-          <p className="text-sm text-slate-600">
-            <TextLink href={`${base}/changes/${openChange.change.id}`}>{openChange.change.code}</TextLink> is open (
-            {openChange.change.status}).
-          </p>
-        ) : (
-          <ActionForm action={createValueChangeAction} testId="create-change-form">
-            <Hidden name="projectId" value={projectId} />
-            <Hidden name="assuranceReviewId" value={review.id} />
-            <Hidden name="decisionId" value={decision.id} />
-            <div className="space-y-2">
-              <FormGrid cols={3}>
-                <TextField
-                  name="code"
-                  label="Code"
-                  required
-                  defaultValue={nextChangeCode(changes.map((c) => c.change.code))}
-                />
-                <MoneyField
-                  name="statedChangeAmount"
-                  label="Stated change to Authorised Value"
-                  currency={currency}
-                  hint="e.g. -0.6m. The proposed version must reconcile to it before authorisation."
-                />
-              </FormGrid>
-              <TextArea name="reason" label="Reason" rows={2} />
-              <p className="text-xs text-slate-500">
-                Creates a draft of the next version copied from the Authorised version in force; adjust only the
-                affected drivers.
+
+        <div data-testid="impact-stage" data-stage={stage} className="space-y-3 text-sm">
+          {stage === "no_decision" && (
+            <p className="text-slate-600" data-testid="value-change-guidance">
+              The Authorised Value remains unchanged by this review. The Value Case impact is determined after a
+              management decision on Cardaxia&apos;s issued recommendation; a Value Change is never created
+              automatically.
+            </p>
+          )}
+
+          {determination && (
+            <div
+              className={`rounded border p-3 ${determination.determination === "no_value_change_required" ? "border-emerald-300 bg-emerald-50" : "border-sky-300 bg-sky-50"}`}
+              data-testid="determination"
+              data-determination={determination.determination}
+            >
+              <p className="font-semibold">{DETERMINATION_LABELS[determination.determination]}</p>
+              <p className="mt-1 whitespace-pre-wrap" data-testid="determination-rationale">
+                {determination.rationale}
               </p>
-              <SubmitButton>Prepare Value Change</SubmitButton>
+              <p className="mt-1 text-xs text-slate-600">
+                Determined by {determination.actorName}, {formatDateTime(determination.createdAt)} · permanent
+              </p>
+              {determination.determination === "no_value_change_required" && (
+                <p className="mt-1 text-xs text-slate-700" data-testid="determination-unchanged">
+                  The Authorised Value remains {money(authorised.total, currency)} (V{authorised.versionNumber}).
+                  Assurance continues against it.
+                </p>
+              )}
             </div>
-          </ActionForm>
+          )}
+
+          {stage === "awaiting_determination" && decision && (
+            <ActionForm action={determineValueCaseImpactAction} testId="determination-form">
+              {hidden}
+              <p className="mb-2 font-medium text-slate-800">
+                Decision recorded — the Value Case impact must now be determined.
+              </p>
+              <fieldset className="mb-2">
+                <legend className="text-sm text-slate-700">
+                  Does this decision require a change to the Authorised Value Case?
+                </legend>
+                <div className="mt-1 flex flex-wrap gap-x-6 gap-y-1">
+                  {VALUE_CHANGE_DETERMINATIONS.map((d) => (
+                    <label key={d} className="inline-flex items-center gap-2">
+                      <input type="radio" name="determination" value={d} required />
+                      {DETERMINATION_LABELS[d]}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <TextArea
+                name="rationale"
+                label="Rationale"
+                required
+                rows={2}
+                hint="Why the decision does, or does not, require changing the Authorised Value Case. Recorded permanently."
+              />
+              <div className="mt-2">
+                <SubmitButton>Record determination</SubmitButton>
+              </div>
+            </ActionForm>
+          )}
+
+          {stage === "proposed_not_prepared" &&
+            decision &&
+            (openChange ? (
+              <p className="text-slate-600">
+                <TextLink href={`${base}/changes/${openChange.change.id}`}>{openChange.change.code}</TextLink> is still
+                open ({openChange.change.status}); resolve it before preparing another Value Change.
+              </p>
+            ) : (
+              <ActionForm action={createValueChangeAction} testId="create-change-form">
+                <Hidden name="projectId" value={projectId} />
+                <Hidden name="assuranceReviewId" value={review.id} />
+                <Hidden name="decisionId" value={decision.id} />
+                <h3 className="mb-2 font-semibold">Prepare Value Change</h3>
+                <div className="space-y-2">
+                  <FormGrid cols={3}>
+                    <TextField
+                      name="code"
+                      label="Code"
+                      required
+                      defaultValue={nextChangeCode(changes.map((c) => c.change.code))}
+                    />
+                    <MoneyField
+                      name="statedChangeAmount"
+                      label="Stated change to Authorised Value"
+                      currency={currency}
+                      hint="e.g. -0.6m. The proposed version must reconcile to it before authorisation."
+                    />
+                  </FormGrid>
+                  <TextArea
+                    name="reason"
+                    label="Value Change reason"
+                    rows={2}
+                    hint="What authorised change is proposed and why. The determination rationale above is kept separately."
+                  />
+                  <p className="text-xs text-slate-500">
+                    Creates a draft of the next version copied from the Authorised version in force; adjust only the
+                    affected drivers. It changes nothing until the VCO authorises it.
+                  </p>
+                  <SubmitButton>Prepare Value Change</SubmitButton>
+                </div>
+              </ActionForm>
+            ))}
+
+          {resulting && (
+            <div className="rounded border border-slate-200 p-3" data-testid="resulting-change">
+              <p>
+                <TextLink href={`${base}/changes/${resulting.change.id}`}>{resulting.change.code}</TextLink> ·{" "}
+                <PlainBadge>{resulting.change.status}</PlainBadge>
+                {!determination && (
+                  <span className="text-xs text-slate-500"> · prepared before determinations were recorded</span>
+                )}
+              </p>
+              {resulting.change.status === "authorised" ? (
+                <p className="mt-1 text-xs text-slate-700" data-testid="resulting-authorised">
+                  Authorised V{resulting.toNumber} · {money(resulting.toTotal, currency)}
+                  {resulting.change.authorisedOn && ` on ${formatDate(resulting.change.authorisedOn)}`} — authorised
+                  through {resulting.change.code} as a separate governed step, not by this review.
+                </p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-600">
+                  V{resulting.fromNumber} → V{resulting.toNumber} proposed · the Authorised Value stays{" "}
+                  {money(resulting.fromTotal, currency)} until the VCO authorises it.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {response.changes.filter((c) => c.id !== resulting?.change.id).length > 0 && (
+          <ul className="mt-3 space-y-1 text-sm">
+            {response.changes
+              .filter((c) => c.id !== resulting?.change.id)
+              .map((c) => (
+                <li key={c.id}>
+                  <TextLink href={`${base}/changes/${c.id}`}>{c.code}</TextLink> <PlainBadge>{c.status}</PlainBadge>
+                </li>
+              ))}
+          </ul>
         )}
       </Section>
     </>

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { issueAfterInternalReview } from "./recommendation";
+import { issueAfterInternalReview, proposeValueChangeFromDecision } from "./recommendation";
 import {
   createReview,
   finaliseReview,
@@ -361,6 +361,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
 
     /** 22–23: a DRAFT Value Change from Review #2 / the decision; V2's driver re-baselined and plan re-phased. */
     async change() {
+      await proposeValueChangeFromDecision(actor, { reviewId: s.review2.id });
       const { change, version } = await createValueChange(actor, {
         projectId: s.project.id,
         code: CANONICAL.valueChange.code,
