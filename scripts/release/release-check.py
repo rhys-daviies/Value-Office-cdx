@@ -1,15 +1,28 @@
-"""4D.10 production release checks — READ-ONLY. Successor of ~/.cardaxia-4d9m/n1c-check.py for the 0020 → 0026
-release (docs/release/4d10-release-procedure.md lists every check and why it changed).
+"""4D.10 production release checks — READ-ONLY against the database. Successor of ~/.cardaxia-4d9m/n1c-check.py for the
+0020 → 0026 release (docs/release/4d10-release-procedure.md lists every check and why it changed).
+
+Two accepted references, never confused (R2A, PMO):
+  4D.9N freeze                     ~/.cardaxia-4d9m/n1c-freeze.json — historical accepted state at 4D.9N acceptance
+                                   (618 factual rows). Never rewritten.
+  4D.10 pre-release baseline       ~/.cardaxia-4d9m/4d10-pre-release-baseline.json — accepted production state
+                                   immediately before the 4D.10 migration (written only by `capture`, on PASS).
+and one derived artefact:
+  release baseline                 ~/.cardaxia-4d9m/4d10-release-baseline.json — written only by a fully PASSING `pre`;
+                                   the only file `post` accepts.
 
 Modes
-  schema    (local only) write the schema fingerprint of a freshly migrated database — how schema-0020.txt and
-            schema-0026.txt are captured
-  snapshot  save a factual snapshot (any state) — used only to create a local freeze for rehearsal validation
-  pre       production must be EXACTLY the accepted pre-release state (migration head 0020, accepted 0020 schema,
-            factual rows identical to the 4D.9N freeze); saves the release baseline
-  post      production must be EXACTLY the accepted post-release state (head 0026, accepted 0026 schema and grants,
-            every baseline row identical over its baseline columns, new columns null, new tables empty, no factual
-            rows added, reports byte-identical)
+  schema     (local only) write the schema fingerprint of a freshly migrated database (schema-0020/0026.txt)
+  snapshot   (local only) save a bare factual snapshot — rehearsal fixtures only
+  reconcile  trace every factual change since the 4D.9N freeze (attribution, commands, reports); writes nothing
+  capture    PMO-authorised: reconcile + head/schema/role checks; on PASS only, atomically writes the 4D.10 pre-release
+             baseline (refuses to replace an existing one without --replace)
+  pre        production must be EXACTLY the accepted pre-release state: head 0020, accepted 0020 schema, factual rows
+             identical to the 4D.10 pre-release baseline (sign-in activity aside). Only after every check PASSES is the
+             release baseline published (atomic rename). A failed run never creates or replaces it; it leaves only a
+             `*.FAILED-<time>.json` diagnostic that `post` refuses
+  post       production must be EXACTLY the accepted post-release state (head 0026, accepted 0026 schema and grants,
+             every baseline row identical over its baseline columns, new columns null, new tables empty, no factual
+             rows added, reports byte-identical). Refuses a missing, malformed, unaccepted or mismatched baseline
 
 Connection
   default   production vo_runtime from the macOS Keychain (service value-office-prod-vo_runtime), forced to a
@@ -18,7 +31,7 @@ Connection
 
 Connection strings and passwords are never printed or written; output is scrubbed."""
 
-import argparse, hashlib, json, os, re, subprocess, sys
+import argparse, datetime, hashlib, json, os, re, subprocess, sys
 from urllib.parse import quote, urlsplit, urlunsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,13 +46,18 @@ NEW_COLUMNS = [("value_driver_version", "adjustment_rationale"), ("value_positio
                ("recommendation", "internal_review_status")]
 NEW_TABLES = ["value_driver_exclusion", "recommendation_review_event", "value_change_determination"]
 DEMO = {"DEMO-TRAJ": None, "DEMO-TRAJ2": "8f635bdf-e0a7-442a-a61a-5fe065e6e77f"}
+REF_KIND, REL_KIND = "4d10-pre-release-production-baseline", "4d10-release-baseline"
 
 ap = argparse.ArgumentParser()
-ap.add_argument("mode", choices=["schema", "snapshot", "pre", "post"])
+ap.add_argument("mode", choices=["schema", "snapshot", "reconcile", "capture", "pre", "post"])
 ap.add_argument("--local", help="localhost database URL (rehearsal validation only)")
-ap.add_argument("--freeze", default=f"{TOOLS}/n1c-freeze.json", help="accepted factual snapshot the pre-check must match")
-ap.add_argument("--baseline", default=f"{TOOLS}/4d10-release-baseline.json", help="release baseline written by pre, read by post")
-ap.add_argument("--out", help="snapshot output file (snapshot mode)")
+ap.add_argument("--freeze", default=f"{TOOLS}/n1c-freeze.json", help="historical 4D.9N freeze (reconcile / capture)")
+ap.add_argument("--reference", default=f"{TOOLS}/4d10-pre-release-baseline.json", help="4D.10 pre-release baseline (capture writes, pre reads)")
+ap.add_argument("--baseline", default=f"{TOOLS}/4d10-release-baseline.json", help="release baseline (pre publishes, post reads)")
+ap.add_argument("--replace", action="store_true", help="allow capture/pre to replace an existing accepted file (after its own PASS)")
+ap.add_argument("--project", default="DEMO-TRAJ2", help="reconcile: the only project allowed to have factual additions")
+ap.add_argument("--actor", default="Rhys Davies", help="reconcile: the only actor allowed for those additions")
+ap.add_argument("--out", help="output file (schema / snapshot modes)")
 args = ap.parse_args()
 
 SECRETS, fails = [], []
@@ -218,6 +236,92 @@ def factual_compare(b, s, label):
 
 
 # ---------------------------------------------------------------------------------------------------------------
+# Accepted-file handling: envelopes, atomic publication, strict loading.
+
+def utc_now(): return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+def expected_lines(f): return [l for l in open(f).read().splitlines() if l and not l.startswith("#")]
+
+def schema_sha(lines): return hashlib.sha256("\n".join(sorted(lines)).encode()).hexdigest()
+
+SCHEMA_0020_SHA = schema_sha(expected_lines(f"{HERE}/schema-0020.txt"))
+
+def repo_head(): return subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True).stdout.strip()
+
+def envelope(kind, s, extra):
+    return {"kind": kind, "accepted": True, "captured_at": utc_now(), "repo_head": repo_head(),
+            "server_version": q("select current_setting('server_version')"), "role": R,
+            "migration_rows": len(s["migrations"]), "migration_head_tag": PRE_TAG, "schema_0020_sha256": SCHEMA_0020_SHA,
+            "factual_rows": sum(v["count"] for k, v in s["tables"].items() if k not in AUTH and k != "audit_event"),
+            "projects": s["projects"], "pdfs": s["pdfs"], "audit_max": s["audit_max"], "snapshot": s, **extra}
+
+def atomic_write(path, obj):
+    tmp = f"{path}.tmp-{os.getpid()}"
+    with open(tmp, "w") as fh:
+        json.dump(obj, fh); fh.flush(); os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+def write_failed(path, kind, s, why):
+    diag = f"{path}.FAILED-{utc_now().replace(':', '')}.json"
+    json.dump({"kind": f"{kind}-FAILED-candidate", "accepted": False, "captured_at": utc_now(), "failures": why, "snapshot": s}, open(diag, "w"))
+    say(f"\n  info  FAILED candidate kept for diagnosis only (never accepted): {os.path.basename(diag)}")
+
+def load_accepted(path, kind, local):
+    """The only way an accepted file is read: anything not exactly an accepted 0020-state file of this kind is refused."""
+    def refuse(why): say(f"STOP: {os.path.basename(path)} refused — {why}"); sys.exit(1)
+    if not os.path.exists(path): refuse("missing")
+    try: env = json.load(open(path))
+    except Exception: refuse("malformed (not JSON)")
+    if not isinstance(env, dict) or env.get("kind") != kind: refuse(f"not a {kind} (kind {env.get('kind') if isinstance(env, dict) else type(env).__name__})")
+    if env.get("accepted") is not True: refuse("not accepted")
+    s = env.get("snapshot")
+    if not isinstance(s, dict) or not all(k in s for k in ("tables", "rows", "cols", "migrations", "pdfs", "audit_max", "projects")): refuse("malformed snapshot")
+    if env.get("migration_rows") != PRE_HEAD or env.get("migration_head_tag") != PRE_TAG or len(s["migrations"]) != PRE_HEAD: refuse("not a migration-0020 state")
+    if s["migrations"] != local[:PRE_HEAD]: refuse("its migration hashes are not this repository's 0000–0020")
+    if env.get("schema_0020_sha256") != SCHEMA_0020_SHA: refuse("captured against a different accepted 0020 schema")
+    say(f"  info  {kind}: captured {env['captured_at']} at repo {env['repo_head'][:7]}, {env['factual_rows']} factual rows, audit max {env['audit_max']}")
+    return env
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Reconciliation of changes since the 4D.9N freeze (R2A): every factual addition on one project, by one actor, through
+# application commands; no frozen row changed or deleted; no report issued or changed.
+
+def reconcile(f, s):
+    lost, added = diff_rows(f, s)
+    lost_f = {t: n for t, n in lost.items() if t not in AUTH}
+    check(f"no frozen factual row modified or deleted (changed/removed: {lost_f or 'none'})", not lost_f)
+    proj = pid(s, args.project)
+    check(f"project {args.project} exists ({(proj or 'missing')[:8]}…)", proj is not None)
+    fact = {t: v for t, v in added.items() if t not in AUTH and t != "audit_event"}
+    foreign = {t: sum(1 for r in v if r[2] != proj) for t, v in fact.items()}
+    foreign = {t: n for t, n in foreign.items() if n}
+    check(f"every factual addition belongs to {args.project} (other projects / unowned: {foreign or 'none'})", not foreign)
+    check(f"no report issued or changed (report_issue {s['tables']['report_issue']['count']} vs {f['tables']['report_issue']['count']}, report_document {s['tables']['report_document']['count']} vs {f['tables']['report_document']['count']}; inventory identical)",
+          s["tables"]["report_issue"]["count"] == f["tables"]["report_issue"]["count"] and s["tables"]["report_document"]["count"] == f["tables"]["report_document"]["count"] and s["pdfs"] == f["pdfs"])
+    audit = [l.split("|") for l in q(f"select a.table_name, a.action, coalesce(a.row_id::text,''), coalesce(a.command,''), coalesce(u.display_name,''), to_char(a.occurred_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') from audit_event a left join app_user u on u.id=a.actor_user_id where a.id > {f['audit_max']} order by a.id").splitlines() if l]
+    inserted = {(a[0], a[2]) for a in audit if a[1] == "INSERT"}
+    untraced = [f"{t}:{r[1][:8]}" for t, v in fact.items() for r in v if (t, r[1]) not in inserted]
+    check(f"every factual addition traces to an INSERT by an application command since the freeze (untraced: {untraced or 'none'})", not untraced)
+    bad_cmd = [f"{a[0]}/{a[1]}" for a in audit if not a[3]]
+    check(f"every audit row since the freeze names its command (missing: {bad_cmd or 'none'})", not bad_cmd)
+    actors = sorted({a[4] for a in audit})
+    check(f"every audit row since the freeze is by {args.actor} (actors: {actors or 'none'})", actors in ([], [args.actor]))
+    touched = [f"{a[0]}/{a[1]}:{a[2][:8]}" for a in audit if a[0] not in AUTH and (a[0], a[2]) not in inserted]
+    check(f"every factual UPDATE/DELETE since the freeze touches only rows created since the freeze (frozen rows touched: {touched or 'none'})", not touched)
+    say(f"  info  {len(audit)} audit rows since the freeze (audit id > {f['audit_max']}), {audit[0][5] if audit else '-'}Z → {audit[-1][5] if audit else '-'}Z")
+    for t, v in sorted(fact.items()):
+        for r in v:
+            cmds = [a[3] for a in audit if a[0] == t and a[2] == r[1]]
+            say(f"  info  + {t} {r[1][:8]}… ({args.project}): {', '.join(cmds)}")
+    gone = sorted({f"{a[0]}:{a[2][:8]}" for a in audit if a[1] == "DELETE" and a[0] not in AUTH})
+    if gone: say(f"  info  rows created then deleted since the freeze (application-managed): {', '.join(gone)}")
+    auth = {t: f"-{lost.get(t, 0)}/+{len(added.get(t, []))}" for t in AUTH if lost.get(t) or added.get(t)}
+    say(f"  info  sign-in/session activity (not factual): {auth or 'none'}")
+    return fact
+
+
+# ---------------------------------------------------------------------------------------------------------------
 
 mode = args.mode
 if mode == "schema":
@@ -227,24 +331,50 @@ if mode == "schema":
     say(f"schema fingerprint written: {len(schema_lines())} facts (PostgreSQL {ver})")
     sys.exit(0)
 if mode == "snapshot":
+    if not args.local or not args.out: say("STOP: bare snapshots are local-only (rehearsal fixtures) and need --out"); sys.exit(1)
     s = snapshot(); json.dump(s, open(args.out, "w"))
     say(f"snapshot saved: {len(s['tables'])} tables, {sum(v['count'] for v in s['tables'].values())} rows, {len(s['migrations'])} migrations")
     sys.exit(0)
 
-if mode == "pre":
+if mode in ("reconcile", "capture"):
+    if mode == "capture" and os.path.exists(args.reference) and not args.replace:
+        say(f"STOP: {os.path.basename(args.reference)} already exists; an accepted pre-release baseline is replaced only with --replace"); sys.exit(1)
     s = snapshot(); local = common(s)
     check(f"production migration head 0020: {len(s['migrations'])} rows, hashes = repository 0000–0020", s["migrations"] == local[:PRE_HEAD])
     schema_check(f"{HERE}/schema-0020.txt", "schema exactly the accepted 0020 schema (incl. vo_runtime grants)")
-    if not os.path.exists(args.freeze):
-        check(f"accepted factual snapshot available ({os.path.basename(args.freeze)})", False)
+    if not os.path.exists(args.freeze): check(f"historical 4D.9N freeze available ({os.path.basename(args.freeze)})", False); fact = {}
     else:
         f = json.load(open(args.freeze))
-        check("migration rows identical to the accepted snapshot", s["migrations"] == f["migrations"])
-        factual_compare(f, s, "the accepted snapshot")
-    json.dump(s, open(args.baseline, "w"))
-    say(f"\nrelease baseline saved ({os.path.basename(args.baseline)}): {len(s['tables'])} tables, {sum(v['count'] for v in s['tables'].values())} rows, audit max id {s['audit_max']}")
+        check("migration rows identical to the 4D.9N freeze", s["migrations"] == f["migrations"])
+        fact = reconcile(f, s)
+    if mode == "capture":
+        if fails:
+            say("\n  info  capture FAILED: no pre-release baseline written")
+        else:
+            env = envelope(REF_KIND, s, {"freeze_audit_max": f["audit_max"], "post_freeze_additions": {t: len(v) for t, v in fact.items()},
+                                         "accepted_by": "PMO (4D.10R2A)"})
+            atomic_write(args.reference, env)
+            say(f"\n4D.10 pre-release production baseline written ({os.path.basename(args.reference)}): captured {env['captured_at']}, {env['factual_rows']} factual rows, audit max {env['audit_max']}")
+elif mode == "pre":
+    if os.path.exists(args.baseline) and not args.replace:
+        say(f"STOP: {os.path.basename(args.baseline)} already exists; it is replaced only with --replace (after this run PASSES)"); sys.exit(1)
+    s = snapshot(); local = common(s)
+    ref = load_accepted(args.reference, REF_KIND, local)
+    check(f"production migration head 0020: {len(s['migrations'])} rows, hashes = repository 0000–0020", s["migrations"] == local[:PRE_HEAD])
+    schema_check(f"{HERE}/schema-0020.txt", "schema exactly the accepted 0020 schema (incl. vo_runtime grants)")
+    check("migration rows identical to the 4D.10 pre-release baseline", s["migrations"] == ref["snapshot"]["migrations"])
+    factual_compare(ref["snapshot"], s, "the 4D.10 pre-release baseline")
+    if fails:
+        write_failed(args.baseline, REL_KIND, s, fails)
+        say("  info  release baseline NOT published")
+    else:
+        env = envelope(REL_KIND, s, {"reference_captured_at": ref["captured_at"]})
+        atomic_write(args.baseline, env)
+        say(f"\nrelease baseline published ({os.path.basename(args.baseline)}): {len(s['tables'])} tables, {sum(v['count'] for v in s['tables'].values())} rows, audit max id {s['audit_max']}")
 else:
-    b = json.load(open(args.baseline))
+    _, local_hashes = repo_hashes()
+    b_env = load_accepted(args.baseline, REL_KIND, local_hashes)
+    b = b_env["snapshot"]
     s = snapshot(column_sets=b["cols"]); local = common(s)
     check(f"production migration head 0026: {len(s['migrations'])} rows, hashes = repository 0000–0026", s["migrations"] == local[:POST_HEAD])
     check("the first 21 migration rows are the baseline's (0000–0020 untouched)", s["migrations"][:PRE_HEAD] == b["migrations"])
