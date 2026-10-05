@@ -69,7 +69,7 @@ Playwright **37/37** (including the acceptance journey, ~1 min).
 
 ## Release readiness
 
-- Plan: `docs/release/4d10-release-preflight.md` (prepared, not executed).
+- Plan: `docs/release/4d10-release-procedure.md` (prepared, not executed; superseded the 4D.10I preflight plan).
 - Methodology questions: `docs/release/4d10-methodology-questions.md` (13 items, current behaviour stated).
 - Remaining before production: PMO release authorisation; owner credential window combined with Security B4;
   update the production checks that pin 0020; pre-release Neon recovery branch; Preview-deployment decision.
