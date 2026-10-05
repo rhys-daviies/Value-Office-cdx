@@ -218,3 +218,96 @@ not replace the production migration.
 | Recovery branch  | none valid for the next attempt; next: `pre-4d10-release-r2-YYYY-MM-DD` (UTC date) after a fresh strict PRE                                                       |
 | Release baseline | `4d10-release-baseline.json` from the aborted R2 must not be reused: the fresh R2 runs `pre --replace` only after PMO authorisation, from a new release candidate |
 | Next             | completely fresh R2 from step 1 on the R2B commit                                                                                                                 |
+
+## R2 fresh attempt — STOPPED at PRE (2026-10-05)
+
+**Outcome: STOP at procedure step 3 (fresh `release-check.py pre` FAIL — the release freeze was broken).** No recovery
+branch, no owner reset, no migration, nothing pushed or deployed. Production unchanged apart from the writes below.
+
+| Step                         | Result                                                                                                                                                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Aborted-R2 baseline archived | `4d10-release-baseline.json` → `4d10-release-baseline.ABORTED-R2-2026-10-05.json` (byte-identical, sha256 `658a1760…`; permissions 000 so `post` cannot read it even with `--baseline` — verified refused); no canonical file left |
+| Git (22:09Z)                 | PASS — clean; `origin/main` = `b7d0c46`; `87d7ff2` descends through exactly the 11 accepted commits; 0021–0026 hashes accepted; only `docs/release` / `scripts/release` since `83f1514`; target file = accepted IDs                |
+| Production identity          | PASS — `ep-old-mode-b7jl3rd0`, `br-tiny-star-b7b8d3bh`, `delicate-resonance-93129287`, `neondb`:5432; PostgreSQL 18.6; 0020 / 21; Vercel `dpl_6PUB…` Ready, env names unchanged                                                    |
+| Fresh PRE (→ 22:11:29Z)      | **FAIL** — factual rows added since the accepted baseline; every other check PASS (schema 0020, relations 33, no row changed/removed, reports/PDFs, least privilege, no owner / `vo_app` sessions)                                 |
+| Release baseline             | not published; diagnostic `4d10-release-baseline.json.FAILED-2026-10-05T221129Z.json` only (refused by `post`)                                                                                                                     |
+
+Freeze breach (audit id > 388, all **Rhys Davies**, through the application):
+
+| Audit   | UTC                 | Command          | Effect                                                                                |
+| ------- | ------------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| 389     | 2026-10-05 21:45:24 | `auth.signIn`    | sign-in (permitted)                                                                   |
+| 390–394 | 2026-10-05 22:00:04 | `project.create` | new project **PROJECT-DREAM** (`f4b55a20…`): client, project, Value Case, 2 key dates |
+
+Per the procedure: no re-baseline, no `--replace`, no further steps. PMO decision required.
+
+## R2C — PROJECT-DREAM accepted; pre-release baseline advanced to v2 (2026-10-05)
+
+**PMO decision:** PROJECT-DREAM is synthetic test data — accept and preserve it; reconcile the movement since baseline
+v1 and capture a successor baseline v2. No migration, credential, recovery-branch, push or deployment action.
+
+**Data classification (this release point only):** Rhys and PMO confirm that every project currently in the Value
+Office production environment is a synthetic / test project, used to confirm functionality, test the intended
+operating workflow, identify product changes and support development and methodology review; there is no real client
+project data in it today. PROJECT-DREAM is one such project. This describes the current environment only — it is not
+a product assumption and does not relax any control intended for client data.
+
+### Reconciliation v1 → now — `release-check.py reconcile --source` (read-only): PASS
+
+Source: baseline **v1** `4d10-pre-release-baseline.json` (sha256 `f5f96f76…`, captured 09:18:03Z, audit max 388),
+selected explicitly and pinned by sha256; strictly loaded (accepted, kind, 0020 state, hashes, schema). v1 predates the
+recorded target identity, so it was proved through its connection: the Keychain item defining the production
+connection is unchanged since 2026-10-02T22:58:54Z, and this run positively identified that connection as `main`
+(`ep-old-mode-b7jl3rd0` / `br-tiny-star-b7b8d3bh` / `delicate-resonance-93129287` / `neondb`).
+
+| Audit   | UTC                 | Command          | Effect                                                                                                            |
+| ------- | ------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 389     | 2026-10-05 21:45:24 | `auth.signIn`    | sign-in                                                                                                           |
+| 390–394 | 2026-10-05 22:00:04 | `project.create` | PROJECT-DREAM `f4b55a20…`: client `453b593a…`, project, value_case `7f52385a…`, key_date `9ad390fb…`, `5623e529…` |
+| 395     | 2026-10-05 22:14:26 | `auth.signIn`    | sign-in (after the fresh-R2 STOP; permitted, not factual)                                                         |
+
+All by **Rhys Davies**. No v1 factual row modified or deleted; the 5 rows are the only factual additions, all owned by
+PROJECT-DREAM (the client row as the project's own client) and each traced to its `project.create` INSERT; no report
+issued or changed (3 / 3, PDFs match); schema exactly 0020, 33 relations; 0020 / 21; DEMO-TRAJ and DEMO-TRAJ2 and the
+four open draft reviews unchanged (part of the unchanged v1 rows); no owner / `vo_app` sessions.
+
+### Baseline v2 — `release-check.py capture --source`: PASS
+
+`~/.cardaxia-4d9m/4d10-pre-release-baseline-v2.json`, sha256 `d820c9e5db284b67…`, captured **2026-10-05T22:38:43Z**
+from release checkout `87d7ff2`: version 2, accepted by "PMO (4D.10R2C): PROJECT-DREAM accepted as synthetic test
+activity"; source v1 recorded by sha256; target identity recorded; PostgreSQL 18.6; 0020 / 21; schema sha256
+`ce2e31ed…`; 33 tables, **662 rows, 256 factual** (v1 + 5), audit max **395**; 3 issued reports with matching PDFs;
+projects BOTOX, CUSTOMER-TRANSFORMATION-, DEMO-TRAJ `90276823…`, DEMO-TRAJ2 `8f635bdf…`, E-004, PROJECT-DREAM
+`f4b55a20…`, SALES-INITIATIVE; the four open draft reviews (BOTOX #1, DEMO-TRAJ #4, DEMO-TRAJ2 #4, SALES-INITIATIVE #1)
+with their row hashes. Delta from v1: client +1, project +1, value_case +1, key_date +2 (+ app_session +2, audit +7).
+
+### Baseline hierarchy (all preserved, none rewritten)
+
+| Reference                                   | File (`~/.cardaxia-4d9m`)                                        | State                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------- |
+| 4D.9N freeze                                | `n1c-freeze.json` (`3032df3a…`)                                  | historical, unchanged                                     |
+| 4D.10 pre-release baseline v1               | `4d10-pre-release-baseline.json` (`f5f96f76…`)                   | historical, unchanged (audit 388)                         |
+| 4D.10 pre-release baseline **v2** (current) | `4d10-pre-release-baseline-v2.json` (`d820c9e5…`)                | current: `pre` compares with it (default)                 |
+| R2 PRE-FAIL candidate                       | `4d10-release-baseline.UNACCEPTED-pre-FAIL-…T0903Z.json`         | evidence; refused by `post`                               |
+| Aborted R2 release baseline                 | `4d10-release-baseline.ABORTED-R2-2026-10-05.json` (`658a1760…`) | evidence; unreadable (000), refused by `post`             |
+| Fresh-R2 PRE-FAIL diagnostic                | `4d10-release-baseline.json.FAILED-2026-10-05T221129Z.json`      | evidence; refused by `post` and as a source               |
+| Release baseline for the next R2            | `4d10-release-baseline.json`                                     | **does not exist** — only a fresh full-PASS PRE writes it |
+
+### Release freeze — re-established
+
+In force from the v2 capture, **2026-10-05T22:38:43Z**, until R4 completes: **no factual application writes** on any
+project (PROJECT-DREAM, DEMO-TRAJ, DEMO-TRAJ2 or any other; no project creation or edits, Assurance, Information
+Requests, Evidence, recommendations, decisions, Value Changes or reports). Permitted: sign-in, read-only release
+checks, approved read-only smoke, the migration, deployment. Any factual write after audit 395 makes the fresh R2 PRE
+fail → STOP.
+
+### Status after R2C
+
+| Item                      | Status                                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------ |
+| Production                | 0020 / 21; factually = baseline v2; application `b7d0c46` (`dpl_6PUB…`)              |
+| Recovery branch           | none created in the fresh attempt; next: `pre-4d10-release-r2-<UTC date>` after PRE  |
+| Security B4               | **NOT COMPLETE for production**                                                      |
+| Migration / push / deploy | none                                                                                 |
+| Tooling                   | `reconcile` / `capture --source` (baseline-to-baseline); envelopes record the target |
+| Next                      | completely fresh R2 from step 1 against baseline v2                                  |

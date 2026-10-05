@@ -13,9 +13,13 @@ and one derived artefact:
 Modes
   schema     (local only) write the schema fingerprint of a freshly migrated database (schema-0020/0026.txt)
   snapshot   (local only) save a bare factual snapshot — rehearsal fixtures only
-  reconcile  trace every factual change since the 4D.9N freeze (attribution, commands, reports); writes nothing
-  capture    PMO-authorised: reconcile + head/schema/role checks; on PASS only, atomically writes the 4D.10 pre-release
-             baseline (refuses to replace an existing one without --replace)
+  reconcile  trace every factual change since the 4D.9N freeze (attribution, commands, reports); writes nothing.
+             With --source FILE --source-sha256 HEX (R2C): since an explicitly selected ACCEPTED 4D.10 pre-release
+             baseline instead — pinned by its sha256, strictly loaded (kind, accepted, 0020 state, hashes, schema) and
+             proved to come from this production target
+  capture    PMO-authorised: reconcile + head/schema/role checks; on PASS only, atomically writes a 4D.10 pre-release
+             baseline to --reference (refuses to replace an existing one without --replace). From a --source baseline
+             it writes a SUCCESSOR (version source+1, linked to the source by sha256); the source is never modified
   pre        production must be EXACTLY the accepted pre-release state: head 0020, accepted 0020 schema, factual rows
              identical to the 4D.10 pre-release baseline (sign-in activity aside). Only after every check PASSES is the
              release baseline published (atomic rename). A failed run never creates or replaces it; it leaves only a
@@ -63,9 +67,12 @@ ap.add_argument("--local", help="localhost database URL (rehearsal validation on
 ap.add_argument("--local-target", help="--local only: target file the localhost database must match")
 ap.add_argument("--endpoint", help="evidence only: Neon endpoint ID (ep-…) of the non-production branch to inspect")
 ap.add_argument("--freeze", default=f"{TOOLS}/n1c-freeze.json", help="historical 4D.9N freeze (reconcile / capture)")
-ap.add_argument("--reference", default=f"{TOOLS}/4d10-pre-release-baseline.json", help="4D.10 pre-release baseline (capture writes, pre reads)")
+ap.add_argument("--reference", default=f"{TOOLS}/4d10-pre-release-baseline-v2.json", help="current 4D.10 pre-release baseline (capture writes, pre reads); v2 since R2C")
 ap.add_argument("--baseline", default=f"{TOOLS}/4d10-release-baseline.json", help="release baseline (pre publishes, post reads)")
 ap.add_argument("--replace", action="store_true", help="allow capture/pre to replace an existing accepted file (after its own PASS)")
+ap.add_argument("--source", help="reconcile / capture: an accepted 4D.10 pre-release baseline to reconcile from (instead of the 4D.9N freeze)")
+ap.add_argument("--source-sha256", help="required with --source: the PMO-accepted sha256 of that file")
+ap.add_argument("--accepted-by", help="capture --source: the PMO acceptance marker recorded in the successor")
 ap.add_argument("--project", default="DEMO-TRAJ2", help="reconcile: the only project allowed to have factual additions")
 ap.add_argument("--actor", default="Rhys Davies", help="reconcile: the only actor allowed for those additions")
 ap.add_argument("--out", help="output file (schema / snapshot modes)")
@@ -73,6 +80,10 @@ args = ap.parse_args()
 
 SECRETS, fails = [], []
 if args.local_target and not args.local: print("STOP: --local-target applies only with --local"); sys.exit(1)
+if bool(args.source) != bool(args.source_sha256) or (args.source and args.mode not in ("reconcile", "capture")):
+    print("STOP: --source and --source-sha256 go together, for reconcile / capture only"); sys.exit(1)
+if args.source and args.mode == "capture" and (not args.accepted_by or os.path.realpath(args.source) == os.path.realpath(args.reference)):
+    print("STOP: capture --source needs --accepted-by and a --reference other than the source (the source is never overwritten)"); sys.exit(1)
 if (args.mode == "evidence") != bool(args.endpoint) or (args.endpoint and args.local):
     print("STOP: evidence mode needs --endpoint (production project only), and --endpoint applies only to evidence"); sys.exit(1)
 if args.endpoint and not re.fullmatch(r"ep-[a-z]+-[a-z]+-[a-z0-9]+", args.endpoint): print("STOP: --endpoint is not a Neon endpoint ID"); sys.exit(1)
@@ -291,8 +302,14 @@ SCHEMA_0020_SHA = schema_sha(expected_lines(f"{HERE}/schema-0020.txt"))
 
 def repo_head(): return subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO, capture_output=True, text=True).stdout.strip()
 
+def target_record():
+    """The identity this run proved (production target or --local-target), recorded in every new envelope (R2C)."""
+    if TARGET is None: return None
+    return {"name": TARGET["name"], "branch_name": TARGET["branch_name"], "host": TARGET["host"], "port": TARGET["port"],
+            "database": TARGET["database"], "settings": TARGET["settings"]}
+
 def envelope(kind, s, extra):
-    return {"kind": kind, "accepted": True, "captured_at": utc_now(), "repo_head": repo_head(),
+    return {"kind": kind, "target": target_record(), "accepted": True, "captured_at": utc_now(), "repo_head": repo_head(),
             "server_version": q("select current_setting('server_version')"), "role": R,
             "migration_rows": len(s["migrations"]), "migration_head_tag": PRE_TAG, "schema_0020_sha256": SCHEMA_0020_SHA,
             "factual_rows": sum(v["count"] for k, v in s["tables"].items() if k not in AUTH and k != "audit_event"),
@@ -326,18 +343,55 @@ def load_accepted(path, kind, local):
     return env
 
 
+def file_sha(path): return hashlib.sha256(open(path, "rb").read()).hexdigest()
+
+def check_envelope_target(env, path):
+    """An envelope that records its target must name exactly the target this run proved (R2C)."""
+    if env.get("target") is not None and env["target"] != target_record():
+        say(f"STOP: {os.path.basename(path)} refused — captured from a different target ({(env['target'] or {}).get('settings')})"); sys.exit(1)
+
+def load_source(local):
+    """--source: an explicitly selected accepted 4D.10 pre-release baseline; anything unproved is a STOP."""
+    def refuse(why): say(f"STOP: source {os.path.basename(args.source)} refused — {why}"); sys.exit(1)
+    if not os.path.exists(args.source): refuse("missing")
+    try: got = file_sha(args.source)
+    except OSError: refuse("unreadable")
+    if got != args.source_sha256.lower(): refuse(f"sha256 {got[:16]}… is not the accepted {args.source_sha256[:16]}…")
+    env = load_accepted(args.source, REF_KIND, local)  # kind, accepted, snapshot shape, 0020 state, hashes, schema
+    if env.get("target") is not None:
+        if TARGET is None: refuse("it records a target but this run proved none (--local-target)")
+        check_envelope_target(env, args.source)
+        say(f"  info  source target identity = this run's target ({env['target']['settings']})")
+    elif args.local:
+        if TARGET is not None: refuse("legacy source (no recorded target) cannot be proved against --local-target")
+        say("  info  local rehearsal: legacy source without a recorded target accepted (no target identity in play)")
+    else:
+        # Legacy (pre-R2B) baseline: proved through the connection that captured it. The Keychain item that defines the
+        # production connection must not have changed since the capture; this run proved that connection IS the target.
+        kc = subprocess.run(["security", "find-generic-password", "-s", "value-office-prod-vo_runtime"], capture_output=True, text=True).stdout
+        m = re.search(r'"mdat"<timedate>=\S+\s+"(\d{14})Z', kc)
+        mdat = datetime.datetime.strptime(m.group(1), "%Y%m%d%H%M%S").strftime("%Y-%m-%dT%H:%M:%SZ") if m else None
+        if not mdat or not mdat < env["captured_at"]: refuse(f"legacy source; the production connection item changed at {mdat or 'unknown'}, not before the capture {env['captured_at']}")
+        say(f"  info  legacy source (no recorded target): captured {env['captured_at']} through the production Keychain connection, unchanged since {mdat}, which this run positively identified as the target")
+    if env["audit_max"] > int(q("select coalesce(max(id),0) from audit_event")): refuse("its audit max is beyond production's (not an earlier state)")
+    say(f"  info  reconciliation source: {os.path.basename(args.source)} (sha256 {got[:16]}…, version {env.get('version', 1)}, captured {env['captured_at']}, audit max {env['audit_max']})")
+    return env, got
+
+
 # ---------------------------------------------------------------------------------------------------------------
 # Reconciliation of changes since the 4D.9N freeze (R2A): every factual addition on one project, by one actor, through
 # application commands; no frozen row changed or deleted; no report issued or changed.
 
-def reconcile(f, s):
+def reconcile(f, s, since="the freeze"):
     lost, added = diff_rows(f, s)
     lost_f = {t: n for t, n in lost.items() if t not in AUTH}
-    check(f"no frozen factual row modified or deleted (changed/removed: {lost_f or 'none'})", not lost_f)
+    check(f"no factual row of {since} modified or deleted (changed/removed: {lost_f or 'none'})", not lost_f)
     proj = pid(s, args.project)
     check(f"project {args.project} exists ({(proj or 'missing')[:8]}…)", proj is not None)
     fact = {t: v for t, v in added.items() if t not in AUTH and t != "audit_event"}
-    foreign = {t: sum(1 for r in v if r[2] != proj) for t, v in fact.items()}
+    # A client row has no project_id: it belongs to the project only if it is that project's own client (R2C).
+    own_client = q(f"select coalesce(client_id::text,'') from project where id='{proj}'") if proj else ""
+    foreign = {t: sum(1 for r in v if r[2] != proj and not (t == "client" and r[1] == own_client)) for t, v in fact.items()}
     foreign = {t: n for t, n in foreign.items() if n}
     check(f"every factual addition belongs to {args.project} (other projects / unowned: {foreign or 'none'})", not foreign)
     check(f"no report issued or changed (report_issue {s['tables']['report_issue']['count']} vs {f['tables']['report_issue']['count']}, report_document {s['tables']['report_document']['count']} vs {f['tables']['report_document']['count']}; inventory identical)",
@@ -345,20 +399,20 @@ def reconcile(f, s):
     audit = [l.split("|") for l in q(f"select a.table_name, a.action, coalesce(a.row_id::text,''), coalesce(a.command,''), coalesce(u.display_name,''), to_char(a.occurred_at at time zone 'UTC','YYYY-MM-DD HH24:MI:SS') from audit_event a left join app_user u on u.id=a.actor_user_id where a.id > {f['audit_max']} order by a.id").splitlines() if l]
     inserted = {(a[0], a[2]) for a in audit if a[1] == "INSERT"}
     untraced = [f"{t}:{r[1][:8]}" for t, v in fact.items() for r in v if (t, r[1]) not in inserted]
-    check(f"every factual addition traces to an INSERT by an application command since the freeze (untraced: {untraced or 'none'})", not untraced)
+    check(f"every factual addition traces to an INSERT by an application command since {since} (untraced: {untraced or 'none'})", not untraced)
     bad_cmd = [f"{a[0]}/{a[1]}" for a in audit if not a[3]]
-    check(f"every audit row since the freeze names its command (missing: {bad_cmd or 'none'})", not bad_cmd)
+    check(f"every audit row since {since} names its command (missing: {bad_cmd or 'none'})", not bad_cmd)
     actors = sorted({a[4] for a in audit})
-    check(f"every audit row since the freeze is by {args.actor} (actors: {actors or 'none'})", actors in ([], [args.actor]))
+    check(f"every audit row since {since} is by {args.actor} (actors: {actors or 'none'})", actors in ([], [args.actor]))
     touched = [f"{a[0]}/{a[1]}:{a[2][:8]}" for a in audit if a[0] not in AUTH and (a[0], a[2]) not in inserted]
-    check(f"every factual UPDATE/DELETE since the freeze touches only rows created since the freeze (frozen rows touched: {touched or 'none'})", not touched)
-    say(f"  info  {len(audit)} audit rows since the freeze (audit id > {f['audit_max']}), {audit[0][5] if audit else '-'}Z → {audit[-1][5] if audit else '-'}Z")
+    check(f"every factual UPDATE/DELETE since {since} touches only rows created since {since} (earlier rows touched: {touched or 'none'})", not touched)
+    say(f"  info  {len(audit)} audit rows since {since} (audit id > {f['audit_max']}), {audit[0][5] if audit else '-'}Z → {audit[-1][5] if audit else '-'}Z")
     for t, v in sorted(fact.items()):
         for r in v:
             cmds = [a[3] for a in audit if a[0] == t and a[2] == r[1]]
             say(f"  info  + {t} {r[1][:8]}… ({args.project}): {', '.join(cmds)}")
     gone = sorted({f"{a[0]}:{a[2][:8]}" for a in audit if a[1] == "DELETE" and a[0] not in AUTH})
-    if gone: say(f"  info  rows created then deleted since the freeze (application-managed): {', '.join(gone)}")
+    if gone: say(f"  info  rows created then deleted since {since} (application-managed): {', '.join(gone)}")
     auth = {t: f"-{lost.get(t, 0)}/+{len(added.get(t, []))}" for t in AUTH if lost.get(t) or added.get(t)}
     say(f"  info  sign-in/session activity (not factual): {auth or 'none'}")
     return fact
@@ -385,7 +439,14 @@ if mode in ("reconcile", "capture"):
     s = snapshot(); local = common(s)
     check(f"production migration head 0020: {len(s['migrations'])} rows, hashes = repository 0000–0020", s["migrations"] == local[:PRE_HEAD])
     schema_check(f"{HERE}/schema-0020.txt", "schema exactly the accepted 0020 schema (incl. vo_runtime grants)")
-    if not os.path.exists(args.freeze): check(f"historical 4D.9N freeze available ({os.path.basename(args.freeze)})", False); fact = {}
+    src = None
+    if args.source:
+        src, src_sha = load_source(local)
+        f, since = src["snapshot"], f"source baseline v{src.get('version', 1)}"
+        relations_check(f["cols"], f"relations of the {since}")
+        check(f"migration rows identical to the {since}", s["migrations"] == f["migrations"])
+        fact = reconcile(f, s, since)
+    elif not os.path.exists(args.freeze): check(f"historical 4D.9N freeze available ({os.path.basename(args.freeze)})", False); fact = {}
     else:
         f = json.load(open(args.freeze))
         relations_check(f["cols"], "relations of the 4D.9N freeze")
@@ -394,16 +455,25 @@ if mode in ("reconcile", "capture"):
     if mode == "capture":
         if fails:
             say("\n  info  capture FAILED: no pre-release baseline written")
+        elif src:
+            drafts = [x for x in q("select string_agg(id::text, ',' order by id) from assurance_review where status='draft'").split(",") if x]
+            md5 = {r[1]: r[0] for r in s["rows"]["assurance_review"]}
+            env = envelope(REF_KIND, s, {"version": src.get("version", 1) + 1, "accepted_by": args.accepted_by,
+                                         "source": {"file": os.path.basename(args.source), "sha256": src_sha, "kind": src["kind"], "version": src.get("version", 1),
+                                                    "captured_at": src["captured_at"], "audit_max": src["audit_max"], "factual_rows": src["factual_rows"]},
+                                         "source_additions": {t: [r[1] for r in v] for t, v in fact.items()}, "reconciled_project": f"{args.project}={pid(s, args.project)}",
+                                         "open_draft_reviews": [f"{d}={md5.get(d)}" for d in drafts]})
         else:
             env = envelope(REF_KIND, s, {"freeze_audit_max": f["audit_max"], "post_freeze_additions": {t: len(v) for t, v in fact.items()},
                                          "accepted_by": "PMO (4D.10R2A)"})
+        if not fails:
             atomic_write(args.reference, env)
-            say(f"\n4D.10 pre-release production baseline written ({os.path.basename(args.reference)}): captured {env['captured_at']}, {env['factual_rows']} factual rows, audit max {env['audit_max']}")
+            say(f"\n4D.10 pre-release production baseline{' v' + str(env['version']) if 'version' in env else ''} written ({os.path.basename(args.reference)}): captured {env['captured_at']}, {env['factual_rows']} factual rows, audit max {env['audit_max']}")
 elif mode == "pre":
     if os.path.exists(args.baseline) and not args.replace:
         say(f"STOP: {os.path.basename(args.baseline)} already exists; it is replaced only with --replace (after this run PASSES)"); sys.exit(1)
     s = snapshot(); local = common(s)
-    ref = load_accepted(args.reference, REF_KIND, local)
+    ref = load_accepted(args.reference, REF_KIND, local); check_envelope_target(ref, args.reference)
     check(f"production migration head 0020: {len(s['migrations'])} rows, hashes = repository 0000–0020", s["migrations"] == local[:PRE_HEAD])
     schema_check(f"{HERE}/schema-0020.txt", "schema exactly the accepted 0020 schema (incl. vo_runtime grants)")
     relations_check(ref["snapshot"]["cols"], "relations of the 4D.10 pre-release baseline")
@@ -413,7 +483,8 @@ elif mode == "pre":
         write_failed(args.baseline, REL_KIND, s, fails)
         say("  info  release baseline NOT published")
     else:
-        env = envelope(REL_KIND, s, {"reference_captured_at": ref["captured_at"]})
+        env = envelope(REL_KIND, s, {"reference_captured_at": ref["captured_at"], "reference_version": ref.get("version", 1),
+                                     "reference_sha256": file_sha(args.reference)})
         atomic_write(args.baseline, env)
         say(f"\nrelease baseline published ({os.path.basename(args.baseline)}): {len(s['tables'])} tables, {sum(v['count'] for v in s['tables'].values())} rows, audit max id {s['audit_max']}")
 else:  # post, evidence
@@ -422,6 +493,7 @@ else:  # post, evidence
     b_env = load_accepted(args.baseline, REL_KIND, local_hashes)
     b = b_env["snapshot"]
     s = snapshot(column_sets=b["cols"]); local = common(s)
+    if mode == "post": check_envelope_target(b_env, args.baseline)
     check(f"production migration head 0026: {len(s['migrations'])} rows, hashes = repository 0000–0026", s["migrations"] == local[:POST_HEAD])
     check("the first 21 migration rows are the baseline's (0000–0020 untouched)", s["migrations"][:PRE_HEAD] == b["migrations"])
     say("  info  new migration hashes: " + ", ".join(h[:16] for h in s["migrations"][PRE_HEAD:]))
