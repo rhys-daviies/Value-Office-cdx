@@ -146,7 +146,7 @@ export default async function VersionPage({ params }: PageProps<"/projects/[proj
           <KeyValues
             items={[
               ["Version", isV0 ? "Original Business Case" : `V${version.versionNumber}`],
-              ["Kind", isV0 ? "Inherited starting point (recorded, never authorised)" : "Value Case"],
+              ["Kind", isV0 ? "Original Business Case (recorded starting point, never authorised)" : "Value Case"],
               [
                 "Status",
                 <VersionBadge

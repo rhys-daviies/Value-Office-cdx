@@ -95,7 +95,11 @@ describe("Value Change determination", () => {
     const r = await getReviewResponse(x.project.id, x.review.id);
     expect(r.determination).toMatchObject({ determination: "no_value_change_required", actorName: expect.any(String) });
     g = await governance(x.project.id);
-    expect(g).toMatchObject({ latestDecision: { stage: "no_value_change" }, nextAction: null });
+    // Nothing governed remains for this decision; the only prompt is the (unsatisfied) Kick-off cadence (4D.10I).
+    expect(g).toMatchObject({
+      latestDecision: { stage: "no_value_change" },
+      nextAction: { label: "Open the kick-off review" },
+    });
 
     // Assurance continues against the existing authorised case.
     const next = await createReview(x.actor, { projectId: x.project.id, trigger: "ad_hoc", reviewDate: today });
@@ -183,7 +187,11 @@ describe("Value Change determination", () => {
     expect(summary.authorised).toMatchObject({ versionNumber: 2 });
     expect(summary.authorisedTotal).toBe("1400000.00");
     g = await governance(x.project.id);
-    expect(g).toMatchObject({ latestDecision: { stage: "change_authorised" }, openChange: null, nextAction: null });
+    expect(g).toMatchObject({
+      latestDecision: { stage: "change_authorised" },
+      openChange: null,
+      nextAction: { label: "Open the kick-off review" },
+    });
     const next = await createReview(x.actor, { projectId: x.project.id, trigger: "ad_hoc", reviewDate: today });
     expect(next.againstVersionId).toBe(summary.authorised!.id); // Assurance now references V2
   });

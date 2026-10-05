@@ -11,6 +11,8 @@ import {
 } from "@/domain/value-case-impact";
 import { db, schema } from "@/server/db/client";
 
+import { getNextAssuranceRequirement } from "./assurance";
+
 // Phase 4D.10H: what is happening in governance after authorisation — the draft review and its recommendation, the
 // most recent management decision and its Value Case impact, any open Value Change — and the one next governed
 // action. Stored facts only; nothing is inferred from dates or amounts.
@@ -30,6 +32,7 @@ export type GovernanceState = {
 };
 
 export async function getGovernanceState(projectId: string): Promise<GovernanceState> {
+  const cadence = await getNextAssuranceRequirement(projectId);
   const reviews = await db()
     .select({
       id: schema.assuranceReview.id,
@@ -99,6 +102,7 @@ export async function getGovernanceState(projectId: string): Promise<GovernanceS
     proposedNotPrepared: at("proposed_not_prepared"),
     draftReview: draft ? { id: draft.id, sequence: draft.sequence, recommendation: stateOf(draft.id) } : null,
     awaitingDecision: awaiting ? { reviewId: awaiting.id, sequence: awaiting.sequence } : null,
+    dueRequirement: cadence.next?.status === "due" ? { label: cadence.next.label } : null,
   };
   return {
     draftReview: facts.draftReview,

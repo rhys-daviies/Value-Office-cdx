@@ -43,6 +43,12 @@ describe("post-authorisation next action", () => {
   });
 
   it("nothing pending → none", () => expect(next({})).toBeNull());
+  it("a due review requirement with no review open → open it (4D.10I)", () => {
+    expect(next({ dueRequirement: { label: "Kick-off review" } })).toBe("Open the kick-off review");
+    expect(next({ dueRequirement: { label: "Kick-off review" }, ...draft(null) })).toBe(
+      "Continue draft Assurance Review #2",
+    );
+  });
   it("draft review states", () => {
     expect(next(draft(null))).toBe("Continue draft Assurance Review #2");
     expect(next(draft("draft"))).toBe("Continue draft Assurance Review #2");

@@ -49,7 +49,8 @@ test("decision → No Value Change Required → Authorised Value unchanged; Over
   await tab(page, "Overview").click();
   await expect(page.getByTestId("overview-authorised-value")).toHaveText("$1.5m");
   await expect(gov.getByTestId("gov-impact")).toHaveText("No Value Change Required");
-  await expect(page.getByTestId("overview-next-action-none")).toBeVisible();
+  // Nothing governed is pending for the decision; the Kick-off review (never held) is the next action (4D.10I).
+  await expect(page.getByTestId("overview-next-action")).toContainText("Open the kick-off review");
 
   // Cadence: an Ad hoc draft while Kick-off is due is called out; a matching draft reads In progress.
   await tab(page, "Assurance").click();

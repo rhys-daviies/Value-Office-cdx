@@ -48,6 +48,8 @@ export type GovernanceFacts = {
   draftReview: { id: string; sequence: number; recommendation: RecommendationState | null } | null;
   /** Latest review with an issued recommendation and no decision. */
   awaitingDecision: { reviewId: string; sequence: number } | null;
+  /** 4D.10I: the next derived Assurance requirement when it is due (existing cadence read model). */
+  dueRequirement?: { label: string } | null;
 };
 
 /**
@@ -94,6 +96,10 @@ export function postAuthorisationNextAction(f: GovernanceFacts, base: string): N
       label: `Record the management decision (Review #${f.awaitingDecision.sequence})`,
       href: `${base}/assurance/${f.awaitingDecision.reviewId}#decision`,
     };
+  }
+  if (!f.draftReview && f.dueRequirement) {
+    // 4D.10I: never "no action pending" while the cadence shows a review is due and none is open.
+    return { label: `Open the ${f.dueRequirement.label.toLowerCase()}`, href: `${base}/assurance#formal` };
   }
   if (f.draftReview) {
     return {
