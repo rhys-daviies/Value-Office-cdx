@@ -1,11 +1,12 @@
 import { and, eq } from "drizzle-orm";
 
+import { issueAfterInternalReview } from "./recommendation";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { createEmergingDriver } from "@/server/commands/drivers";
 import { recordEvidence } from "@/server/commands/evidence";
 import { documentMatterEvidence, requestMatterEvidence } from "@/server/commands/matter-evidence";
 import { assessMatterWorking, createMatter, setMatterRemediation, setMatterStage } from "@/server/commands/matters";
-import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { createProject } from "@/server/commands/project";
 import { setForecastPoint, setScenarioPoint } from "@/server/commands/trajectory";
 import type { Actor } from "@/server/commands/run";
@@ -118,7 +119,7 @@ export async function seedCompactDecided(actor: Actor, opts: { code: string; nam
     totalValue: "1700000.00",
   });
   await saveRecommendation(actor, { reviewId: review.id, scenarioId: pursue.id, narrative: "Pursue it" });
-  await issueRecommendation(actor, { reviewId: review.id });
+  await issueAfterInternalReview(actor, { reviewId: review.id });
   await finaliseReview(actor, { reviewId: review.id });
   await recordDecision(actor, {
     reviewId: review.id,
@@ -301,7 +302,7 @@ export async function seedCompactEvolution(actor: Actor, opts: { code: string; n
       });
       scenarioId = rebase.id;
       await saveRecommendation(actor, { reviewId, scenarioId: rebase.id, narrative: "Rebase the commitment" });
-      await issueRecommendation(actor, { reviewId });
+      await issueAfterInternalReview(actor, { reviewId });
     },
   );
   const decision = await recordDecision(actor, {
@@ -417,7 +418,7 @@ export async function seedCompactDecision(actor: Actor, opts: { code: string; na
     scenarioId: accelerate.id,
     narrative: "Bring the second supplier on now",
   });
-  await issueRecommendation(actor, { reviewId: review.id });
+  await issueAfterInternalReview(actor, { reviewId: review.id });
   await finaliseReview(actor, { reviewId: review.id });
   const decision = await recordDecision(actor, {
     reviewId: review.id,

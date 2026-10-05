@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 
+import { issueAfterInternalReview } from "./recommendation";
 import { createReview, finaliseReview, updateReview, upsertValuePositions } from "@/server/commands/assurance";
 import { createLeakage } from "@/server/commands/leakage";
-import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { createValueChange, proposeValueChange } from "@/server/commands/value-change";
 import { createClient, createProject, setProjectValueBasis } from "@/server/commands/project";
 import { recordEvidence } from "@/server/commands/evidence";
@@ -273,7 +274,7 @@ export async function seedHorizon(
     scenarioId: recommended.id,
     narrative: `${PLACEHOLDER} Cardaxia recommendation narrative not specified.`,
   });
-  await issueRecommendation(actor, { reviewId: draftReview.id });
+  await issueAfterInternalReview(actor, { reviewId: draftReview.id });
   const review = await finaliseReview(actor, { reviewId: draftReview.id });
 
   // Client decision (distinct from the recommendation, which is never rewritten).

@@ -498,6 +498,12 @@ export function OptionPathsSection({
           {a.recommendationIssued && !a.finalised && (
             <Notice tone="locked">Option paths are frozen: Cardaxia&apos;s recommendation has been issued.</Notice>
           )}
+          {a.recommendationInReview && !a.finalised && (
+            <Notice tone="locked">
+              Option paths are read-only while the recommendation is in Internal Cardaxia Review. Return it for revision
+              to change them.
+            </Notice>
+          )}
           <div className="mt-3 space-y-4">
             {a.options.map((o) => (
               <div key={o.scenarioId} className="rounded border border-slate-200 p-3" data-testid="option-path">

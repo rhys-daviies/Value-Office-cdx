@@ -3,10 +3,13 @@
 import { SCENARIO_KINDS, type ScenarioKind } from "@/domain/statuses";
 import { assessLeakage, createLeakage, setLeakageDrivers, updateLeakage } from "@/server/commands/leakage";
 import {
+  approveRecommendation,
   issueRecommendation,
   recordDecision,
   removeScenario,
+  returnRecommendation,
   saveRecommendation,
+  submitRecommendation,
   upsertScenario,
 } from "@/server/commands/options";
 
@@ -105,10 +108,33 @@ export async function saveRecommendationAction(_prev: ActionState, fd: FormData)
   });
 }
 
+// --- Internal Cardaxia review (Phase 4D.10G) ------------------------------------------
+
+export async function submitRecommendationAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await submitRecommendation(actor, { reviewId: required(fd, "reviewId"), note: opt(fd, "note") });
+    return "Submitted for Internal Cardaxia Review — read-only until returned or issued";
+  });
+}
+
+export async function returnRecommendationAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await returnRecommendation(actor, { reviewId: required(fd, "reviewId"), feedback: required(fd, "feedback") });
+    return "Returned for revision — the recommendation and options are editable again";
+  });
+}
+
+export async function approveRecommendationAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
+  return perform(projectOf(fd), async (actor) => {
+    await approveRecommendation(actor, { reviewId: required(fd, "reviewId"), note: opt(fd, "note") });
+    return "Internal review complete — Ready to Issue";
+  });
+}
+
 export async function issueRecommendationAction(_prev: ActionState, fd: FormData): Promise<ActionState> {
   return perform(projectOf(fd), async (actor) => {
     await issueRecommendation(actor, { reviewId: required(fd, "reviewId") });
-    return "Recommendation issued — it and the options are now permanent";
+    return "Recommendation issued to management — it and the options are now permanent";
   });
 }
 

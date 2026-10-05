@@ -1,4 +1,5 @@
 import { todayIso } from "@/domain/attention";
+import { issueAfterInternalReview } from "@/fixtures/recommendation";
 import { eq } from "drizzle-orm";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -7,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { seedCompactTrajectory, seedCompactTrajectoryDraft } from "@/fixtures/compact";
 import { createReview, finaliseReview, updateReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
-import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { setPlanPoint, setScenarioPoint, setVersionBasis } from "@/server/commands/trajectory";
 import { authoriseInitialVersion, proposeVersion } from "@/server/commands/value-case";
 import { db, schema } from "@/server/db/client";
@@ -132,7 +133,7 @@ async function reviewWithOptions(
       scenarioId: scenarios[opts.recommend]!.id,
       narrative: "Recommended",
     });
-    await issueRecommendation(actor, { reviewId: review.id });
+    await issueAfterInternalReview(actor, { reviewId: review.id });
   }
   await finaliseReview(actor, { reviewId: review.id });
   if (opts.select !== undefined) {

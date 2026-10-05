@@ -352,6 +352,8 @@ export type ReviewTrajectoryAuthoring = {
     editable: boolean;
   };
   recommendationIssued: boolean;
+  /** Phase 4D.10G: in internal review or ready to issue — option paths read-only until returned. */
+  recommendationInReview: boolean;
   options: {
     scenarioId: string;
     label: string;
@@ -381,7 +383,10 @@ export async function getReviewTrajectoryAuthoring(
       .where(eq(schema.scenario.assuranceReviewId, r.id))
       .orderBy(asc(schema.scenario.sortOrder), asc(schema.scenario.createdAt)),
     db()
-      .select({ issuedAt: schema.recommendation.issuedAt })
+      .select({
+        issuedAt: schema.recommendation.issuedAt,
+        internalReviewStatus: schema.recommendation.internalReviewStatus,
+      })
       .from(schema.recommendation)
       .where(eq(schema.recommendation.assuranceReviewId, r.id)),
   ]);
@@ -395,6 +400,9 @@ export async function getReviewTrajectoryAuthoring(
   const measure = trajectoryMeasure(v!.valueBasisKind);
   const finalised = r.status === "finalised";
   const issued = Boolean(rec?.issuedAt);
+  // Phase 4D.10G: option paths are read-only (not frozen) while the recommendation is in internal review.
+  const inReview =
+    !issued && (rec?.internalReviewStatus === "in_internal_review" || rec?.internalReviewStatus === "ready_to_issue");
   const fp = forecastPoints.get(r.id) ?? [];
   // Status of the governing version's setup (phasing here means this review's forecast milestones).
   const status = trajectoryStatus(v!, fp.length);
@@ -416,6 +424,7 @@ export async function getReviewTrajectoryAuthoring(
       editable: !finalised,
     },
     recommendationIssued: issued,
+    recommendationInReview: inReview,
     options: options.map((o) => {
       const points = optionPoints.get(o.id) ?? [];
       return {
@@ -424,7 +433,7 @@ export async function getReviewTrajectoryAuthoring(
         totalValue: o.totalValue,
         points,
         reconciliation: measure ? terminalReconciliation(points, v!.valuePeriodEnd, o.totalValue) : null,
-        editable: !finalised && !issued,
+        editable: !finalised && !issued && !inReview,
       };
     }),
   };

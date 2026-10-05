@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import type { AssuranceStage, AssuranceTrigger, LeakageStatus } from "@/domain/statuses";
 import type { LeakageAmounts } from "@/domain/response";
+import type { RecommendationState } from "@/domain/recommendation";
 import { realisedPositionComplete } from "@/domain/trajectory";
 import { db, schema } from "@/server/db/client";
 
@@ -68,6 +69,8 @@ export type ReviewStory = {
   matters: StoryMatter[];
   recommendation: {
     issued: boolean;
+    /** Phase 4D.10G lifecycle state (draft / in internal review / returned / ready to issue / issued). */
+    state: RecommendationState;
     label: string;
     totalValue: string;
     milestones: number;
@@ -200,6 +203,7 @@ export async function getReviewStory(projectId: string, reviewId: string): Promi
       rec && rec.scenario
         ? {
             issued: rec.issuedAt !== null,
+            state: rec.state,
             label: rec.scenario.label,
             totalValue: rec.scenario.totalValue,
             milestones: milestones(rec.scenario.id),

@@ -30,6 +30,7 @@ try {
     ["DRIVERS", "Drivers Compact"],
     ["OFFICE", "Office Compact"],
     ["WORKSPACE", "Workspace Compact"],
+    ["RECOMMEND", "Recommendation Compact"],
     ["EVOLVE", "Evolution Compact"],
     ["DECIDE", "Decision Compact"],
     ["TRAJ", "Trajectory Compact"],

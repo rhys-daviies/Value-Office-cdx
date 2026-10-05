@@ -1,4 +1,5 @@
 import { and, eq } from "drizzle-orm";
+import { issueAfterInternalReview } from "@/fixtures/recommendation";
 import { describe, expect, it } from "vitest";
 
 import { clientElectedDifference, leakageAmounts } from "@/domain/response";
@@ -8,7 +9,7 @@ import { createReview, finaliseReview, updateReview, upsertValuePositions } from
 import { recordEvidence } from "@/server/commands/evidence";
 import { assessLeakage, createLeakage, setLeakageDrivers, updateLeakage } from "@/server/commands/leakage";
 import { COMMANDS } from "@/server/commands/names";
-import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import type { Actor } from "@/server/commands/run";
 import { addStakeholder } from "@/server/commands/stakeholders";
 import { updateDriverVersion } from "@/server/commands/value-case";
@@ -94,7 +95,7 @@ async function reviewWithOptions(ctx: Ctx) {
     totalValue: "1400000.00",
   });
   await saveRecommendation(ctx.actor, { reviewId: review.id, scenarioId: recommended.id, narrative: "Act now" });
-  await issueRecommendation(ctx.actor, { reviewId: review.id });
+  await issueAfterInternalReview(ctx.actor, { reviewId: review.id });
   const finalised = await finaliseReview(ctx.actor, { reviewId: review.id });
   return { review: finalised, current, recommended, delay };
 }
@@ -441,7 +442,7 @@ describe("options, recommendation and decision", () => {
       totalValue: "1.00",
     });
     await saveRecommendation(ctx.actor, { reviewId: review.id, scenarioId: rec.id, narrative: "n" });
-    await issueRecommendation(ctx.actor, { reviewId: review.id });
+    await issueAfterInternalReview(ctx.actor, { reviewId: review.id });
     await expectDomainError(
       upsertScenario(ctx.actor, {
         reviewId: review.id,
@@ -489,7 +490,7 @@ describe("options, recommendation and decision", () => {
       totalValue: "1.00",
     });
     await saveRecommendation(ctx.actor, { reviewId: second.id, scenarioId: rec2.id, narrative: "n" });
-    await issueRecommendation(ctx.actor, { reviewId: second.id });
+    await issueAfterInternalReview(ctx.actor, { reviewId: second.id });
     await expectDomainError(
       recordDecision(ctx.actor, {
         reviewId: second.id,

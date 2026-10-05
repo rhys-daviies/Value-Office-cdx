@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { DomainError } from "@/domain/errors";
+import { recommendationState, type RecommendationReviewStep, reviewStepAllowed } from "@/domain/recommendation";
+import type { Tx } from "@/server/db/client";
 import { SCENARIO_KINDS } from "@/domain/statuses";
 import { schema } from "@/server/db/client";
 
@@ -12,7 +14,8 @@ import { clearableText, isoDate, moneyString, nonBlank, optionalText, uuid } fro
 // Options / alternative trajectories, Cardaxia's recommendation and the client
 // decision. Scenario totals are entered by the consultant — nothing here derives
 // them (no cost-of-delay engine). The recommendation and the decision are
-// separate records; issuing freezes the recommendation and its options.
+// separate records; issuing freezes the recommendation and its options. Phase 4D.10G: an internal Cardaxia review
+// (submit → return / ready to issue) comes before issue.
 
 export const upsertScenario = defineCommand(
   COMMANDS.upsertScenario,
@@ -90,11 +93,94 @@ export const saveRecommendation = defineCommand(
   },
 );
 
-/** Issues the recommendation: it and the review's options become permanent. */
+// ---------------------------------------------------------------------------
+// Phase 4D.10G: internal Cardaxia review before issue. The reviewer is internal Cardaxia (never the client VCO); the
+// acting user of each step is recorded in recommendation_review_event and audit_event. Guarded again by
+// vo_recommendation_review_guard / vo_recommendation_review_event_guard.
+
+async function lockRecommendation(tx: Tx, reviewId: string) {
+  const [row] = await tx
+    .select()
+    .from(schema.recommendation)
+    .where(eq(schema.recommendation.assuranceReviewId, reviewId))
+    .for("update");
+  if (!row) throw new DomainError("VO_NOT_FOUND", "Draft the recommendation first");
+  return row;
+}
+
+const STEP_TARGET = {
+  submitted: "in_internal_review",
+  returned: "returned",
+  approved: "ready_to_issue",
+} as const;
+
+async function reviewStep(
+  tx: Tx,
+  actorId: string,
+  reviewId: string,
+  step: RecommendationReviewStep,
+  note: string | undefined,
+) {
+  const rec = await lockRecommendation(tx, reviewId);
+  const state = recommendationState(rec);
+  if (!reviewStepAllowed(state, step)) {
+    throw new DomainError(
+      "VO_INVALID_TRANSITION",
+      `The recommendation is ${state.replace(/_/g, " ")}; it cannot be ${step} now`,
+    );
+  }
+  await tx.insert(schema.recommendationReviewEvent).values({
+    recommendationId: rec.id,
+    assuranceReviewId: rec.assuranceReviewId,
+    projectId: rec.projectId,
+    kind: step,
+    note: note ?? null,
+    createdBy: actorId,
+  });
+  const [row] = await tx
+    .update(schema.recommendation)
+    .set({ internalReviewStatus: STEP_TARGET[step] })
+    .where(eq(schema.recommendation.id, rec.id))
+    .returning();
+  return row!;
+}
+
+/** "Cardaxia believes this recommendation is ready for internal quality review." Not issue; not client approval. */
+export const submitRecommendation = defineCommand(
+  COMMANDS.submitRecommendation,
+  z.object({ reviewId: uuid, note: optionalText }),
+  async ({ tx, actor }, input) => reviewStep(tx, actor.userId, input.reviewId, "submitted", input.note),
+);
+
+/** Internal reviewer returns the recommendation for revision; the feedback is kept permanently. */
+export const returnRecommendation = defineCommand(
+  COMMANDS.returnRecommendation,
+  z.object({ reviewId: uuid, feedback: nonBlank }),
+  async ({ tx, actor }, input) => reviewStep(tx, actor.userId, input.reviewId, "returned", input.feedback),
+);
+
+/** Internal review complete: Ready to Issue. Nothing is issued and no decision can yet be recorded. */
+export const approveRecommendation = defineCommand(
+  COMMANDS.approveRecommendation,
+  z.object({ reviewId: uuid, note: optionalText }),
+  async ({ tx, actor }, input) => reviewStep(tx, actor.userId, input.reviewId, "approved", input.note),
+);
+
+/** Issues the recommendation: it and the review's options become permanent. Internal review must be complete. */
 export const issueRecommendation = defineCommand(
   COMMANDS.issueRecommendation,
   z.object({ reviewId: uuid }),
   async ({ tx, actor }, input) => {
+    const [current] = await tx
+      .select()
+      .from(schema.recommendation)
+      .where(eq(schema.recommendation.assuranceReviewId, input.reviewId));
+    if (current && !current.issuedAt && current.internalReviewStatus !== "ready_to_issue") {
+      throw new DomainError(
+        "VO_INTERNAL_REVIEW_REQUIRED",
+        "Complete Internal Cardaxia Review (Ready to Issue) before issuing to management",
+      );
+    }
     const [row] = await tx
       .update(schema.recommendation)
       .set({ issuedAt: new Date(), issuedBy: actor.userId })

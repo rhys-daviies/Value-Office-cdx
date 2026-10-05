@@ -1,11 +1,15 @@
 import { SCENARIO_KINDS } from "@/domain/statuses";
+import { RECOMMENDATION_STATE_LABELS, recommendationEditable } from "@/domain/recommendation";
 import {
+  approveRecommendationAction,
   assessLeakageAction,
   createLeakageAction,
   issueRecommendationAction,
   recordDecisionAction,
   removeScenarioAction,
+  returnRecommendationAction,
   saveRecommendationAction,
+  submitRecommendationAction,
   updateLeakageAction,
   upsertScenarioAction,
 } from "@/server/actions/response";
@@ -58,7 +62,9 @@ type Base = {
 function state({ review, response }: Base) {
   const draft = review.status === "draft";
   const issued = Boolean(response.recommendation?.issuedAt);
-  return { draft, issued, optionsEditable: draft && !issued };
+  const recState = response.recommendation?.state ?? "draft";
+  // Phase 4D.10G: read-only (not frozen) while in internal review or ready to issue.
+  return { draft, issued, recState, optionsEditable: draft && recommendationEditable(recState) };
 }
 
 /** D. Risks / Value Leakage: the review's Assurance matters with their evidence and remediation (Phase 4D.10F). */
@@ -345,6 +351,12 @@ export function OptionsSection({
         description="Consultant-entered projected totals for each option. Differences are calculated; the values themselves are never derived."
       >
         {issued && <Notice tone="locked">Options are frozen: Cardaxia&apos;s recommendation has been issued.</Notice>}
+        {draft && !issued && !optionsEditable && (
+          <Notice tone="locked">
+            Options are read-only while the recommendation is in Internal Cardaxia Review. Return it for revision to
+            change them; they are frozen only when issued.
+          </Notice>
+        )}
         {scenarios.length === 0 ? (
           <Empty>No options recorded.</Empty>
         ) : (
@@ -450,17 +462,68 @@ export function OptionsSection({
   );
 }
 
-/** G. Cardaxia recommendation: draft → issue (unchanged lifecycle). */
+/**
+ * G. Cardaxia recommendation (Phase 4D.10G): draft → Internal Cardaxia Review → returned | ready to issue → issued to
+ * management. The reviewer is internal Cardaxia, not the client VCO. Issue remains the permanent freeze.
+ */
 export function RecommendationSection({ projectId, currency, review, response }: Base) {
   const { draft } = state({ projectId, currency, review, response });
-  const { scenarios, recommendation } = response;
+  const { scenarios, recommendation, decision } = response;
+  const recommended = scenarios.find((s) => s.kind === "recommended");
+  const st = recommendation?.state ?? "draft";
+  const lastReturn = recommendation?.history.filter((h) => h.kind === "returned").at(-1);
+  const hidden = (
+    <>
+      <Hidden name="projectId" value={projectId} />
+      <Hidden name="reviewId" value={review.id} />
+    </>
+  );
+  const readOnly = recommendation && (
+    <div className="rounded border border-slate-200 bg-slate-50 p-3 text-sm" data-testid="recommendation-readonly">
+      <p className="font-semibold">
+        {recommendation.scenario?.label}: {money(recommendation.scenario?.totalValue ?? null, currency)}
+      </p>
+      <p className="mt-1 whitespace-pre-wrap">{recommendation.narrative}</p>
+    </div>
+  );
+  const returnForm = (
+    <ActionForm action={returnRecommendationAction} testId="return-recommendation-form" resetOnSuccess>
+      {hidden}
+      <TextArea
+        name="feedback"
+        label="Return for revision — reviewer feedback"
+        required
+        rows={2}
+        placeholder="e.g. Add a delayed-action option; explain the trajectory"
+      />
+      <div className="mt-2">
+        <SubmitButton variant="secondary">Return for revision</SubmitButton>
+      </div>
+    </ActionForm>
+  );
   return (
     <>
       <Section
         id="recommendation"
         title="Cardaxia recommendation"
-        description="Separate from, and never rewritten by, the client's decision."
+        description="Reviewed internally by Cardaxia before it is issued to management. Separate from, and never rewritten by, the client's decision."
+        actions={
+          recommendation ? (
+            <span data-testid="recommendation-state" data-state={st}>
+              <PlainBadge tone={STATE_TONE[st]}>{RECOMMENDATION_STATE_LABELS[st]}</PlainBadge>
+            </span>
+          ) : undefined
+        }
       >
+        {lastReturn && (st === "returned" || st === "draft") && (
+          <Notice tone="warning" title="Returned for revision">
+            <span data-testid="recommendation-feedback">
+              Reviewer feedback: {lastReturn.note} ({lastReturn.actorName}, {formatDateTime(lastReturn.at)})
+            </span>
+            <span className="mt-1 block text-xs">Revise the recommendation or options, then resubmit.</span>
+          </Notice>
+        )}
+
         {recommendation?.issuedAt ? (
           <div className="rounded border border-emerald-300 bg-emerald-50 p-3 text-sm" data-testid="recommendation">
             <p className="font-semibold">
@@ -469,24 +532,65 @@ export function RecommendationSection({ projectId, currency, review, response }:
             </p>
             <p className="mt-1 whitespace-pre-wrap">{recommendation.narrative}</p>
             <p className="mt-1 text-xs text-slate-600">
-              Issued {formatDateTime(recommendation.issuedAt)} by {recommendation.issuerName}
+              Issued {formatDateTime(recommendation.issuedAt)} by {recommendation.issuerName} ·{" "}
+              <span data-testid="recommendation-decision-status">
+                {decision ? "Management decision recorded" : "Awaiting management decision"}
+              </span>
             </p>
           </div>
         ) : !draft ? (
           <p className="text-sm text-slate-600">No recommendation was issued in this review.</p>
-        ) : !scenarios.some((s) => s.kind === "recommended") ? (
+        ) : !recommended ? (
           <p className="text-sm text-slate-600">
             Add an option of kind &quot;Recommended&quot; to draft the recommendation.
           </p>
+        ) : st === "in_internal_review" ? (
+          <div className="space-y-3" data-testid="internal-review-panel">
+            {readOnly}
+            <p className="text-sm text-slate-700">
+              Awaiting Internal Cardaxia Review. The recommendation and options are read-only until the reviewer returns
+              it for revision or marks it Ready to Issue.
+            </p>
+            <div className="grid gap-4 rounded border border-sky-200 bg-sky-50/50 p-3 lg:grid-cols-2">
+              {returnForm}
+              <ActionForm action={approveRecommendationAction} testId="approve-recommendation-form">
+                {hidden}
+                <TextArea name="note" label="Reviewer note (optional)" rows={2} />
+                <div className="mt-2">
+                  <SubmitButton>Mark Ready to Issue</SubmitButton>
+                </div>
+              </ActionForm>
+              <p className="text-xs text-slate-500 lg:col-span-2">
+                Internal Cardaxia quality review — not client approval. The acting user is recorded for each step; this
+                pilot does not yet separate author and reviewer accounts.
+              </p>
+            </div>
+          </div>
+        ) : st === "ready_to_issue" ? (
+          <div className="space-y-3" data-testid="ready-to-issue-panel">
+            {readOnly}
+            <p className="text-sm text-slate-700">
+              Internal review complete. Not yet issued: no management decision can be recorded until it is.
+            </p>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <ActionForm
+                action={issueRecommendationAction}
+                confirm="Issue Cardaxia's recommendation to management? It and the options become permanent."
+                testId="issue-recommendation-form"
+              >
+                {hidden}
+                <SubmitButton>Issue to management</SubmitButton>
+              </ActionForm>
+              {returnForm}
+            </div>
+          </div>
         ) : (
           <div className="space-y-3">
             <ActionForm action={saveRecommendationAction} testId="recommendation-form">
-              <Hidden name="projectId" value={projectId} />
-              <Hidden name="reviewId" value={review.id} />
-              <Hidden name="scenarioId" value={scenarios.find((s) => s.kind === "recommended")!.id} />
+              {hidden}
+              <Hidden name="scenarioId" value={recommended.id} />
               <p className="mb-2 text-sm">
-                Recommended option: <strong>{scenarios.find((s) => s.kind === "recommended")!.label}</strong> (
-                {money(scenarios.find((s) => s.kind === "recommended")!.totalValue, currency)})
+                Recommended option: <strong>{recommended.label}</strong> ({money(recommended.totalValue, currency)})
               </p>
               <TextArea
                 name="narrative"
@@ -500,21 +604,53 @@ export function RecommendationSection({ projectId, currency, review, response }:
               </div>
             </ActionForm>
             {recommendation && (
-              <ActionForm
-                action={issueRecommendationAction}
-                confirm="Issue Cardaxia's recommendation? It and the options become permanent."
-              >
-                <Hidden name="projectId" value={projectId} />
-                <Hidden name="reviewId" value={review.id} />
-                <SubmitButton>Issue recommendation</SubmitButton>
+              <ActionForm action={submitRecommendationAction} testId="submit-recommendation-form">
+                {hidden}
+                <TextArea name="note" label="Note for the reviewer (optional)" rows={1} />
+                <div className="mt-2">
+                  <SubmitButton>
+                    {st === "returned" ? "Resubmit for Internal Review" : "Submit for Internal Review"}
+                  </SubmitButton>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Cardaxia believes it is ready for internal quality review. Not issue; not client approval.
+                </p>
               </ActionForm>
             )}
+          </div>
+        )}
+
+        {recommendation && recommendation.history.length > 0 && (
+          <div className="mt-4 border-t border-slate-100 pt-3">
+            <h3 className="mb-1 text-sm font-semibold">Internal review history</h3>
+            <ol className="space-y-1 text-xs text-slate-700" data-testid="review-history">
+              {recommendation.history.map((h) => (
+                <li key={h.id} data-testid="review-history-item" data-kind={h.kind}>
+                  <span className="font-medium">{HISTORY_LABELS[h.kind]}</span> · {h.actorName} · {formatDateTime(h.at)}
+                  {h.note && <span className="block text-slate-600">{h.note}</span>}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
       </Section>
     </>
   );
 }
+
+const STATE_TONE = {
+  draft: "slate",
+  in_internal_review: "sky",
+  returned: "amber",
+  ready_to_issue: "violet",
+  issued: "emerald",
+} as const;
+
+const HISTORY_LABELS = {
+  submitted: "Submitted for internal review",
+  returned: "Returned for revision",
+  approved: "Ready to Issue",
+} as const;
 
 /** H. Client / AVO decision against the issued recommendation (unchanged rules). */
 export function DecisionSection({

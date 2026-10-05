@@ -10,6 +10,7 @@ import {
   summariseLeakage,
   type LeakageAmounts,
 } from "@/domain/response";
+import { recommendationState } from "@/domain/recommendation";
 import { db, schema } from "@/server/db/client";
 
 import { loadVersionDrivers } from "./value-case";
@@ -270,6 +271,22 @@ export async function getReviewResponse(projectId: string, reviewId: string) {
     .leftJoin(issuer, eq(issuer.id, schema.recommendation.issuedBy))
     .where(eq(schema.recommendation.assuranceReviewId, reviewId));
   const recommendedScenario = rec ? (scenarios.find((s) => s.id === rec.recommendation.scenarioId) ?? null) : null;
+  // Phase 4D.10G: internal Cardaxia review history, oldest first (every return reason is kept).
+  const reviewer = alias(schema.appUser, "reviewer");
+  const history = rec
+    ? await db()
+        .select({
+          id: schema.recommendationReviewEvent.id,
+          kind: schema.recommendationReviewEvent.kind,
+          note: schema.recommendationReviewEvent.note,
+          at: schema.recommendationReviewEvent.createdAt,
+          actorName: reviewer.displayName,
+        })
+        .from(schema.recommendationReviewEvent)
+        .innerJoin(reviewer, eq(reviewer.id, schema.recommendationReviewEvent.createdBy))
+        .where(eq(schema.recommendationReviewEvent.recommendationId, rec.recommendation.id))
+        .orderBy(asc(schema.recommendationReviewEvent.createdAt), asc(schema.recommendationReviewEvent.id))
+    : [];
 
   const recorder = alias(schema.appUser, "recorder");
   const [dec] = await db()
@@ -297,7 +314,15 @@ export async function getReviewResponse(projectId: string, reviewId: string) {
     leakageBasis,
     leakageSummary,
     scenarios,
-    recommendation: rec ? { ...rec.recommendation, issuerName: rec.issuerName, scenario: recommendedScenario } : null,
+    recommendation: rec
+      ? {
+          ...rec.recommendation,
+          issuerName: rec.issuerName,
+          scenario: recommendedScenario,
+          state: recommendationState(rec.recommendation),
+          history,
+        }
+      : null,
     decision: dec
       ? {
           ...dec.decision,

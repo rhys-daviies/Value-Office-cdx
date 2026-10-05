@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { issueAfterInternalReview } from "@/fixtures/recommendation";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -20,7 +21,6 @@ import {
 } from "@/server/actions/trajectory";
 import { finaliseReview } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
-import { issueRecommendation } from "@/server/commands/options";
 import { authoriseInitialVersion, proposeVersion } from "@/server/commands/value-case";
 import { authoriseValueChange, createValueChange, proposeValueChange } from "@/server/commands/value-change";
 import { db, schema } from "@/server/db/client";
@@ -254,7 +254,7 @@ describe("C/D. forecast and option-path authoring", () => {
 
   it("recommendation issue freezes option paths; finalisation freezes the forecast", async () => {
     const r = await review();
-    await issueRecommendation(r.actor, { reviewId: r.review.id });
+    await issueAfterInternalReview(r.actor, { reviewId: r.review.id });
     let a = await r.authoring();
     expect(a.recommendationIssued).toBe(true);
     expect(a.options.every((o) => !o.editable)).toBe(true);
@@ -271,7 +271,7 @@ describe("C/D. forecast and option-path authoring", () => {
 describe("E. Value Change re-phasing", () => {
   it("copied plan shown against V1; re-phase; V1 unchanged; kind fixed; period may change; $0 change operable", async () => {
     const r = await review();
-    await issueRecommendation(r.actor, { reviewId: r.review.id });
+    await issueAfterInternalReview(r.actor, { reviewId: r.review.id });
     await finaliseReview(r.actor, { reviewId: r.review.id });
     const v1Before = (await getVersionTrajectoryAuthoring(r.project.id, r.v1.id))!.points;
     const { change, version: v2 } = await createValueChange(r.actor, {

@@ -84,6 +84,9 @@ export const COMMANDS = {
   upsertScenario: "options.upsertScenario",
   removeScenario: "options.removeScenario",
   saveRecommendation: "options.saveRecommendation",
+  submitRecommendation: "options.submitRecommendation", // trigger-checked
+  returnRecommendation: "options.returnRecommendation", // trigger-checked
+  approveRecommendation: "options.approveRecommendation", // trigger-checked
   issueRecommendation: "options.issueRecommendation", // trigger-checked
   recordDecision: "options.recordDecision",
   createValueChange: "valueChange.create", // trigger-checked

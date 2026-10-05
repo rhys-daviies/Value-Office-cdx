@@ -28,6 +28,8 @@ import {
   INFORMATION_REQUEST_ITEM_STATUSES,
   LEAKAGE_STATUSES,
   ASSURANCE_STAGES,
+  RECOMMENDATION_REVIEW_EVENT_KINDS,
+  RECOMMENDATION_REVIEW_STATUSES,
   SCENARIO_KINDS,
   VALUE_BASIS_KINDS,
   VALUE_CHANGE_STATUSES,
@@ -60,6 +62,11 @@ export const assuranceReviewStatus = pgEnum("assurance_review_status", ASSURANCE
 export const leakageStatus = pgEnum("leakage_status", LEAKAGE_STATUSES);
 export const assuranceStage = pgEnum("assurance_stage", ASSURANCE_STAGES);
 export const scenarioKind = pgEnum("scenario_kind", SCENARIO_KINDS);
+export const recommendationReviewStatus = pgEnum("recommendation_review_status", RECOMMENDATION_REVIEW_STATUSES);
+export const recommendationReviewEventKind = pgEnum(
+  "recommendation_review_event_kind",
+  RECOMMENDATION_REVIEW_EVENT_KINDS,
+);
 export const valueChangeStatus = pgEnum("value_change_status", VALUE_CHANGE_STATUSES);
 export const valueBasisKind = pgEnum("value_basis_kind", VALUE_BASIS_KINDS);
 export const reportType = pgEnum("report_type", REPORT_TYPES);
@@ -949,6 +956,9 @@ export const recommendation = pgTable(
     narrative: text().notNull(),
     issuedBy: uuid().references(() => appUser.id),
     issuedAt: timestamp({ withTimezone: true }),
+    // Phase 4D.10G: internal Cardaxia review before issue. Null = draft (and every recommendation issued before the
+    // workflow existed). Issued is issued_at, never this column.
+    internalReviewStatus: recommendationReviewStatus(),
     createdBy: uuid()
       .notNull()
       .references(() => appUser.id),
@@ -956,6 +966,7 @@ export const recommendation = pgTable(
   },
   (t) => [
     unique("recommendation_review_uq").on(t.assuranceReviewId),
+    unique("recommendation_id_review_uq").on(t.id, t.assuranceReviewId),
     foreignKey({
       name: "recommendation_review_fk",
       columns: [t.assuranceReviewId, t.projectId],
@@ -967,6 +978,46 @@ export const recommendation = pgTable(
       foreignColumns: [scenario.id, scenario.assuranceReviewId],
     }),
     check("recommendation_issued_shape", sql`(${t.issuedAt} is null) = (${t.issuedBy} is null)`),
+    // Historical issued rows keep null; a prospectively issued one was ready to issue.
+    check(
+      "recommendation_issued_review_shape",
+      sql`${t.issuedAt} is null or ${t.internalReviewStatus} is null or ${t.internalReviewStatus} = 'ready_to_issue'`,
+    ),
+  ],
+);
+
+/**
+ * Phase 4D.10G: the recommendation's internal Cardaxia review history — submitted / returned (with feedback) /
+ * approved as ready to issue. Insert-only, so every return reason across cycles is kept. Written only by the
+ * recommendation review commands, in the same transaction as the state change it records.
+ */
+export const recommendationReviewEvent = pgTable(
+  "recommendation_review_event",
+  {
+    id: id(),
+    recommendationId: uuid().notNull(),
+    assuranceReviewId: uuid().notNull(),
+    projectId: uuid().notNull(),
+    kind: recommendationReviewEventKind().notNull(),
+    note: text(),
+    createdBy: uuid()
+      .notNull()
+      .references(() => appUser.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    foreignKey({
+      name: "recommendation_review_event_rec_fk",
+      columns: [t.recommendationId, t.assuranceReviewId],
+      foreignColumns: [recommendation.id, recommendation.assuranceReviewId],
+    }),
+    foreignKey({
+      name: "recommendation_review_event_review_fk",
+      columns: [t.assuranceReviewId, t.projectId],
+      foreignColumns: [assuranceReview.id, assuranceReview.projectId],
+    }),
+    check("recommendation_review_event_feedback", sql`${t.kind} <> 'returned' or btrim(coalesce(${t.note}, '')) <> ''`),
+    index("recommendation_review_event_rec_idx").on(t.recommendationId, t.createdAt),
   ],
 );
 

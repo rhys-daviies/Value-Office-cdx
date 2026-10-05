@@ -261,6 +261,30 @@ Presentation and composition only: no schema, no migration, no new methodology.
   the Authorised Value Case; a Value Change stays explicit and manual.
 - The **in-app story** adds Why it matters after What changed. Issued report renderers and snapshots are unchanged.
 
+## Recommendation internal review (Phase 4D.10G)
+
+Cardaxia challenges its own advice before management sees it. The reviewer is **internal Cardaxia**, never the client
+VCO.
+
+| State              | Stored as                             | Recommendation, options, option paths | Decision |
+| ------------------ | ------------------------------------- | ------------------------------------- | -------- |
+| Draft              | `internal_review_status` null         | editable                              | no       |
+| In internal review | `in_internal_review`                  | read-only (not frozen)                | no       |
+| Returned           | `returned`                            | editable                              | no       |
+| Ready to Issue     | `ready_to_issue`                      | read-only (not frozen)                | no       |
+| Issued             | `issued_at` set (status kept or null) | permanently frozen (unchanged guards) | yes      |
+
+- Transitions: draft/returned → submit → in review → return (feedback required) | ready to issue; ready to issue →
+  return | issue. Commands `options.submitRecommendation`, `options.returnRecommendation`,
+  `options.approveRecommendation`; issue keeps `options.issueRecommendation` and now requires Ready to Issue.
+- Each step writes an insert-only `recommendation_review_event` in the same transaction as the state change (the
+  guard requires it), so every return reason across cycles is kept; `audit_event` records actor and before/after.
+- Submission already requires the option paths to reconcile (the issue-time economics), so review cannot bypass them.
+- The acting user of every step is recorded. The pilot's auth model cannot separate author and reviewer, so separation
+  of duties is not enforced (no pretend RBAC).
+- Prospective: recommendations issued before this phase read as Issued with no history. Reports are unchanged.
+- Migration record: `docs/release/4d10g-migration.md`.
+
 ## Value Drivers: identity, living record, versioned snapshot (Phase 4D.3)
 
 | Layer                  | Record                                         | Changes how                                                   |

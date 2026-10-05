@@ -93,7 +93,12 @@ test("position → leakage → options → recommendation → decision → Value
   await rec.getByLabel("Recommendation").fill("Act now to protect $0.2m.");
   await rec.getByRole("button", { name: "Save draft recommendation" }).click();
   await saved(rec, "Recommendation saved");
-  await page.getByRole("button", { name: "Issue recommendation" }).click();
+  // 4D.10G: internal Cardaxia review before issue.
+  await page.getByRole("button", { name: "Submit for Internal Review" }).click();
+  await expect(page.getByTestId("recommendation-state")).toHaveAttribute("data-state", "in_internal_review");
+  await page.getByRole("button", { name: "Mark Ready to Issue" }).click();
+  await expect(page.getByTestId("recommendation-state")).toHaveAttribute("data-state", "ready_to_issue");
+  await page.getByRole("button", { name: "Issue to management" }).click();
   await expect(page.getByTestId("recommendation")).toContainText("Issued");
 
   // ---- Finalise, then the client decides differently ---------------------------------------

@@ -92,6 +92,17 @@ export type AssuranceStage = (typeof ASSURANCE_STAGES)[number];
 export const SCENARIO_KINDS = ["current", "recommended", "alternative", "no_action"] as const;
 export type ScenarioKind = (typeof SCENARIO_KINDS)[number];
 
+/**
+ * Phase 4D.10G internal Cardaxia review of an unissued recommendation (stored; null = draft). Issued is recorded by
+ * recommendation.issued_at, so historical issued rows need no backfill. See src/domain/recommendation.ts.
+ */
+export const RECOMMENDATION_REVIEW_STATUSES = ["in_internal_review", "returned", "ready_to_issue"] as const;
+export type RecommendationReviewStatus = (typeof RECOMMENDATION_REVIEW_STATUSES)[number];
+
+/** Durable internal review history, one row per step (insert-only). */
+export const RECOMMENDATION_REVIEW_EVENT_KINDS = ["submitted", "returned", "approved"] as const;
+export type RecommendationReviewEventKind = (typeof RECOMMENDATION_REVIEW_EVENT_KINDS)[number];
+
 /** draft ⇄ proposed → authorised | rejected; draft/proposed → withdrawn. */
 export const VALUE_CHANGE_STATUSES = ["draft", "proposed", "authorised", "rejected", "withdrawn"] as const;
 export type ValueChangeStatus = (typeof VALUE_CHANGE_STATUSES)[number];

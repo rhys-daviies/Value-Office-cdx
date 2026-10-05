@@ -148,8 +148,13 @@ test("Formal forecast and option-path milestones on a draft review; recommendati
   await expect(options.filter({ hasText: "Act now" }).getByTestId("milestone")).toHaveCount(2);
   await expect(noAction.getByTestId("option-reconciliation")).toContainText("Reconciled");
 
-  // Issuing the recommendation freezes every option path.
-  await page.getByRole("button", { name: "Issue recommendation" }).click();
+  // 4D.10G: in Internal Cardaxia Review the paths are read-only (not frozen); issuing freezes them.
+  await page.getByRole("button", { name: "Submit for Internal Review" }).click();
+  await expect(page.getByTestId("option-paths")).toContainText("read-only while the recommendation is in Internal");
+  await expect(page.getByTestId("option-paths").getByTestId("milestone-remove")).toHaveCount(0);
+  await page.getByRole("button", { name: "Mark Ready to Issue" }).click();
+  await expect(page.getByTestId("recommendation-state")).toHaveAttribute("data-state", "ready_to_issue");
+  await page.getByRole("button", { name: "Issue to management" }).click();
   await expect(page.getByTestId("option-paths")).toContainText("Option paths are frozen");
   await expect(page.getByTestId("option-paths").getByTestId("milestone-remove")).toHaveCount(0);
   await expect(forecast.getByTestId("milestone-remove")).toHaveCount(2); // forecast stays editable until finalisation

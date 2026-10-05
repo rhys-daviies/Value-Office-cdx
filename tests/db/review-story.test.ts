@@ -102,7 +102,13 @@ describe("review story", () => {
       realisedTotal: "4000000.00",
       realisedComplete: true,
     });
-    expect(s.recommendation).toEqual({ issued: true, label: "Act now", totalValue: "29000000.00", milestones: 2 });
+    expect(s.recommendation).toEqual({
+      issued: true,
+      state: "issued",
+      label: "Act now",
+      totalValue: "29000000.00",
+      milestones: 2,
+    });
     expect(s.decision).toMatchObject({
       label: "Delay 3 months",
       totalValue: "27000000.00",

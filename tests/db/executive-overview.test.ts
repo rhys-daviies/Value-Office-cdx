@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { issueAfterInternalReview } from "@/fixtures/recommendation";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -9,7 +10,7 @@ import { CANONICAL } from "@/fixtures/canonical";
 import { seedCompactEvolution, seedCompactTrajectory, seedCompactTrajectoryDraft } from "@/fixtures/compact";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
-import { issueRecommendation, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { setPlanPoint, setVersionBasis } from "@/server/commands/trajectory";
 import { authoriseInitialVersion, proposeVersion } from "@/server/commands/value-case";
 import { db, schema } from "@/server/db/client";
@@ -80,7 +81,7 @@ async function authorisedProject(opts: { plan?: boolean; review?: "none" | "reco
       totalValue: "29000000.00",
     });
     await saveRecommendation(actor, { reviewId: r.id, scenarioId: s.id, narrative: "Act" });
-    await issueRecommendation(actor, { reviewId: r.id });
+    await issueAfterInternalReview(actor, { reviewId: r.id });
     await finaliseReview(actor, { reviewId: r.id });
   }
   return d;
@@ -201,7 +202,7 @@ describe("executive Overview", () => {
       totalValue: "28000000.00",
     });
     await saveRecommendation(actor, { reviewId: r3.id, scenarioId: sc.id, narrative: "Re-tender" });
-    await issueRecommendation(actor, { reviewId: r3.id });
+    await issueAfterInternalReview(actor, { reviewId: r3.id });
     await finaliseReview(actor, { reviewId: r3.id });
 
     const o = await getExecutiveOverview(x.project.id, TODAY);

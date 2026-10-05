@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
+import { issueAfterInternalReview } from "@/fixtures/recommendation";
 import path from "node:path";
 
 import { and, eq } from "drizzle-orm";
@@ -17,7 +18,7 @@ import {
 } from "@/server/commands/information-request";
 import { assessLeakage, createLeakage } from "@/server/commands/leakage";
 import { COMMANDS } from "@/server/commands/names";
-import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { issueReport as issueReportCommand } from "@/server/commands/reports";
 import type { Actor } from "@/server/commands/run";
 import { updateDriverVersion } from "@/server/commands/value-case";
@@ -122,7 +123,7 @@ async function compactDecided() {
     totalValue: "1400000.00",
   });
   await saveRecommendation(actor, { reviewId: review.id, scenarioId: recommended.id, narrative: "Act now" });
-  await issueRecommendation(actor, { reviewId: review.id });
+  await issueAfterInternalReview(actor, { reviewId: review.id });
   await finaliseReview(actor, { reviewId: review.id });
   const decision = await recordDecision(actor, {
     reviewId: review.id,

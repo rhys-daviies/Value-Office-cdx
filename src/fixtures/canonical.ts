@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
+import { issueAfterInternalReview } from "./recommendation";
 import {
   createReview,
   finaliseReview,
@@ -11,7 +12,7 @@ import { recordEvidence } from "@/server/commands/evidence";
 import { assessLeakage } from "@/server/commands/leakage";
 import { documentMatterEvidence } from "@/server/commands/matter-evidence";
 import { createMatter, setMatterStage } from "@/server/commands/matters";
-import { issueRecommendation, recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import { recordDecision, saveRecommendation, upsertScenario } from "@/server/commands/options";
 import { createProject } from "@/server/commands/project";
 import type { Actor } from "@/server/commands/run";
 import { addStakeholder, setValueCaseOwner } from "@/server/commands/stakeholders";
@@ -345,7 +346,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
         unrecoverableAmount: CANONICAL.review2.leakage.unrecoverable,
         unrecoverableRationale: "Synthetic: one quarter of savings is lost under the revised plan (E-002)",
       });
-      await issueRecommendation(actor, { reviewId: r2.id });
+      await issueAfterInternalReview(actor, { reviewId: r2.id });
       await finaliseReview(actor, { reviewId: r2.id });
       // Management selects a different option from Cardaxia's recommendation, after it was issued.
       s.decision = await recordDecision(actor, {

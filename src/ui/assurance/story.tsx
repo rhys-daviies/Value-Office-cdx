@@ -1,3 +1,4 @@
+import { RECOMMENDATION_STATE_LABELS } from "@/domain/recommendation";
 import type { ReviewStory as Story, StoryMatter } from "@/server/queries/review-story";
 import { GovernedTag, WorkingTag } from "@/ui/components/badges";
 import { TextLink } from "@/ui/components/layout";
@@ -190,8 +191,12 @@ export function ReviewStory({ story: s, currency, base }: { story: Story; curren
           {s.recommendation ? (
             <>
               <p>
-                {s.recommendation.issued ? RECOMMENDATION_LABEL : "Draft recommendation (not issued)"}:{" "}
-                <span className="font-medium">{s.recommendation.label}</span>
+                {s.recommendation.issued
+                  ? RECOMMENDATION_LABEL
+                  : s.recommendation.state === "draft"
+                    ? "Draft recommendation (not issued)"
+                    : `Recommendation · ${RECOMMENDATION_STATE_LABELS[s.recommendation.state]} (not issued)`}
+                : <span className="font-medium">{s.recommendation.label}</span>
               </p>
               <p className="text-xs text-slate-700">
                 Stored option total {money(s.recommendation.totalValue)} ·{" "}

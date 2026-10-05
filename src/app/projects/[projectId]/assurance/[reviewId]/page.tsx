@@ -8,6 +8,7 @@ import {
   unlinkReviewEvidenceAction,
   updateReviewAction,
 } from "@/server/actions/assurance";
+import { RECOMMENDATION_STATE_LABELS } from "@/domain/recommendation";
 import { hasRationale } from "@/domain/value-case";
 import {
   getAssuranceWorkspace,
@@ -129,7 +130,7 @@ export default async function AssuranceReviewPage({ params }: PageProps<"/projec
       id: "recommendation",
       label: "Recommendation",
       done: Boolean(response.recommendation?.issuedAt),
-      state: response.recommendation?.issuedAt ? "issued" : response.recommendation ? "draft" : "none",
+      state: response.recommendation ? RECOMMENDATION_STATE_LABELS[response.recommendation.state] : "none",
     },
     {
       id: "decision",

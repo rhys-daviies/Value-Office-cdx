@@ -4,7 +4,14 @@ import { describe, expect, it } from "vitest";
 import { createReview, finaliseReview, upsertValuePositions } from "@/server/commands/assurance";
 import { recordEvidence } from "@/server/commands/evidence";
 import { COMMANDS } from "@/server/commands/names";
-import { issueRecommendation, removeScenario, saveRecommendation, upsertScenario } from "@/server/commands/options";
+import {
+  approveRecommendation,
+  issueRecommendation,
+  removeScenario,
+  saveRecommendation,
+  submitRecommendation,
+  upsertScenario,
+} from "@/server/commands/options";
 import type { Actor } from "@/server/commands/run";
 import { addStakeholder, setValueCaseOwner } from "@/server/commands/stakeholders";
 import {
@@ -464,8 +471,11 @@ describe("E. option points", () => {
     await setScenarioPoint(actor, { scenarioId: act.id, asOf: "2027-12-31", value: "900000.00" });
     await setScenarioPoint(actor, { scenarioId: act.id, asOf: END, value: "1400000.00" });
     await saveRecommendation(actor, { reviewId: review.id, scenarioId: act.id, narrative: "Act now" });
-    await expectDomainError(issueRecommendation(actor, { reviewId: review.id }), "VO_TRAJECTORY_NOT_RECONCILED");
+    // 4D.10G: the issue-time economics are already required at submission for internal review.
+    await expectDomainError(submitRecommendation(actor, { reviewId: review.id }), "VO_TRAJECTORY_NOT_RECONCILED");
     await setScenarioPoint(actor, { scenarioId: act.id, asOf: END, value: "1450000.00" });
+    await submitRecommendation(actor, { reviewId: review.id });
+    await approveRecommendation(actor, { reviewId: review.id });
     await issueRecommendation(actor, { reviewId: review.id });
     await expectDomainError(
       setScenarioPoint(actor, { scenarioId: delay.id, asOf: END, value: "1350000.00" }),
