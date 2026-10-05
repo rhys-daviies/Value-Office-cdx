@@ -1,0 +1,14 @@
+{
+  "kind": "release-target",
+  "name": "Value Office production",
+  "branch_name": "main",
+  "host": "ep-old-mode-b7jl3rd0.c-13.us-east-1.aws.neon.tech",
+  "port": 5432,
+  "database": "neondb",
+  "settings": {
+    "neon.project_id": "delicate-resonance-93129287",
+    "neon.branch_id": "br-tiny-star-b7b8d3bh",
+    "neon.endpoint_id": "ep-old-mode-b7jl3rd0"
+  },
+  "established": "2026-10-05 (4D.10R2B). Machine-read, read-only, from the production vo_runtime connection (pg_settings, source 'configuration file'; the database holding the accepted 4D.10 pre-release baseline, still at 0020 while the recovery branch is at 0026). Branch name main and the project, branch and endpoint IDs human-confirmed by Rhys in the Neon Console. No credential recorded."
+}

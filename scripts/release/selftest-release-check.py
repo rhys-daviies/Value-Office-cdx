@@ -10,6 +10,7 @@ and seeded by the PRODUCTION code (git worktree at b7d0c46), copies for destruct
   E  post, no baseline          refused
   F  post, failed/unaccepted/malformed/foreign baseline   refused
   G  accepted baseline + 0026   post PASS
+  H  0026 + a table vo_runtime cannot see (no grant, constraint or index)   post FAIL (R2B relations check)
   +  capture refuses to replace an existing pre-release baseline without --replace
 
   python3 scripts/release/selftest-release-check.py [--pgbin /Library/PostgreSQL/18/bin] [--port 5435]"""
@@ -123,6 +124,12 @@ try:
     r = run(["npx", "tsx", "scripts/migrate.ts"], cwd=REPO, env={**env, "DATABASE_URL": SU("a20"), "VO_APP_DB_ROLE": "vo_runtime"})
     rc, out = check_tool("post", "--local", RT("a20"), "--baseline", base)
     expect("G accepted baseline + 0026 state: post PASSES", r.returncode == 0 and rc == 0, out[-400:])
+
+    # H (R2B) — a table vo_runtime cannot see (owner-created, no grant/constraint/index) is still caught
+    psql("a20", "create table selftest_hidden (a int)")
+    rc, out = check_tool("post", "--local", RT("a20"), "--baseline", base)
+    expect("H post FAILS on an unprivileged, constraint-free extra table (pg_class relations check)",
+           rc != 0 and "unexpected ['selftest_hidden']" in out and "missing 0, unexpected 0" in out, out[-400:])
 finally:
     run([bin_("pg_ctl"), "-D", data, "stop", "-m", "fast"])
     if os.path.exists(f"{wt}/node_modules"): os.unlink(f"{wt}/node_modules")

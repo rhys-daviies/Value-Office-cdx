@@ -24,10 +24,17 @@ Modes
              every baseline row identical over its baseline columns, new columns null, new tables empty, no factual
              rows added, reports byte-identical). Refuses a missing, malformed, unaccepted or mismatched baseline
 
+  evidence   (R2B) read-only inspection of ANOTHER branch of the production project (--endpoint ep-…): the connection
+             must be positively NOT production (same Neon project, different branch and endpoint); then every `post`
+             check runs against the release baseline. Supplementary evidence only — never a production result
+
 Connection
   default   production vo_runtime from the macOS Keychain (service value-office-prod-vo_runtime), forced to a
-            read-only session on the unpooled host, TLS required
-  --local URL  localhost-only database for rehearsal validation (never production)
+            read-only session on the unpooled host, TLS required. Every production run first proves the connection is
+            the accepted production target (scripts/release/production-target.json: host, port, database and the
+            server's neon.project_id / neon.branch_id / neon.endpoint_id) — a FAIL like any other check (R2B)
+  --local URL  localhost-only database for rehearsal validation (never production); --local-target FILE applies the
+            same identity check to it
 
 Connection strings and passwords are never printed or written; output is scrubbed."""
 
@@ -35,6 +42,8 @@ import argparse, datetime, hashlib, json, os, re, subprocess, sys
 from urllib.parse import quote, urlsplit, urlunsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import neon_target  # noqa: E402
 REPO = os.path.abspath(os.path.join(HERE, "..", ".."))
 TOOLS = os.path.expanduser("~/.cardaxia-4d9m")
 R = "vo_runtime"
@@ -49,8 +58,10 @@ DEMO = {"DEMO-TRAJ": None, "DEMO-TRAJ2": "8f635bdf-e0a7-442a-a61a-5fe065e6e77f"}
 REF_KIND, REL_KIND = "4d10-pre-release-production-baseline", "4d10-release-baseline"
 
 ap = argparse.ArgumentParser()
-ap.add_argument("mode", choices=["schema", "snapshot", "reconcile", "capture", "pre", "post"])
+ap.add_argument("mode", choices=["schema", "snapshot", "reconcile", "capture", "pre", "post", "evidence"])
 ap.add_argument("--local", help="localhost database URL (rehearsal validation only)")
+ap.add_argument("--local-target", help="--local only: target file the localhost database must match")
+ap.add_argument("--endpoint", help="evidence only: Neon endpoint ID (ep-…) of the non-production branch to inspect")
 ap.add_argument("--freeze", default=f"{TOOLS}/n1c-freeze.json", help="historical 4D.9N freeze (reconcile / capture)")
 ap.add_argument("--reference", default=f"{TOOLS}/4d10-pre-release-baseline.json", help="4D.10 pre-release baseline (capture writes, pre reads)")
 ap.add_argument("--baseline", default=f"{TOOLS}/4d10-release-baseline.json", help="release baseline (pre publishes, post reads)")
@@ -61,6 +72,11 @@ ap.add_argument("--out", help="output file (schema / snapshot modes)")
 args = ap.parse_args()
 
 SECRETS, fails = [], []
+if args.local_target and not args.local: print("STOP: --local-target applies only with --local"); sys.exit(1)
+if (args.mode == "evidence") != bool(args.endpoint) or (args.endpoint and args.local):
+    print("STOP: evidence mode needs --endpoint (production project only), and --endpoint applies only to evidence"); sys.exit(1)
+if args.endpoint and not re.fullmatch(r"ep-[a-z]+-[a-z]+-[a-z0-9]+", args.endpoint): print("STOP: --endpoint is not a Neon endpoint ID"); sys.exit(1)
+TARGET = neon_target.load_target(args.local_target, production=False) if args.local_target else (None if args.local else neon_target.load_target(neon_target.PRODUCTION_TARGET, production=True))
 if args.local:
     lp = urlsplit(args.local)
     if lp.hostname not in ("localhost", "127.0.0.1"):
@@ -76,6 +92,7 @@ else:
     U = kc.stdout.strip(); p = urlsplit(U)
     if p.username != R: print("STOP: Keychain credential is not vo_runtime"); sys.exit(1)
     first, _, rest = (p.hostname or "").partition(".")
+    if args.endpoint: first = args.endpoint  # evidence: same credential, the other branch's compute endpoint
     RO = urlunsplit((p.scheme, p.netloc.rsplit("@", 1)[0] + "@" + first.replace("-pooler", "") + "." + rest, p.path,
                      (p.query + "&" if p.query else "") + "options=" + quote("-c default_transaction_read_only=on", safe=""), ""))
     SECRETS += [U, RO, p.password or "\0"]
@@ -122,6 +139,13 @@ select 'grant|'||table_schema||'.'||table_name||'|'||string_agg(privilege_type, 
   from information_schema.role_table_grants where grantee='{R}' group by table_schema, table_name
 order by 1
 """
+
+def relations_check(expected, label):
+    """Every public table/view in pg_class, regardless of privilege (R2B): information_schema hides relations vo_runtime
+    has no grant on, so an unexpected owner-created table without constraints or indexes would otherwise go unseen."""
+    got = set(x for x in q("select string_agg(relname, ',' order by relname) from pg_catalog.pg_class where relnamespace='public'::regnamespace and relkind in ('r','p','v','m','f')").split(",") if x)
+    extra, missing = sorted(got - set(expected)), sorted(set(expected) - got)
+    check(f"{label}: {len(got)} public tables/views in pg_class (any owner, any privilege) = the expected {len(expected)} (unexpected {extra or 'none'}, missing {missing or 'none'})", not extra and not missing)
 
 def schema_lines(): return [l for l in q(SCHEMA_SQL).splitlines() if l]
 
@@ -189,7 +213,26 @@ def repo_hashes():
     journal = json.load(open(f"{REPO}/drizzle/meta/_journal.json"))
     return [e["tag"] for e in journal["entries"]], [hashlib.sha256(open(f"{REPO}/drizzle/{e['tag']}.sql", "rb").read()).hexdigest() for e in journal["entries"]]
 
+def target_identity():
+    """Production (and --local-target) runs: the connection must positively BE the accepted target. Evidence runs: it must
+    positively NOT be production, while belonging to the same Neon project."""
+    if TARGET is None:
+        say("  info  local rehearsal: no target identity file (--local-target) — branch identity not checked"); return
+    result = neon_target.compare(TARGET, RO, q)
+    if args.mode == "evidence":
+        got = {f: a for f, _, a, _ in result}
+        say("  info  connection identity: " + ", ".join(f"{f}={a}" for f, a in got.items()))
+        check(f"evidence target is a branch of the production project ({TARGET['settings']['neon.project_id']}), endpoint {args.endpoint}",
+              got["neon.project_id"] == TARGET["settings"]["neon.project_id"] and got["neon.endpoint_id"] == args.endpoint)
+        check(f"evidence target is positively NOT production (branch {got['neon.branch_id']} ≠ {TARGET['settings']['neon.branch_id']}, endpoint ≠ {TARGET['settings']['neon.endpoint_id']})",
+              got["neon.branch_id"] not in (TARGET["settings"]["neon.branch_id"], "absent") and got["neon.endpoint_id"] != TARGET["settings"]["neon.endpoint_id"])
+        return
+    for line in neon_target.render(TARGET, result).splitlines(): say(line)
+    bad = [f for f, _, _, ok in result if not ok]
+    check(f"connection is the accepted target {TARGET['name']} (branch `{TARGET['branch_name']}`): host, port, database and server identity settings{(' — differ: ' + ', '.join(bad)) if bad else ''}", not bad)
+
 def common(s):
+    target_identity()
     who = q("select current_user||' · db '||current_database()||' · read-only '||current_setting('transaction_read_only')||' · server '||current_setting('server_version')")
     say(f"connection: {who}")
     check(f"connected as {R} in a read-only session", who.startswith(f"{R} ") and "read-only on" in who)
@@ -345,6 +388,7 @@ if mode in ("reconcile", "capture"):
     if not os.path.exists(args.freeze): check(f"historical 4D.9N freeze available ({os.path.basename(args.freeze)})", False); fact = {}
     else:
         f = json.load(open(args.freeze))
+        relations_check(f["cols"], "relations of the 4D.9N freeze")
         check("migration rows identical to the 4D.9N freeze", s["migrations"] == f["migrations"])
         fact = reconcile(f, s)
     if mode == "capture":
@@ -362,6 +406,7 @@ elif mode == "pre":
     ref = load_accepted(args.reference, REF_KIND, local)
     check(f"production migration head 0020: {len(s['migrations'])} rows, hashes = repository 0000–0020", s["migrations"] == local[:PRE_HEAD])
     schema_check(f"{HERE}/schema-0020.txt", "schema exactly the accepted 0020 schema (incl. vo_runtime grants)")
+    relations_check(ref["snapshot"]["cols"], "relations of the 4D.10 pre-release baseline")
     check("migration rows identical to the 4D.10 pre-release baseline", s["migrations"] == ref["snapshot"]["migrations"])
     factual_compare(ref["snapshot"], s, "the 4D.10 pre-release baseline")
     if fails:
@@ -371,7 +416,8 @@ elif mode == "pre":
         env = envelope(REL_KIND, s, {"reference_captured_at": ref["captured_at"]})
         atomic_write(args.baseline, env)
         say(f"\nrelease baseline published ({os.path.basename(args.baseline)}): {len(s['tables'])} tables, {sum(v['count'] for v in s['tables'].values())} rows, audit max id {s['audit_max']}")
-else:
+else:  # post, evidence
+    if mode == "evidence": say("EVIDENCE ONLY — a non-production branch; this is not a production release result")
     _, local_hashes = repo_hashes()
     b_env = load_accepted(args.baseline, REL_KIND, local_hashes)
     b = b_env["snapshot"]
@@ -381,6 +427,7 @@ else:
     say("  info  new migration hashes: " + ", ".join(h[:16] for h in s["migrations"][PRE_HEAD:]))
     schema_check(f"{HERE}/schema-0026.txt", "schema exactly the accepted 0026 schema (incl. vo_runtime grants on the new tables)")
     check(f"tables: baseline {len(b['cols'])} + {len(NEW_TABLES)} new = {len(s['cols'])}", set(s["cols"]) == set(b["cols"]) | set(NEW_TABLES) and not set(b["cols"]) & set(NEW_TABLES))
+    relations_check(set(b["cols"]) | set(NEW_TABLES), "relations: the release baseline's + the 3 new tables")
     empty = {t: s["tables"][t]["count"] for t in NEW_TABLES if t in s["tables"]}
     check(f"new tables empty: {empty}", all(n == 0 for n in empty.values()) and len(empty) == len(NEW_TABLES))
     nonnull = {f"{t}.{c}": (int(q(f"select count(*) from public.{t} where {c} is not null")) if c in s["cols"].get(t, []) or c in columns(t) else "missing")
@@ -391,5 +438,5 @@ else:
     check(f"columns added to existing tables are exactly the accepted three: {added_cols}", added_cols == {t: [c] for t, c in NEW_COLUMNS})
     factual_compare(b, s, "the release baseline")
 
-say(f"\nRESULT ({mode}{', local' if args.local else ''}): {'PASS' if not fails else 'FAIL: ' + '; '.join(fails)}")
+say(f"\nRESULT ({mode}{', local' if args.local else ''}{', endpoint ' + args.endpoint + ' (NOT production)' if args.endpoint else ''}): {'PASS' if not fails else 'FAIL: ' + '; '.join(fails)}")
 sys.exit(0 if not fails else 1)

@@ -122,3 +122,99 @@ no envelope) is refused by `post`.
 | Migration       | not run (0020, 21 rows)                                                         |
 | Application     | unchanged (`dpl_6PUBbKWZ2HC6Wb1uju5MRVSdbUvr`, `b7d0c46`)                       |
 | Next            | restart R2 from step 1 (`pre` now compares with the 4D.10 pre-release baseline) |
+
+## R2 restart — production database release: STOPPED at POST (2026-10-05)
+
+**Outcome: STOP at procedure step 8 (`release-check.py post` FAIL — the production database is still at 0020).** No
+retry, no re-baseline, nothing pushed or deployed. The application is unchanged (`dpl_6PUBbKWZ2HC6Wb1uju5MRVSdbUvr`,
+`b7d0c46`).
+
+| Step                         | Result                                                                                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Freeze verification (09:27Z) | PASS — tree clean; `origin/main` = `b7d0c46` (fetched); `0cb2328` descends from it; exactly the 10 reviewed commits (`bd71123` … `0cb2328`); 0021–0026 hashes = accepted; only tooling/docs since `0ebde60`; Vercel env names unchanged (4)                        |
+| PRE (→ 09:29:57Z)            | **PASS** against the 4D.10 pre-release baseline: no factual row changed/added/removed, audit max 388, schema exactly 0020 (1,110), 0020 / 21, 3 PDFs match, least privilege, no owner / `vo_app` sessions, DEMO projects present                                   |
+| Release baseline             | `4d10-release-baseline.json` (published by the aborted R2's PRE, repo `0cb2328`) left in place, unmodified. The fresh R2's `pre` refuses while it exists: PMO to authorise either archiving it under a new name or `pre --replace` (publishes only on a full PASS) |
+| Recovery branch              | `pre-4d10-release-2026-10-05` — Rhys confirmed created and ready (after PRE); parent not yet explicitly confirmed. HUMAN CONFIRMED — no Neon API access. Production re-checked unchanged at 19:56Z                                                                 |
+| B4 + runner                  | Rhys reported "success"; runner output not yet provided                                                                                                                                                                                                            |
+| POST (20:01:49Z)             | **FAIL** — production `neondb` head still 0020 (21 rows, last applied before this phase), 33 tables, new tables/columns absent (106 schema facts missing). Every factual row, migration row and report still identical; no owner sessions                          |
+| Re-check (20:04Z, read-only) | production still 21 migrations, 33 tables, audit max 388, nothing since the baseline                                                                                                                                                                               |
+
+Cause: established by PMO and 4D.10R2B, below (the runner migrated the recovery branch). Old application on 0026: not
+applicable (production still 0020).
+
+## R2B — release targeting hardening after the wrong-branch migration (2026-10-05)
+
+**Classification: RELEASE TARGETING / BRANCH IDENTITY FAILURE.** Not a migration-chain failure: 0021–0026 applied
+exactly as accepted — on the wrong branch.
+
+### Confirmed sequence
+
+| #   | Event                                                                                                                                                                            |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | PRE passed against production `main` at 0020 (09:29:57Z); release baseline published                                                                                             |
+| B   | Recovery branch `pre-4d10-release-2026-10-05` created from `main` (Rhys, after PRE)                                                                                              |
+| C   | The Neon Console remained on the recovery branch (branch creation leaves it selected)                                                                                            |
+| D   | `neondb_owner` was reset while that branch was selected                                                                                                                          |
+| E   | Connect supplied a connection string targeting that branch (endpoint `ep-weathered-smoke-b7i4m245`)                                                                              |
+| F   | `migrate-production.py` accepted it: it checked role, unpooled host, TLS and the 0020 hashes — and a fresh branch is a byte-identical clone of production, so every check passed |
+| G   | Migrations 0021–0026 applied successfully there                                                                                                                                  |
+| H   | POST against actual production FAILED (20:01:49Z): production still 0020                                                                                                         |
+| I   | Read-only production verification (20:04Z, and R2B) confirmed no production mutation                                                                                             |
+| J   | PMO's SQL inspection of the recovery branch showed 27 migrations                                                                                                                 |
+| K   | Rhys confirmed the owner reset was performed while the recovery branch was selected                                                                                              |
+
+Root cause: the runner inferred production from the **data** (database name, role, schema, migration state, PostgreSQL
+version, copied Console string), and the human sequence (create branch → stay → reset → Connect) put the Console on
+the clone. Neither positively identified the **branch**.
+
+### Production (R2B read-only, `reconcile`)
+
+Target identity PASS (`ep-old-mode-b7jl3rd0`, `br-tiny-star-b7b8d3bh`, project `delicate-resonance-93129287`,
+`neondb`); 0020 / 21; schema exactly 0020; 33 public tables (pg_class); still the same 22 reconciled audit rows since
+the 4D.9N freeze, none since the accepted 4D.10 pre-release baseline (audit max 388); reports and PDFs identical; no
+owner / `vo_app` sessions. The accepted baselines are unchanged.
+
+### Recovery branch `pre-4d10-release-2026-10-05` — forensic evidence (`release-check.py evidence`, read-only)
+
+**INVALID AS PRE-RELEASE RECOVERY POINT — MIGRATED TO 0026 DURING ABORTED R2 — PRESERVED FOR FORENSIC / MIGRATION
+EVIDENCE.** Not modified, reset or deleted.
+
+| Check                                                     | Result                                                                                                                                  |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity                                                  | branch `br-bitter-boat-b75plc9y`, endpoint `ep-weathered-smoke-b7i4m245`, project `delicate-resonance-93129287` — positively NOT `main` |
+| Migrations                                                | 27; first 21 = baseline; 0021–0026 hashes = accepted                                                                                    |
+| Schema                                                    | all 1,216 accepted 0026 facts present (missing 0); **4 unexpected** — `playing_with_neon` (Neon Console SQL Editor sample table)        |
+| Relations (pg_class)                                      | 37 = the expected 36 + `playing_with_neon`                                                                                              |
+| New tables / new columns                                  | 3 tables empty; 3 columns NULL on every row; exactly the accepted three added                                                           |
+| Factual rows vs release baseline                          | all 251 present and byte-identical; none added; no audit since 388                                                                      |
+| Reports, grants, least privilege, sessions, DEMO projects | identical / PASS                                                                                                                        |
+
+Result FAIL only because of `playing_with_neon` — created on the branch after it was taken (absent from production),
+not by any migration. Supplementary evidence that the 0020 → 0026 chain preserves the production data exactly; it does
+not replace the production migration.
+
+### Hardening
+
+- **Target identity** (`neon_target.py`, `production-target.json`): host, port, database and the server's
+  configuration-file `neon.project_id` / `neon.branch_id` / `neon.endpoint_id` must equal the accepted production
+  target; branch name `main` pinned to those IDs by Rhys's Console confirmation. Runner: identity table shown and
+  enforced before `MIGRATE` (no override), branch-name checkpoint, re-checked before and after migrating.
+  `release-check.py`: the same check on every production run (a FAIL like any other); `evidence` mode for other branches.
+- **Relations check**: public tables counted from `pg_class` — `information_schema` hid the ungranted
+  `playing_with_neon` columns from `vo_runtime`; a bare owner-created table would have been invisible.
+- **Console procedure** (`4d10-release-procedure.md` §3–4): after creating the recovery branch, switch to `main`,
+  confirm IDs, reset on `main`, Connect on `main` (host `ep-old-mode-b7jl3rd0`), each confirmed to Claude before the next.
+- Tests: `selftest-branch-targeting.py` 12/12 (wrong branch refused before MIGRATE, also at production's address and
+  with a client spoof; unidentifiable target refused; no production override; correct target passes and migrates);
+  `selftest-release-check.py` 20/20 (new case H: hidden table).
+
+### Status after R2B
+
+| Item             | Status                                                                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Production       | 0020 / 21, factually = accepted 4D.10 pre-release baseline; application `b7d0c46` (`dpl_6PUB…`)                                                                   |
+| Release freeze   | in force since 2026-10-05T09:15:57Z                                                                                                                               |
+| Security B4      | **NOT COMPLETE for production** (the reset was branch-scoped to the recovery branch)                                                                              |
+| Recovery branch  | none valid for the next attempt; next: `pre-4d10-release-r2-YYYY-MM-DD` (UTC date) after a fresh strict PRE                                                       |
+| Release baseline | `4d10-release-baseline.json` from the aborted R2 must not be reused: the fresh R2 runs `pre --replace` only after PMO authorisation, from a new release candidate |
+| Next             | completely fresh R2 from step 1 on the R2B commit                                                                                                                 |
