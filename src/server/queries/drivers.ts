@@ -100,6 +100,7 @@ export async function getDriverRegister(projectId: string) {
     summary.latest && inForce && summary.latest.review.againstVersionId === inForce.id ? summary.latest : null;
   const forecastRows = latest ? ((await getAssuranceWorkspace(projectId, latest.review.id))?.rows ?? []) : [];
   const name = new Map(stakeholders.map((s) => [s.personId, s.name]));
+  const role = new Map(stakeholders.map((s) => [s.personId, s.roleDescription]));
 
   const entries = identities.map((driver) => {
     const own = versions.filter((v) => v.dv.valueDriverId === driver.id);
@@ -142,6 +143,8 @@ export async function getDriverRegister(projectId: string) {
       working,
       fromVersion: rec ? null : (startFrom?.version.versionNumber ?? null),
       avoName: working?.avoPersonId ? (name.get(working.avoPersonId) ?? null) : null,
+      /** Phase 4D.13: the AVO's role on this engagement, shown as "person — role". */
+      avoRole: working?.avoPersonId ? (role.get(working.avoPersonId) ?? null) : null,
       authorised: authorisedRow
         ? { versionNumber: authorisedRow.version.versionNumber, financialValue: authorisedRow.dv.financialValue }
         : null,

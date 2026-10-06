@@ -35,9 +35,9 @@ test("living driver edits leave V1 alone; an emerging driver joins V2 only throu
     .click();
   await expect(page.getByTestId("working-driver")).toBeVisible(); // the start form is replaced
   const avo = page.getByTestId("driver-avo-form");
-  await avo.getByLabel("Working AVO").selectOption({ label: "Test VCO" });
+  await avo.getByLabel("Working AVO").selectOption({ label: "Test VCO — Value Case Owner" }); // 4D.13: person — role
   await submit(avo, "Save AVO", "Working AVO updated");
-  await expect(page.getByTestId("working-avo")).toHaveText("Test VCO");
+  await expect(page.getByTestId("working-avo")).toHaveText("Test VCO — Value Case Owner");
   const estimate = page.getByTestId("driver-estimate-form");
   await estimate.getByLabel("Working estimate (not authorised)").fill("0.8m");
   await submit(estimate, "Save working estimate", "Working estimate recorded");

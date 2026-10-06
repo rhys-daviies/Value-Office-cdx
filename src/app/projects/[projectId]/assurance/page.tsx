@@ -30,6 +30,7 @@ import { GovernedTag } from "@/ui/components/badges";
 import { formatDate } from "@/ui/format";
 import { TRIGGER_LABELS } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
+import { ownerOptions } from "@/ui/people";
 
 export const metadata = { title: "Value Assurance" };
 
@@ -133,7 +134,7 @@ export default async function AssurancePage({ params, searchParams }: PageProps<
         currency={currency}
         workspace={workspace}
         filter={filter}
-        stakeholders={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
+        stakeholders={ownerOptions(stakeholders)}
         drivers={drivers}
         raiseOpen={query.raise === "1"}
       />

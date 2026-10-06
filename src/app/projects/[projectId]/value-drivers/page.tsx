@@ -13,6 +13,7 @@ import { AuthorisedValue, CurrentForecast, LivingStatusBadge, WorkingEstimate } 
 import { formatMoneyShort } from "@/ui/format";
 import { EVIDENCE_STATUS_LABELS, QUALIFICATION_LABELS } from "@/ui/labels";
 import { requireProject } from "@/ui/require";
+import { ownerOptions, personWithRole } from "@/ui/people";
 
 export const metadata = { title: "Value Drivers" };
 
@@ -22,7 +23,7 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
   const [register, assurance] = await Promise.all([getDriverRegister(projectId), getContinuousAssurance(projectId)]);
   const currency = project.currency;
   const base = `/projects/${projectId}/value-drivers`;
-  const stakeholders = register.stakeholders.map((s) => ({ value: s.personId, label: s.name }));
+  const stakeholders = ownerOptions(register.stakeholders);
 
   return (
     <>
@@ -93,7 +94,13 @@ export default async function ValueDriversPage({ params }: PageProps<"/projects/
                       </>
                     )}
                   </td>
-                  <td>{e.avoName ?? <span className="text-amber-700">Not assigned</span>}</td>
+                  <td>
+                    {e.avoName ? (
+                      personWithRole(e.avoName, e.avoRole)
+                    ) : (
+                      <span className="text-amber-700">Not assigned</span>
+                    )}
+                  </td>
                   <td>
                     <WorkingEstimate value={e.working?.workingEstimate} currency={currency} noRecord={!e.record} />
                   </td>

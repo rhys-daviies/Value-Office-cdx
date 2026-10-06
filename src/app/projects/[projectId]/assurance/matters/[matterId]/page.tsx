@@ -22,6 +22,7 @@ import { Empty, KeyValues, Notice, Section, Table, TextLink } from "@/ui/compone
 import { formatDate, formatDateTime, formatMoneyShort, moneyInputValue } from "@/ui/format";
 import { ASSURANCE_STAGE_LABELS } from "@/ui/labels";
 import { isUuid, requireProject } from "@/ui/require";
+import { ownerOptions, personWithRole } from "@/ui/people";
 
 export const metadata = { title: "Assurance matter" };
 
@@ -123,7 +124,7 @@ export default async function AssuranceMatterPage({
               [
                 "Risk / Leakage Owner",
                 <span key="o" data-testid="matter-owner">
-                  {m.ownerName ?? "Not assigned"}
+                  {m.ownerName ? personWithRole(m.ownerName, m.ownerRole) : "Not assigned"}
                 </span>,
               ],
               ["Required decision date", formatDate(leakage.requiredDecisionDate)],
@@ -170,7 +171,7 @@ export default async function AssuranceMatterPage({
                   label="Risk / Leakage Owner"
                   placeholder="— Not assigned —"
                   defaultValue={leakage.responseOwnerPersonId}
-                  options={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
+                  options={ownerOptions(stakeholders)}
                 />
                 <p className="mt-1 text-xs text-slate-500">May differ from the affected drivers&apos; AVOs.</p>
                 <div className="mt-2">
@@ -190,7 +191,7 @@ export default async function AssuranceMatterPage({
         ev={ev}
         draftReview={handoff.draft}
         reliedOn={handoff.reliedOn}
-        stakeholders={stakeholders.map((s) => ({ value: s.personId, label: s.name }))}
+        stakeholders={ownerOptions(stakeholders)}
       />
 
       <Section

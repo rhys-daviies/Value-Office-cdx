@@ -8,6 +8,8 @@ import {
 } from "@/server/actions/information-request";
 import { getInformationRequestWorkspace, type InformationRequestWorkspace } from "@/server/queries/information-request";
 import { formatRequestReference } from "@/server/commands/information-request";
+import { ATTENTION_WINDOW_DAYS, todayIso } from "@/domain/attention";
+import { outstandingQueue, type DueState } from "@/domain/request-queue";
 import { INFORMATION_REQUEST_ITEM_STATUSES, INFORMATION_REQUEST_PURPOSES } from "@/domain/statuses";
 import { ActionForm, SubmitButton } from "@/ui/components/action-form";
 import { PlainBadge, RequestItemBadge } from "@/ui/components/badges";
@@ -16,6 +18,7 @@ import { ButtonLink, Empty, Expander, Notice, Section, Table, TextLink } from "@
 import { reportPreviewHref } from "@/ui/reports/routes";
 import { formatDate } from "@/ui/format";
 import { IR_ITEM_STATUS_LABELS, IR_PURPOSE_LABELS, IR_STATUS_LABELS, irPurposeLabel } from "@/ui/labels";
+import { ownerOptions, personWithRole } from "@/ui/people";
 import { requireProject } from "@/ui/require";
 
 export const metadata = { title: "Information Requests" };
@@ -58,6 +61,7 @@ export default async function InformationRequestPage({
         </Section>
       ) : (
         <>
+          <OutstandingItems projectId={projectId} ws={ws} today={todayIso()} />
           <RequestIndex ws={ws} />
           {ws.requests.map((entry) => (
             <RequestPanel key={entry.request.id} projectId={projectId} entry={entry} ws={ws} />
@@ -91,6 +95,101 @@ export default async function InformationRequestPage({
         </>
       )}
     </>
+  );
+}
+
+const DUE_BADGE: Record<DueState, { label: string; tone: "red" | "amber" | "slate" }> = {
+  overdue: { label: "Overdue", tone: "red" },
+  due_soon: { label: "Due soon", tone: "amber" },
+  outstanding: { label: "Outstanding", tone: "slate" },
+};
+
+/** Phase 4D.13: the consultant's working queue — every outstanding item on an issued request, earliest due first. */
+function OutstandingItems({ projectId, ws, today }: { projectId: string; ws: Workspace; today: string }) {
+  const driverName = new Map(ws.drivers.map((d) => [d.driverId, d.name]));
+  const queue = outstandingQueue(
+    ws.requests.flatMap(({ request, items }) =>
+      items.map((i) => ({
+        ...i,
+        request,
+        requestStatus: request.status,
+        itemStatus: i.item.status,
+        dueOn: i.item.dueOn,
+        reference: request.reference,
+        sequence: i.item.sequence,
+      })),
+    ),
+    today,
+  );
+  const overdue = queue.filter((q) => q.due === "overdue").length;
+  const soon = queue.filter((q) => q.due === "due_soon").length;
+  return (
+    <Section
+      title={`Outstanding items (${queue.length})`}
+      description={
+        queue.length === 0
+          ? undefined
+          : `${overdue} overdue · ${soon} due within ${ATTENTION_WINDOW_DAYS} days · open or partially received items on issued requests, earliest due first.`
+      }
+      testId="ir-outstanding"
+    >
+      {queue.length === 0 ? (
+        <Empty>Nothing outstanding — no open items on issued requests.</Empty>
+      ) : (
+        <Table>
+          <thead>
+            <tr>
+              <th>Due</th>
+              <th>Request / item</th>
+              <th>Requested from</th>
+              <th>Status</th>
+              <th>Value Driver</th>
+              <th>Assurance matter</th>
+            </tr>
+          </thead>
+          <tbody>
+            {queue.map((q) => (
+              <tr key={q.item.id} data-testid="ir-outstanding-row" data-due={q.due}>
+                <td className="whitespace-nowrap">
+                  <PlainBadge tone={DUE_BADGE[q.due].tone}>{DUE_BADGE[q.due].label}</PlainBadge>{" "}
+                  {q.dueOn ? formatDate(q.dueOn) : <span className="text-slate-500">No due date</span>}
+                </td>
+                <td>
+                  <TextLink href={`#ir-${q.request.id}`}>
+                    {q.reference} item {q.sequence}
+                  </TextLink>
+                  <span className="block text-slate-600">{q.item.description}</span>
+                </td>
+                <td>
+                  {q.requestedFromName ? (
+                    personWithRole(q.requestedFromName, q.requestedFromRole)
+                  ) : (
+                    <span className="text-amber-700">Not assigned</span>
+                  )}
+                </td>
+                <td>
+                  <RequestItemBadge status={q.itemStatus} />
+                </td>
+                <td>
+                  {q.driverCode
+                    ? `${q.driverCode} ${q.item.valueDriverId ? (driverName.get(q.item.valueDriverId) ?? "") : ""}`.trim()
+                    : "—"}
+                </td>
+                <td>
+                  {q.matter?.id ? (
+                    <TextLink href={`/projects/${projectId}/assurance/matters/${q.matter.id}`}>
+                      {q.matter.code} {q.matter.title}
+                    </TextLink>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </Table>
+      )}
+    </Section>
   );
 }
 
@@ -129,7 +228,7 @@ function RequestIndex({ ws }: { ws: Workspace }) {
 
 function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: RequestEntry; ws: Workspace }) {
   const { request, items } = entry;
-  const stakeholderOptions = ws.stakeholders.map((s) => ({ value: s.personId, label: s.name }));
+  const stakeholderOptions = ownerOptions(ws.stakeholders);
   const driverOptions = ws.drivers.map((d) => ({ value: d.driverId, label: `${d.code} ${d.name}` }));
   const evidenceOptions = ws.evidence.map((e) => ({ value: e.id, label: `${e.code} ${e.title}` }));
 
@@ -197,110 +296,112 @@ function RequestPanel({ projectId, entry, ws }: { projectId: string; entry: Requ
               {IR_ITEM_STATUS_LABELS[status]} ({group.length})
             </h3>
             <div className="space-y-2">
-              {group.map(({ item, requestedFromName, driverCode, evidenceCode, evidenceTitle, matter }) => (
-                <Expander
-                  key={item.id}
-                  testId="ir-item"
-                  summary={
-                    <span className="inline-flex flex-wrap items-center gap-2">
-                      <span className="text-slate-500">#{item.sequence}</span>
-                      <span>{item.description}</span>
-                      <RequestItemBadge status={item.status} />
-                      <span className="font-normal text-slate-500">
-                        {[
-                          matter && `matter ${matter.code}`,
-                          requestedFromName && `from ${requestedFromName}`,
-                          item.dueOn && `due ${formatDate(item.dueOn)}`,
-                          driverCode,
-                          evidenceCode && `→ ${evidenceCode}`,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
+              {group.map(
+                ({ item, requestedFromName, requestedFromRole, driverCode, evidenceCode, evidenceTitle, matter }) => (
+                  <Expander
+                    key={item.id}
+                    testId="ir-item"
+                    summary={
+                      <span className="inline-flex flex-wrap items-center gap-2">
+                        <span className="text-slate-500">#{item.sequence}</span>
+                        <span>{item.description}</span>
+                        <RequestItemBadge status={item.status} />
+                        <span className="font-normal text-slate-500">
+                          {[
+                            matter && `matter ${matter.code}`,
+                            requestedFromName && `from ${personWithRole(requestedFromName, requestedFromRole)}`,
+                            item.dueOn && `due ${formatDate(item.dueOn)}`,
+                            driverCode,
+                            evidenceCode && `→ ${evidenceCode}`,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
                       </span>
-                    </span>
-                  }
-                >
-                  {matter && (
-                    <p className="mb-2 text-sm">
-                      Evidence for Assurance matter{" "}
-                      <TextLink href={`/projects/${projectId}/assurance/matters/${matter.id}`}>
-                        {matter.code} {matter.title}
-                      </TextLink>
-                    </p>
-                  )}
-                  {request.status === "closed" ? (
-                    <p className="text-sm text-slate-600">
-                      Request closed. {evidenceCode ? `Fulfilled by ${evidenceCode} ${evidenceTitle}.` : ""}
-                    </p>
-                  ) : (
-                    <>
-                      <ActionForm action={updateRequestItemAction}>
-                        <Hidden name="projectId" value={projectId} />
-                        <Hidden name="itemId" value={item.id} />
-                        <div className="space-y-3">
-                          <TextArea
-                            name="description"
-                            label="Requested information"
-                            required
-                            rows={2}
-                            defaultValue={item.description}
-                          />
-                          <FormGrid cols={3}>
-                            <SelectField
-                              name="status"
-                              label="Status"
+                    }
+                  >
+                    {matter && (
+                      <p className="mb-2 text-sm">
+                        Evidence for Assurance matter{" "}
+                        <TextLink href={`/projects/${projectId}/assurance/matters/${matter.id}`}>
+                          {matter.code} {matter.title}
+                        </TextLink>
+                      </p>
+                    )}
+                    {request.status === "closed" ? (
+                      <p className="text-sm text-slate-600">
+                        Request closed. {evidenceCode ? `Fulfilled by ${evidenceCode} ${evidenceTitle}.` : ""}
+                      </p>
+                    ) : (
+                      <>
+                        <ActionForm action={updateRequestItemAction}>
+                          <Hidden name="projectId" value={projectId} />
+                          <Hidden name="itemId" value={item.id} />
+                          <div className="space-y-3">
+                            <TextArea
+                              name="description"
+                              label="Requested information"
                               required
-                              defaultValue={item.status}
-                              options={INFORMATION_REQUEST_ITEM_STATUSES.map((s) => ({
-                                value: s,
-                                label: IR_ITEM_STATUS_LABELS[s],
-                              }))}
+                              rows={2}
+                              defaultValue={item.description}
                             />
-                            <SelectField
-                              name="requestedFromPersonId"
-                              label="Requested from"
-                              defaultValue={item.requestedFromPersonId}
-                              placeholder="—"
-                              options={stakeholderOptions}
-                            />
-                            <DateField name="dueOn" label="Due" defaultValue={item.dueOn} />
-                            <SelectField
-                              name="valueDriverId"
-                              label="Value Driver"
-                              defaultValue={item.valueDriverId}
-                              placeholder="— Not driver-specific —"
-                              options={driverOptions}
-                            />
-                            <SelectField
-                              name="fulfilledByEvidenceId"
-                              label="Fulfilled by evidence"
-                              defaultValue={item.fulfilledByEvidenceId}
-                              placeholder="—"
-                              options={evidenceOptions}
-                              hint="Record evidence in the Evidence register first"
-                            />
-                            <TextField name="notes" label="Notes" defaultValue={item.notes} />
-                          </FormGrid>
-                          <SubmitButton variant="secondary">Save item</SubmitButton>
-                        </div>
-                      </ActionForm>
-                      {request.status === "draft" && (
-                        <div className="mt-3 border-t border-slate-100 pt-3">
-                          <ActionForm
-                            action={removeRequestItemAction}
-                            confirm="Remove this item from the draft request?"
-                            showSuccess={false}
-                          >
-                            <Hidden name="projectId" value={projectId} />
-                            <Hidden name="itemId" value={item.id} />
-                            <SubmitButton variant="danger">Remove item</SubmitButton>
-                          </ActionForm>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </Expander>
-              ))}
+                            <FormGrid cols={3}>
+                              <SelectField
+                                name="status"
+                                label="Status"
+                                required
+                                defaultValue={item.status}
+                                options={INFORMATION_REQUEST_ITEM_STATUSES.map((s) => ({
+                                  value: s,
+                                  label: IR_ITEM_STATUS_LABELS[s],
+                                }))}
+                              />
+                              <SelectField
+                                name="requestedFromPersonId"
+                                label="Requested from"
+                                defaultValue={item.requestedFromPersonId}
+                                placeholder="—"
+                                options={stakeholderOptions}
+                              />
+                              <DateField name="dueOn" label="Due" defaultValue={item.dueOn} />
+                              <SelectField
+                                name="valueDriverId"
+                                label="Value Driver"
+                                defaultValue={item.valueDriverId}
+                                placeholder="— Not driver-specific —"
+                                options={driverOptions}
+                              />
+                              <SelectField
+                                name="fulfilledByEvidenceId"
+                                label="Fulfilled by evidence"
+                                defaultValue={item.fulfilledByEvidenceId}
+                                placeholder="—"
+                                options={evidenceOptions}
+                                hint="Record evidence in the Evidence register first"
+                              />
+                              <TextField name="notes" label="Notes" defaultValue={item.notes} />
+                            </FormGrid>
+                            <SubmitButton variant="secondary">Save item</SubmitButton>
+                          </div>
+                        </ActionForm>
+                        {request.status === "draft" && (
+                          <div className="mt-3 border-t border-slate-100 pt-3">
+                            <ActionForm
+                              action={removeRequestItemAction}
+                              confirm="Remove this item from the draft request?"
+                              showSuccess={false}
+                            >
+                              <Hidden name="projectId" value={projectId} />
+                              <Hidden name="itemId" value={item.id} />
+                              <SubmitButton variant="danger">Remove item</SubmitButton>
+                            </ActionForm>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </Expander>
+                ),
+              )}
             </div>
           </div>
         );

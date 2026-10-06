@@ -47,9 +47,9 @@ test("matter outside a review → working stages → working VL → remediation 
   const matterUrl = await raiseMatter(page, "VL-202", "Vendor cutover slipping");
 
   const owner = page.getByTestId("owner-form");
-  await owner.getByLabel("Risk / Leakage Owner").selectOption({ label: "Test VCO" });
+  await owner.getByLabel("Risk / Leakage Owner").selectOption({ label: "Test VCO — Value Case Owner" }); // 4D.13: person — role
   await submit(owner, "Save owner", "Risk / Leakage Owner updated");
-  await expect(page.getByTestId("matter-owner")).toHaveText("Test VCO");
+  await expect(page.getByTestId("matter-owner")).toHaveText("Test VCO — Value Case Owner");
 
   await setStage(page, "Awaiting evidence");
   await setStage(page, "Assessing");

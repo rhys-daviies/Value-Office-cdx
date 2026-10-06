@@ -283,7 +283,7 @@ export function canonicalJourney(actor: Actor, opts: { code: string; name: strin
 
       const { person: lead } = await addStakeholder(actor, {
         projectId: p,
-        name: "Test Delivery Lead",
+        name: "Dana Whitfield",
         roleDescription: "Risk / Leakage Owner",
       });
       s.lead = lead;

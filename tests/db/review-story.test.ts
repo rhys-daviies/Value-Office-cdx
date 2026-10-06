@@ -81,7 +81,7 @@ describe("review story", () => {
         title: "Vendor sequencing risk",
         status: "open",
         stage: "escalated",
-        ownerName: "Test Delivery Lead",
+        ownerName: "Dana Whitfield",
         raisedInThisReview: false, // raised in Continuous Assurance, formally assessed here
         drivers: [
           {

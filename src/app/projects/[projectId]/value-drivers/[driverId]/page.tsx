@@ -35,6 +35,7 @@ import {
 } from "@/ui/format";
 import { EVIDENCE_STATUS_LABELS, QUALIFICATION_LABELS, VERSION_STATUS_LABELS } from "@/ui/labels";
 import { isUuid, requireProject } from "@/ui/require";
+import { ownerOptions, personWithRole } from "@/ui/people";
 
 export const metadata = { title: "Value Driver" };
 
@@ -48,7 +49,7 @@ export default async function ValueDriverPage({ params }: PageProps<"/projects/[
   const { record, working } = entry;
   const currency = project.currency;
   const base = `/projects/${projectId}`;
-  const stakeholders = d.stakeholders.map((s) => ({ value: s.personId, label: s.name }));
+  const stakeholders = ownerOptions(d.stakeholders);
   const hidden = (
     <>
       <Hidden name="projectId" value={projectId} />
@@ -109,7 +110,7 @@ export default async function ValueDriverPage({ params }: PageProps<"/projects/[
                 [
                   "Working AVO",
                   <span key="a" data-testid="working-avo">
-                    {entry.avoName ?? "Not assigned"}
+                    {entry.avoName ? personWithRole(entry.avoName, entry.avoRole) : "Not assigned"}
                   </span>,
                 ],
                 [
@@ -234,7 +235,11 @@ export default async function ValueDriverPage({ params }: PageProps<"/projects/[
             </Expander>
 
             <div>
-              <h3 className="mb-2 text-sm font-semibold">Working assumptions ({d.assumptions.length})</h3>
+              <h3 className="mb-1 text-sm font-semibold">Working assumptions ({d.assumptions.length})</h3>
+              <p className="mb-2 text-xs text-slate-600" data-testid="driver-assumptions-help">
+                The assumptions behind this driver&apos;s current working forecast, with how well evidence supports
+                each. They become the governed Assumptions when the driver is next included in a Value Change.
+              </p>
               {d.assumptions.length === 0 && <Empty>No working assumptions yet.</Empty>}
               <div className="space-y-2" data-testid="driver-assumptions">
                 {d.assumptions.map((a) => (

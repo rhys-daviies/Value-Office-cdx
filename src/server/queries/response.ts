@@ -44,6 +44,8 @@ export function workingAmounts(m: Pick<MatterRow, "workingTotalAmount" | "workin
 export type LeakageEntry = {
   leakage: MatterRow;
   ownerName: string | null;
+  /** The owner's role on this engagement (Phase 4D.13 presentation: "person — role"). Not used by the reports. */
+  ownerRole: string | null;
   /** Review the matter was raised in; null when raised in Continuous Assurance. */
   identifiedInSequence: number | null;
   drivers: { valueDriverId: string; code: string }[];
@@ -60,11 +62,19 @@ export async function getLeakageRegister(projectId: string): Promise<LeakageEntr
     .select({
       leakage: schema.valueLeakage,
       ownerName: schema.person.name,
+      ownerRole: schema.projectStakeholder.roleDescription,
       identifiedInSequence: identifiedIn.sequence,
     })
     .from(schema.valueLeakage)
     .leftJoin(identifiedIn, eq(identifiedIn.id, schema.valueLeakage.identifiedInReviewId))
     .leftJoin(schema.person, eq(schema.person.id, schema.valueLeakage.responseOwnerPersonId))
+    .leftJoin(
+      schema.projectStakeholder,
+      and(
+        eq(schema.projectStakeholder.projectId, schema.valueLeakage.projectId),
+        eq(schema.projectStakeholder.personId, schema.valueLeakage.responseOwnerPersonId),
+      ),
+    )
     .where(eq(schema.valueLeakage.projectId, projectId))
     .orderBy(asc(schema.valueLeakage.code));
   if (items.length === 0) return [];
@@ -92,7 +102,7 @@ export async function getLeakageRegister(projectId: string): Promise<LeakageEntr
     .where(inArray(schema.leakageAssessment.valueLeakageId, ids))
     .orderBy(asc(schema.assuranceReview.sequence));
 
-  return items.map(({ leakage, ownerName, identifiedInSequence }) => {
+  return items.map(({ leakage, ownerName, ownerRole, identifiedInSequence }) => {
     const mine = assessments
       .filter((x) => x.a.valueLeakageId === leakage.id)
       .map((x) => ({ ...x.a, reviewSequence: x.reviewSequence, reviewStatus: x.reviewStatus }));
@@ -100,6 +110,7 @@ export async function getLeakageRegister(projectId: string): Promise<LeakageEntr
     return {
       leakage,
       ownerName,
+      ownerRole,
       identifiedInSequence,
       drivers: drivers.filter((d) => d.valueLeakageId === leakage.id),
       assessments: mine,

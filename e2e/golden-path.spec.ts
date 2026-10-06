@@ -49,7 +49,7 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await expect(page.getByTestId("vco-name")).toContainText("Vera Owner");
 
   await addStakeholder.getByLabel("Name").fill("Avery Accountable");
-  await addStakeholder.getByLabel("Role on this project").fill("AVO — Service");
+  await addStakeholder.getByLabel("Role on this engagement").fill("AVO — Service");
   await submit(addStakeholder, "Add stakeholder", "Avery Accountable added");
   await expect(page.getByTestId("stakeholder")).toHaveCount(2);
 
@@ -88,7 +88,7 @@ test("consultant takes a project from creation to Authorised V1", async ({ page 
   await page.getByTestId("create-ir-form").getByRole("button", { name: "Create Information Request" }).click();
   const item = page.getByTestId("add-ir-item-form");
   await item.getByLabel("Requested information").fill("Baseline effort per case, FY25");
-  await item.getByLabel("Requested from").selectOption({ label: "Avery Accountable" });
+  await item.getByLabel("Requested from").selectOption({ label: "Avery Accountable — AVO — Service" }); // 4D.13: person — role
   await item.getByLabel("Value Driver").selectOption({ label: "VD-01 Service Productivity" });
   await submit(item, "Add item", "Item added");
   await expect(page.getByTestId("ir-item")).toHaveCount(1);

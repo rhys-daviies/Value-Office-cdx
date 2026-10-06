@@ -12,11 +12,16 @@ import { requireProject } from "@/ui/require";
 
 export const metadata = { title: "Evidence" };
 
-export default async function EvidencePage({ params }: PageProps<"/projects/[projectId]/evidence">) {
+export default async function EvidencePage({ params, searchParams }: PageProps<"/projects/[projectId]/evidence">) {
   const { projectId } = await params;
+  const query = await searchParams;
   await requireProject(projectId);
-  const { entries, documents, stakeholders } = await getEvidenceRegister(projectId);
+  const { entries: all, documents, stakeholders } = await getEvidenceRegister(projectId);
   const base = `/projects/${projectId}/evidence`;
+  // Phase 4D.13: a simple lens, not a workflow — evidence with no existing relationship to anything it supports.
+  const onlyUnclassified = query.show === "needs-classification";
+  const unclassifiedCount = all.filter((e) => e.needsClassification).length;
+  const entries = onlyUnclassified ? all.filter((e) => e.needsClassification) : all;
   const stakeholderOptions = stakeholders.map((s) => ({ value: s.personId, label: s.name }));
   const documentOptions = documents.map(({ document: d }) => ({ value: d.id, label: d.title }));
 
@@ -30,7 +35,25 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
       </p>
 
       <Section
-        title={`Evidence register (${entries.length})`}
+        title={`Evidence register (${all.length})`}
+        actions={
+          <span className="inline-flex gap-3 text-sm" data-testid="evidence-filter">
+            {onlyUnclassified ? (
+              <Link href={base} className="text-sky-800 hover:underline">
+                Show all
+              </Link>
+            ) : (
+              <span className="font-medium text-slate-700">All</span>
+            )}
+            {onlyUnclassified ? (
+              <span className="font-medium text-slate-700">Needs classification ({unclassifiedCount})</span>
+            ) : (
+              <Link href={`${base}?show=needs-classification`} className="text-sky-800 hover:underline">
+                Needs classification ({unclassifiedCount})
+              </Link>
+            )}
+          </span>
+        }
         description={
           <span className="inline-flex flex-wrap items-center gap-2">
             Why do we believe it? <GovernedTag>Formal reliance</GovernedTag> locks evidence once relied on;{" "}
@@ -39,7 +62,11 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
         }
       >
         {entries.length === 0 ? (
-          <Empty>No evidence recorded yet.</Empty>
+          <Empty>
+            {onlyUnclassified
+              ? "Every item of evidence is linked to something it supports."
+              : "No evidence recorded yet."}
+          </Empty>
         ) : (
           <Table>
             <thead>
@@ -109,6 +136,14 @@ export default async function EvidencePage({ params }: PageProps<"/projects/[pro
                     ))}
                   </td>
                   <td className="space-y-1">
+                    {e.needsClassification && (
+                      <span
+                        title="Not yet linked to a Value Driver, assumption, Assurance matter or review, request item or governance record"
+                        data-testid="evidence-needs-classification"
+                      >
+                        <PlainBadge tone="amber">Needs classification</PlainBadge>
+                      </span>
+                    )}
                     {e.locked && <LockedBadge label="Locked" />}
                     {e.evidence.isMaterialChange && <PlainBadge tone="red">Material change</PlainBadge>}
                     {e.supersedesCode && <PlainBadge>Supersedes {e.supersedesCode}</PlainBadge>}

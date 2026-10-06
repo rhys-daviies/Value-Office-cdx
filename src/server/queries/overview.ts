@@ -56,6 +56,8 @@ export type ExecutiveOverview = {
     working: { total: string | null };
     evidenceOutstanding: { items: number; matters: number };
     remediation: { planned: number; unplanned: number; monitored: number };
+    /** Phase 4D.13: small operational signals — overdue request items and evidence needing classification. */
+    operational: { overdueRequestItems: number; evidenceNeedingClassification: number };
   };
   /** Phase 4D.10H: what is happening in governance, and the one next governed action. */
   governance: GovernanceState;
@@ -123,6 +125,7 @@ export async function getExecutiveOverview(projectId: string, today = todayIso()
       working: { total: workspace.working.total },
       evidenceOutstanding: workspace.evidenceOutstanding,
       remediation: workspace.remediation,
+      operational: state.operational,
     },
     governance,
     decision,

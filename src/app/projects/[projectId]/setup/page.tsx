@@ -171,11 +171,15 @@ export default async function SetupPage({ params }: PageProps<"/projects/[projec
                   <Hidden name="projectId" value={projectId} />
                   <Hidden name="personId" value={s.personId} />
                   <FormGrid cols={3}>
-                    <TextField name="name" label="Name" required defaultValue={s.name} />
+                    <TextField name="name" label="Person's name" required defaultValue={s.name} />
                     <TextField name="title" label="Title" defaultValue={s.title} />
                     <TextField name="organisation" label="Organisation" defaultValue={s.organisation} />
                     <TextField name="email" label="Email" type="email" defaultValue={s.email} />
-                    <TextField name="roleDescription" label="Role on this project" defaultValue={s.roleDescription} />
+                    <TextField
+                      name="roleDescription"
+                      label="Role on this engagement"
+                      defaultValue={s.roleDescription}
+                    />
                   </FormGrid>
                   <div className="mt-3">
                     <SubmitButton variant="secondary">Save stakeholder</SubmitButton>
@@ -191,7 +195,7 @@ export default async function SetupPage({ params }: PageProps<"/projects/[projec
             <ActionForm action={addStakeholderAction} resetOnSuccess testId="add-stakeholder-form">
               <Hidden name="projectId" value={projectId} />
               <FormGrid>
-                <TextField name="name" label="Name" required />
+                <TextField name="name" label="Person's name" required placeholder="e.g. Jane Smith" />
                 <TextField name="title" label="Title" />
                 <TextField name="organisation" label="Organisation" />
                 <TextField name="email" label="Email" type="email" />
@@ -199,8 +203,8 @@ export default async function SetupPage({ params }: PageProps<"/projects/[projec
               <div className="mt-3 space-y-3">
                 <TextField
                   name="roleDescription"
-                  label="Role on this project"
-                  placeholder="e.g. Programme Sponsor, AVO for Retention"
+                  label="Role on this engagement"
+                  placeholder="e.g. Programme Sponsor, AVO for Retention, Risk / Leakage Owner"
                 />
                 <Checkbox name="makeVco" label="This person is the Value Case Owner" />
                 <SubmitButton>Add stakeholder</SubmitButton>

@@ -43,7 +43,7 @@ test("matter → request evidence → document and fulfil → stage stays → de
   await page.getByTestId("request-evidence").locator("summary").click();
   const request = page.getByTestId("request-evidence-form");
   await request.getByLabel("Evidence required").fill("Revised vendor implementation schedule");
-  await request.getByLabel("Requested from").selectOption({ label: "Test VCO" });
+  await request.getByLabel("Requested from").selectOption({ label: "Test VCO — Value Case Owner" }); // 4D.13: person — role
   await request.getByLabel("Due").fill("2026-10-05");
   await request.getByLabel("Value Driver").selectOption({ index: 1 }); // VD-01 (affected) listed first
   await expect(request.getByLabel("Add to Assurance Information Request")).toHaveValue("new");
@@ -51,7 +51,7 @@ test("matter → request evidence → document and fulfil → stage stays → de
   const item = page.getByTestId("matter-request");
   await expect(item).toContainText("IR-01 #1");
   await expect(item).toContainText("Open");
-  await expect(item).toContainText("Requested from Test VCO");
+  await expect(item).toContainText("Requested from Test VCO — Value Case Owner");
   await expect(item).toContainText("Value Driver VD-01");
   await expect(page.getByTestId("matter-next-step")).toContainText("1 evidence request(s) outstanding");
 

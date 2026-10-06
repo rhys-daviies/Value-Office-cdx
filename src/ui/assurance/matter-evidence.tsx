@@ -17,6 +17,7 @@ import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from ".
 import { Empty, Expander, Notice, Section, TextLink } from "../components/layout";
 import { formatDate } from "../format";
 import { IR_ITEM_STATUS_LABELS } from "../labels";
+import { personWithRole } from "@/ui/people";
 
 type Option = { value: string; label: string };
 
@@ -216,7 +217,7 @@ export function MatterEvidenceSections({
                 </div>
                 <div className="text-xs text-slate-500">
                   {[
-                    `Requested from ${i.requestedFromName ?? "—"}`,
+                    `Requested from ${i.requestedFromName ? personWithRole(i.requestedFromName, i.requestedFromRole) : "—"}`,
                     i.item.dueOn && `due ${formatDate(i.item.dueOn)}`,
                     i.driverCode && `Value Driver ${i.driverCode}`,
                   ]

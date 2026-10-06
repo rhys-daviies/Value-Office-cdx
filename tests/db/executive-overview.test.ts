@@ -121,7 +121,7 @@ describe("executive Overview", () => {
       matter: {
         code: "VL-001",
         title: "Vendor sequencing risk",
-        ownerName: "Test Delivery Lead",
+        ownerName: "Dana Whitfield",
         drivers: [{ code: "VD-01", name: "Procurement Savings" }],
         conditions: [{ kind: "escalated", label: "Escalated — decision required" }],
         formal: {

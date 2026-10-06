@@ -2,12 +2,14 @@ import { and, count, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { type AttentionItem, deriveMatterAttention, todayIso } from "@/domain/attention";
 import { type EvidenceRequestState, evidenceRequestState, type RequestCounts } from "@/domain/assurance-workflow";
+import { overdueCount } from "@/domain/request-queue";
 import { summariseLeakage } from "@/domain/response";
 import { ASSURANCE_STAGES, type AssuranceStage } from "@/domain/statuses";
 import { db, schema } from "@/server/db/client";
 
 import { getAssuranceWorkspace, getNextAssuranceRequirement, getValuePositionSummary } from "./assurance";
 import { getDriverRegister } from "./drivers";
+import { evidenceNeedingClassification } from "./evidence";
 import { getContinuousAssurance, getResponseSummary, type LeakageEntry } from "./response";
 import { loadVersionDrivers } from "./value-case";
 
@@ -160,6 +162,24 @@ export async function getOverviewValueOfficeState(projectId: string, today = tod
     .select({ n: count() })
     .from(schema.evidenceLink)
     .where(and(eq(schema.evidenceLink.projectId, projectId), isNotNull(schema.evidenceLink.valueLeakageId)));
+  // Phase 4D.13 operational signals — the same definitions as the Information Requests queue and the Evidence register.
+  const [requestItems, unclassified] = await Promise.all([
+    db()
+      .select({
+        requestStatus: schema.informationRequest.status,
+        itemStatus: schema.informationRequestItem.status,
+        dueOn: schema.informationRequestItem.dueOn,
+        reference: schema.informationRequest.reference,
+        sequence: schema.informationRequestItem.sequence,
+      })
+      .from(schema.informationRequestItem)
+      .innerJoin(
+        schema.informationRequest,
+        eq(schema.informationRequest.id, schema.informationRequestItem.informationRequestId),
+      )
+      .where(eq(schema.informationRequestItem.projectId, projectId)),
+    evidenceNeedingClassification(projectId),
+  ]);
   return {
     position,
     cadence,
@@ -173,6 +193,10 @@ export async function getOverviewValueOfficeState(projectId: string, today = tod
     },
     pendingChanges,
     matterEvidenceLinks: evidence?.n ?? 0,
+    operational: {
+      overdueRequestItems: overdueCount(requestItems, today),
+      evidenceNeedingClassification: unclassified.size,
+    },
   };
 }
 

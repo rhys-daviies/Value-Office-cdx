@@ -100,6 +100,31 @@ export function ValueAttention({ o, base }: { o: ExecutiveOverview; base: string
           </span>
         </p>
       )}
+      <OperationalSignals o={o} base={base} />
     </section>
+  );
+}
+
+/** Phase 4D.13: two small attention indicators linking to where the work is done — shown only when there is any. */
+function OperationalSignals({ o, base }: { o: ExecutiveOverview; base: string }) {
+  const { overdueRequestItems: overdue, evidenceNeedingClassification: unclassified } = o.attention.operational;
+  if (overdue === 0 && unclassified === 0) return null;
+  const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+  return (
+    <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" data-testid="attention-operational">
+      {overdue > 0 && (
+        <TextLink href={`${base}/information-request`}>
+          <span data-testid="attention-overdue-requests">{plural(overdue, "overdue request item")}</span> →
+        </TextLink>
+      )}
+      {unclassified > 0 && (
+        <TextLink href={`${base}/evidence?show=needs-classification`}>
+          <span data-testid="attention-unclassified-evidence">
+            {plural(unclassified, "evidence item")} need{unclassified === 1 ? "s" : ""} classification
+          </span>{" "}
+          →
+        </TextLink>
+      )}
+    </p>
   );
 }

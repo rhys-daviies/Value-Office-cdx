@@ -281,6 +281,28 @@ export const authoriseValueChange = defineCommand(
     if (valueCase.vcoPersonId !== input.authorisedByPersonId) {
       throw new DomainError("VO_NOT_VCO", "Only the Value Case Owner can authorise a Value Change");
     }
+    // Phase 4D.13 governance guard: authorising supersedes the version in force. A draft Assurance Review measured
+    // against that version could then never be finalised (the database only finalises against the authorised
+    // version) and would block every new review. Refuse — nothing is changed — until the draft is finalised.
+    const [stranded] = await tx
+      .select({ sequence: schema.assuranceReview.sequence, versionNumber: schema.valueCaseVersion.versionNumber })
+      .from(schema.assuranceReview)
+      .innerJoin(schema.valueCaseVersion, eq(schema.valueCaseVersion.id, schema.assuranceReview.againstVersionId))
+      .where(
+        and(
+          eq(schema.assuranceReview.projectId, change.projectId),
+          eq(schema.assuranceReview.status, "draft"),
+          eq(schema.assuranceReview.againstVersionId, change.fromVersionId),
+        ),
+      );
+    if (stranded) {
+      throw new DomainError(
+        "VO_DRAFT_REVIEW_OPEN",
+        `${change.code} cannot be authorised while Assurance Review #${stranded.sequence} is still a draft measured ` +
+          `against Authorised V${stranded.versionNumber}: authorising would supersede V${stranded.versionNumber} and ` +
+          `leave that review unable to be finalised. Finalise Review #${stranded.sequence} first, then authorise ${change.code}.`,
+      );
+    }
     const now = new Date();
     const authorisation = {
       authorisedOn: input.authorisedOn,

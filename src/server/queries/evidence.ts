@@ -72,7 +72,7 @@ export async function getEvidenceRegister(projectId: string) {
     .where(eq(schema.evidence.projectId, projectId))
     .orderBy(asc(schema.evidence.code));
 
-  const [links, reviewLinks, locked, authorisations, documents, stakeholders] = await Promise.all([
+  const [links, reviewLinks, locked, authorisations, documents, stakeholders, unclassified] = await Promise.all([
     listLinks(projectId),
     db()
       .select({
@@ -100,6 +100,7 @@ export async function getEvidenceRegister(projectId: string) {
       ),
     listDocuments(projectId),
     listStakeholders(projectId),
+    evidenceNeedingClassification(projectId),
   ]);
   const { matterLinks, driverLinks, fulfils } = await listWorkingUse(projectId);
 
@@ -113,6 +114,8 @@ export async function getEvidenceRegister(projectId: string) {
     driverLinks: driverLinks.filter((l) => l.evidenceId === r.evidence.id),
     fulfils: fulfils.filter((f) => f.evidenceId === r.evidence.id),
     locked: locked.has(r.evidence.id),
+    /** Phase 4D.13: no existing relationship to anything it supports (see evidenceNeedingClassification). */
+    needsClassification: unclassified.has(r.evidence.id),
   }));
   return { entries, documents, stakeholders };
 }
@@ -174,6 +177,27 @@ async function listWorkingUse(projectId: string) {
 }
 
 /** Mirrors vo_evidence_is_locked(): relied on by a non-draft version. */
+/**
+ * Evidence needing classification (Phase 4D.13): evidence with NO existing relationship to anything it supports — no
+ * evidence link of any kind (driver, driver version, assumption, Assurance matter, Assurance Review), not the evidence
+ * that fulfilled an Information Request item, and not cited by an authorisation, a review trigger or a decision.
+ * Derived from existing relationships only — no stored state. A driver link is NOT required: evidence tied to a
+ * review, matter, request or governance record is classified. (Superseding evidence is not, by itself, classified:
+ * it still needs its own links.) The one definition used by the Evidence register and the Overview count.
+ */
+export async function evidenceNeedingClassification(projectId: string): Promise<Set<string>> {
+  const result = await db().execute<{ id: string }>(sql`
+    select e.id from evidence e
+    where e.project_id = ${projectId}
+      and not exists (select 1 from evidence_link l where l.evidence_id = e.id)
+      and not exists (select 1 from information_request_item i where i.fulfilled_by_evidence_id = e.id)
+      and not exists (select 1 from value_case_version v where v.authorisation_evidence_id = e.id)
+      and not exists (select 1 from value_change c where c.authorisation_evidence_id = e.id)
+      and not exists (select 1 from assurance_review r where r.trigger_evidence_id = e.id)
+      and not exists (select 1 from decision d where d.supporting_evidence_id = e.id)`);
+  return new Set(result.rows.map((r) => r.id));
+}
+
 async function lockedEvidenceIds(projectId: string): Promise<Set<string>> {
   const result = await db().execute<{ id: string }>(sql`
     select e.id from evidence e
@@ -257,6 +281,7 @@ export async function getMatterEvidence(projectId: string, matterId: string) {
           status: schema.informationRequest.status,
         },
         requestedFromName: schema.person.name,
+        requestedFromRole: schema.projectStakeholder.roleDescription,
         driverCode: schema.valueDriver.code,
         evidence: { id: fulfilled.id, code: fulfilled.code, title: fulfilled.title },
       })
@@ -266,6 +291,13 @@ export async function getMatterEvidence(projectId: string, matterId: string) {
         eq(schema.informationRequest.id, schema.informationRequestItem.informationRequestId),
       )
       .leftJoin(schema.person, eq(schema.person.id, schema.informationRequestItem.requestedFromPersonId))
+      .leftJoin(
+        schema.projectStakeholder,
+        and(
+          eq(schema.projectStakeholder.projectId, schema.informationRequestItem.projectId),
+          eq(schema.projectStakeholder.personId, schema.informationRequestItem.requestedFromPersonId),
+        ),
+      )
       .leftJoin(schema.valueDriver, eq(schema.valueDriver.id, schema.informationRequestItem.valueDriverId))
       .leftJoin(fulfilled, eq(fulfilled.id, schema.informationRequestItem.fulfilledByEvidenceId))
       .where(

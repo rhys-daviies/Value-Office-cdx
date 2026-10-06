@@ -11,6 +11,7 @@ import { DateField, FormGrid, Hidden, SelectField, TextArea, TextField } from ".
 import { Empty, Expander, Table } from "../components/layout";
 import { formatDate, formatMoneyShort } from "../format";
 import { ASSURANCE_STAGE_LABELS } from "../labels";
+import { personWithRole } from "@/ui/people";
 
 type Option = { value: string; label: string };
 type Driver = { driverId: string; code: string; name: string };
@@ -237,7 +238,13 @@ export function ContinuousAssurance({
                   <td>
                     <StageBadge entry={e} />
                   </td>
-                  <td>{e.ownerName ?? <span className="text-amber-700">Not assigned</span>}</td>
+                  <td>
+                    {e.ownerName ? (
+                      personWithRole(e.ownerName, e.ownerRole)
+                    ) : (
+                      <span className="text-amber-700">Not assigned</span>
+                    )}
+                  </td>
                   <td>
                     <WorkingAmount entry={e} currency={currency} />
                   </td>

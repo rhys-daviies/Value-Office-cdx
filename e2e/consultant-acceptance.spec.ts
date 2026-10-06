@@ -150,7 +150,7 @@ test("full consultant journey: new project → Original Business Case → V1 →
     await s.getByLabel("This person is the Value Case Owner").check();
     await submit(s, "Add stakeholder", "Val Owner added as Value Case Owner");
     await s.getByLabel("Name").fill("Ava Accountable");
-    await s.getByLabel("Role on this project").fill("AVO — Procurement");
+    await s.getByLabel("Role on this engagement").fill("AVO — Procurement");
     await submit(s, "Add stakeholder", "Ava Accountable added");
 
     const dayOne = page.getByTestId("day-one-create-form");
@@ -310,7 +310,7 @@ test("full consultant journey: new project → Original Business Case → V1 →
     await m.getByLabel("Code").fill("VL-001");
     await m.getByLabel("Issue").fill("Supplier price increase");
     await m.getByLabel("Description").fill("Lead supplier signalled a 6% increase from Q3");
-    await m.getByLabel("Risk / Leakage Owner").selectOption({ label: "Ava Accountable" });
+    await m.getByLabel("Risk / Leakage Owner").selectOption({ label: "Ava Accountable — AVO — Procurement" }); // person — role
     await m.getByLabel("VD-01").check();
     await m.getByRole("button", { name: "Raise matter" }).click();
     await page.waitForURL(/\/assurance\/matters\/[0-9a-f-]{36}$/);
@@ -326,7 +326,7 @@ test("full consultant journey: new project → Original Business Case → V1 →
     await open(page.getByTestId("request-evidence"));
     const req = page.getByTestId("request-evidence-form");
     await req.getByLabel("Evidence required").fill("Supplier price notice");
-    await req.getByLabel("Requested from").selectOption({ label: "Ava Accountable" });
+    await req.getByLabel("Requested from").selectOption({ label: "Ava Accountable — AVO — Procurement" });
     await req.getByRole("button", { name: "Request evidence" }).click();
     await expect(page.getByTestId("matter-request-summary")).toHaveText("Evidence requested · 1 item outstanding");
 
