@@ -1,0 +1,386 @@
+{
+  "kind": "4d10-final-freeze",
+  "release": "Value Office 4D.10",
+  "phase": "4D.10R4",
+  "accepted": true,
+  "accepted_by": "PMO (4D.10R4)",
+  "captured_at": "2026-10-06T02:13:04Z",
+  "captured_by": "read-only vo_runtime session (target-verified), no credentials recorded",
+  "application": {
+    "git_sha": "afe224825595cf5d13f052420116e5310bb55fc2",
+    "vercel_deployment": "dpl_FiRvJW8QqVJkkDyjpfQak6JqLH6S",
+    "domain": "value-office-cdx.vercel.app",
+    "previous_healthy_deployment": {
+      "id": "dpl_6PUBbKWZ2HC6Wb1uju5MRVSdbUvr",
+      "git_sha": "b7d0c46",
+      "note": "verified healthy on 0026 in R2; rollback target"
+    }
+  },
+  "database": {
+    "target": {
+      "neon_project_id": "delicate-resonance-93129287",
+      "branch_name": "main",
+      "branch_id": "br-tiny-star-b7b8d3bh",
+      "endpoint_id": "ep-old-mode-b7jl3rd0",
+      "host": "ep-old-mode-b7jl3rd0.c-13.us-east-1.aws.neon.tech",
+      "database": "neondb"
+    },
+    "server_version": "18.6 (4e955f5)",
+    "migration_head": "0026_phase4d10h_value_change_determination_integrity",
+    "migration_rows": 27,
+    "migration_hashes": [
+      "fbd6cc5db3fd87560ea70eb9f887682ee978d785176f1a915a757565c5dd652d",
+      "166c287e2bdd5b456d7a97480987cc3bd83e857982313937f969fd78972d26d5",
+      "eac00f3da080d749f0b8e76136bfb1907b0e12f1a75e8bed5a62622d1742d1a0",
+      "c506eb0c67485136c210c45dc91059795dcc98a58f21782c7aeaf242f0432e1d",
+      "25c915fe572a3aa9ed300d7c55d02fd0c3d00a054960c86f050e3f159890e3b4",
+      "dd710c63c6aca1c84c8779d8075e8cb88e822b516f2abe51c0b0b75e5ca0a11f",
+      "68cdf7f1a172aa053a51ce453d0a5d13729711c45a67f27ddd7218f94224bbd8",
+      "bd7b01082a38784d536d74276426c2f44a7447daed96f1664e6a923f245cddd8",
+      "2c07fd9e0cf36cb83ce1ecbac080639e49c98f3b50061b425d0a88b45e2eab08",
+      "34bb0751fceee53e322233f3a165a8dd9f5c74da943d714d481b16585696c32a",
+      "461894aca80553846c5819906a648e3f5da90468fd7cc938f071eed9019929cd",
+      "809a9d1a7ca8469b4a2f4791d6a53447d0550be8371c8eef1d393438fd905220",
+      "4ff496691bc4547433c0c1cf0fc2c082bcbf8e381d65e0a71aa64f940ec58fd3",
+      "9b8da749d60f18380630418bd77d6e0da6ded10d2f2562b55fa9ac6bb514a14a",
+      "243f2c59c022aefcdd40cbf89f44618de5267a242c88ec882c18682337f42b66",
+      "4fe1fcc72a6fffff7aba609d2533db50602bed928ad0073fe6587424dbcb254c",
+      "08ab264c8bb60c7ed4a7a593ec4f4622553ec62b28114477574dca02fa13cd75",
+      "04efb08d6eb83319af9aa03db964712642c1be16042c2627312f3433829a4c7c",
+      "645189a0744897f85dcde142d23b455cbfe959b0658db418b18220320d6d10b4",
+      "40cd6382df4b0033aaf068ab983059d52ca00ce4cca25d49279713712a7be4bc",
+      "f54c6863e97204555945126803ae1696a08333d9c383cb0ab2eb46fe818bfae6",
+      "32f092e1d4ed3646bfd7ba47dd3a6bdc6f92d1602554d8b4dcd10c483ec8c774",
+      "bf132649b79c8839170a55f497d1d1bf477e530e9ed03888fb31ad2712a7eaa7",
+      "f8c3a1f23d323c4a97b07e7740cf90ee584c5fb671eb9ffcab3dfedcf094f602",
+      "0d8c06da2968ecba342773d4063c4474fc7ea48cea929b84d6d3f2acfb6f4f80",
+      "02d4f98e3afd342a75eb6db23cd2590ad640b59cd1e3edaa1c879e5b07531680",
+      "d02cea6c4a2fd4c2e6d4e6c849d8e1867301711bf3d964dd4408f14bf14fd1c0"
+    ],
+    "schema": {
+      "facts": 1216,
+      "sha256_sorted_facts": "58180acb9f8fcc9456168d0b14f9df7ba3fae9430e3ab0e49912b1069e17d6a4",
+      "equals": "scripts/release/schema-0026.txt"
+    },
+    "tables": 36,
+    "rows_total": 671,
+    "factual_rows": 256,
+    "factual_digest_sha256": "bbb1f99ec87dbbfe6d0739143cc88a7ab92fbd44b67ffaaf05c15d62c9fe9ff0",
+    "table_digests": {
+      "app_credential": {
+        "count": 1,
+        "md5": "82658291ed20926f7efe023b362572a9"
+      },
+      "app_session": {
+        "count": 14,
+        "md5": "9ea95e8038dd7359f82b5cdf044e65bd"
+      },
+      "app_user": {
+        "count": 1,
+        "md5": "c1154b634a6d1b222986266b5f93ff4f"
+      },
+      "assumption": {
+        "count": 4,
+        "md5": "f74f1fec9a664c4daf3eca3ac015e604"
+      },
+      "assurance_review": {
+        "count": 11,
+        "md5": "bff2a2f3769aa14c6cd37de6340a468a"
+      },
+      "audit_event": {
+        "count": 399,
+        "md5": "afef8dcd14172ae3ef5bb332d777901a"
+      },
+      "client": {
+        "count": 6,
+        "md5": "683fbeb57a6280376f5624c731221e8a"
+      },
+      "decision": {
+        "count": 5,
+        "md5": "1f4a46e2c68ad3899041c4279a978c60"
+      },
+      "document": {
+        "count": 0,
+        "md5": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "evidence": {
+        "count": 16,
+        "md5": "4b150bb8202bd96149000102daa68499"
+      },
+      "evidence_link": {
+        "count": 10,
+        "md5": "6393a3ebf725107552924316812d737e"
+      },
+      "information_request": {
+        "count": 3,
+        "md5": "3a133894bf64cc06a5a43763987bea1a"
+      },
+      "information_request_item": {
+        "count": 6,
+        "md5": "675536177b46f8444ef2e83dd1e4483d"
+      },
+      "key_date": {
+        "count": 8,
+        "md5": "4621944d20ed24bdbb1c268f6b589845"
+      },
+      "leakage_assessment": {
+        "count": 6,
+        "md5": "07f37a7d452a1769695e70039d178675"
+      },
+      "person": {
+        "count": 8,
+        "md5": "b9074e1d399763e170e38fa792a5067f"
+      },
+      "project": {
+        "count": 7,
+        "md5": "79c0b2513a2daf874b0a9dca4701602c"
+      },
+      "project_stakeholder": {
+        "count": 8,
+        "md5": "b711001f5b656ea39b5ae508d0333b01"
+      },
+      "recommendation": {
+        "count": 5,
+        "md5": "e613918641d646c6aba7433acd07df65"
+      },
+      "recommendation_review_event": {
+        "count": 0,
+        "md5": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "report_document": {
+        "count": 3,
+        "md5": "54258079d781d2598b3d8cf44f829bc7"
+      },
+      "report_issue": {
+        "count": 3,
+        "md5": "2067687716ea3e48aa494699bff165b3"
+      },
+      "scenario": {
+        "count": 14,
+        "md5": "c0f4b15df2f8242984329c938dea960b"
+      },
+      "value_case": {
+        "count": 7,
+        "md5": "db18e85d486ba53f6cea489abcf11847"
+      },
+      "value_case_version": {
+        "count": 15,
+        "md5": "70545c4692653c736cda067251afc1de"
+      },
+      "value_change": {
+        "count": 4,
+        "md5": "5e315e52de94e5a3c554008ecc2e25c1"
+      },
+      "value_change_determination": {
+        "count": 0,
+        "md5": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "value_driver": {
+        "count": 12,
+        "md5": "ae27c53c2d97bbfa0b7bcd7bad7ddb40"
+      },
+      "value_driver_exclusion": {
+        "count": 0,
+        "md5": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "value_driver_record": {
+        "count": 1,
+        "md5": "61894181f314513fdc8cde4555a401a8"
+      },
+      "value_driver_record_assumption": {
+        "count": 0,
+        "md5": "d41d8cd98f00b204e9800998ecf8427e"
+      },
+      "value_driver_version": {
+        "count": 20,
+        "md5": "a891033c1eb3b297039d5bd1ace22061"
+      },
+      "value_leakage": {
+        "count": 6,
+        "md5": "25cb3219dfe9084db66e815b14ad7a64"
+      },
+      "value_leakage_driver": {
+        "count": 6,
+        "md5": "7a745d0c6d4bd9a03b4cf0d2751a8292"
+      },
+      "value_position": {
+        "count": 23,
+        "md5": "0aba456dabfe15a111b843b640f97d72"
+      },
+      "value_trajectory_point": {
+        "count": 39,
+        "md5": "1f7f382ed11d29aa8438d5b683b7561c"
+      }
+    },
+    "audit_max": 400,
+    "auth_rows": {
+      "app_session": 14,
+      "app_user": 1,
+      "app_credential": 1
+    },
+    "release_baseline_crosscheck": {
+      "file": "4d10-release-baseline.json",
+      "sha256": "d3ffaacccdcecc061805b291a8df5325fc5ca3325bc2165fcf131761e6e57b8b",
+      "tables_identical_over_baseline_columns": "31/33"
+    }
+  },
+  "reports": [
+    {
+      "type": "requalification",
+      "issue_number": "1",
+      "project": "SALES-INITIATIVE",
+      "issue_id": "abf85d1f-663c-4e4f-9464-685e5435d266",
+      "renderer": "report-html-1",
+      "issued_at": "2026-09-29T22:57:11Z",
+      "sha256": "6ef3d5ebd3dcdbdf0b471f433e1806f07b93a905b324fd8a8a3901d6c939d041",
+      "bytes": "35747",
+      "bytes_match": "t"
+    },
+    {
+      "type": "requalification",
+      "issue_number": "2",
+      "project": "SALES-INITIATIVE",
+      "issue_id": "2480e095-ae6c-41b0-ba55-a1e900ecfd3e",
+      "renderer": "report-html-1",
+      "issued_at": "2026-09-29T23:11:10Z",
+      "sha256": "56e397c4ac65ac4a7fba8921e4f2913bf2e52034c1cceac69b9f8a971b8bfbbf",
+      "bytes": "35743",
+      "bytes_match": "t"
+    },
+    {
+      "type": "information_request",
+      "issue_number": "1",
+      "project": "CUSTOMER-TRANSFORMATION-",
+      "issue_id": "2c1934ba-9e8e-407f-87cf-647d4ffb00d0",
+      "renderer": "report-html-2",
+      "issued_at": "2026-10-02T23:36:45Z",
+      "sha256": "88b2f44d8c22f12c81730953c82dde8bdb4590862d0bd28aeba5193848556f2f",
+      "bytes": "27225",
+      "bytes_match": "t"
+    }
+  ],
+  "projects": [
+    {
+      "code": "BOTOX",
+      "id": "152c04de-1d54-48bc-ae0d-fcc534d278c0",
+      "name": "Botox"
+    },
+    {
+      "code": "CUSTOMER-TRANSFORMATION-",
+      "id": "32d1b19e-f047-45f1-b536-8bc31144f845",
+      "name": "Customer transformation program"
+    },
+    {
+      "code": "DEMO-TRAJ",
+      "id": "90276823-e7ef-4560-9953-184a1514bcb0",
+      "name": "Trajectory Executive Demo (SYNTHETIC)"
+    },
+    {
+      "code": "DEMO-TRAJ2",
+      "id": "8f635bdf-e0a7-442a-a61a-5fe065e6e77f",
+      "name": "Trajectory Executive Demo v2 (SYNTHETIC)"
+    },
+    {
+      "code": "E-004",
+      "id": "81c818d4-2961-46a3-b1c6-33f1281a762f",
+      "name": "Invoice processing"
+    },
+    {
+      "code": "PROJECT-DREAM",
+      "id": "f4b55a20-3434-4796-a3a5-39d71331f9a4",
+      "name": "Project Dream"
+    },
+    {
+      "code": "SALES-INITIATIVE",
+      "id": "9fd0cf84-3885-4ebf-921b-cd20b010eb2f",
+      "name": "Sales initiative"
+    }
+  ],
+  "open_draft_reviews": [
+    {
+      "project": "BOTOX",
+      "review_id": "09dd31e0-7323-46d2-8018-1672199581cf",
+      "sequence": "1",
+      "trigger": "six_month",
+      "row_md5": "e476767057385e588f33258ce38527df"
+    },
+    {
+      "project": "DEMO-TRAJ",
+      "review_id": "2af7695a-0c2a-4bdc-9457-f859b362ec9a",
+      "sequence": "4",
+      "trigger": "ad_hoc",
+      "row_md5": "ec1889c570605b1a0bc6da432256cf3d"
+    },
+    {
+      "project": "DEMO-TRAJ2",
+      "review_id": "53bb328a-7615-430a-8feb-ecdebf486727",
+      "sequence": "4",
+      "trigger": "material_evidence_change",
+      "row_md5": "e0a044dc03e5f28d55e30bc069f8d893"
+    },
+    {
+      "project": "SALES-INITIATIVE",
+      "review_id": "84d7056f-b7b7-428d-a9c0-60d91a77e4ea",
+      "sequence": "1",
+      "trigger": "ad_hoc",
+      "row_md5": "fdac8385d2f6eaa3818964f01d58e2ec"
+    }
+  ],
+  "runtime": {
+    "role": "vo_runtime",
+    "attributes_super_createrole_createdb_replication_bypassrls_login": "false,false,false,false,false,true",
+    "table_grants": [
+      "grant|drizzle.__drizzle_migrations|SELECT",
+      "grant|public.app_credential|INSERT,SELECT,UPDATE",
+      "grant|public.app_session|INSERT,SELECT,UPDATE",
+      "grant|public.app_user|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.assumption|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.assurance_review|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.audit_event|SELECT",
+      "grant|public.client|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.decision|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.document|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.evidence_link|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.evidence|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.information_request_item|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.information_request|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.key_date|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.leakage_assessment|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.person|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.project_stakeholder|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.project|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.recommendation_review_event|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.recommendation|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.report_document|INSERT,SELECT",
+      "grant|public.report_issue|INSERT,SELECT",
+      "grant|public.scenario|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_case_version|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_case|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_change_determination|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_change|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_driver_exclusion|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_driver_record_assumption|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_driver_record|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_driver_version|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_driver|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_leakage_driver|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_leakage|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_position|DELETE,INSERT,SELECT,UPDATE",
+      "grant|public.value_trajectory_point|DELETE,INSERT,SELECT,UPDATE"
+    ]
+  },
+  "recovery_point": {
+    "branch_name": "pre-4d10-release-r2-2026-10-05",
+    "branch_id": "br-shy-mud-b788by30",
+    "endpoint_id": "ep-red-recipe-b7k2f2ih",
+    "state": "0020 / 21 migrations, identical to the release baseline (R4 read-only verification)"
+  },
+  "security": {
+    "B1": "complete",
+    "B2": "complete",
+    "B3": "pending / deferred (not executed)",
+    "B4": "complete for production (R2 fresh attempt #2)",
+    "B5-B8": "deferred"
+  },
+  "full_snapshot": "~/.cardaxia-4d9m/4d10-final-freeze.json (row-level hashes, local)"
+}

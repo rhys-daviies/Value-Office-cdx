@@ -1,7 +1,8 @@
 # 4D.10 production release procedure
 
-**Status: frozen procedure for PMO authorisation, hardened after the aborted R2 (4D.10R2B).** Production is still at
-0020 on `b7d0c46`; the attempts so far are recorded in `4d10-release-record.md`. The R2 restart migrated the new
+**Status: EXECUTED — 4D.10 ACCEPTED / RELEASED / FROZEN (R4, 2026-10-06).** Hardened after the aborted R2 (4D.10R2B). Production
+runs `afe2248` on 0026; every attempt and the final freeze are recorded in `4d10-release-record.md` and
+`4d10-final-freeze.json`. The R2 restart migrated the new
 recovery branch instead of production (release targeting / branch identity failure): every database step now proves
 **which Neon branch** it is connected to (§2a), and the Console sequence has a deliberate switch back to `main` (§3–4).
 Supersedes the 4D.10I preflight plan.

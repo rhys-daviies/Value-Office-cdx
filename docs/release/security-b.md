@@ -108,12 +108,16 @@ Critical: none. High: none.
 | ---- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | B1   | Create recovery branch `post-4d9n-freeze-2026-10-04` (Neon Console, Rhys)                         | Done (human)                                                                                                                          |
 | B2   | Documentation: rollback policy, canonical roles, migration path, integration warning, this record | Done (local)                                                                                                                          |
-| B3   | Reset `vo_app` password in the Neon Console and discard it (stage 1 retirement)                   | Pending                                                                                                                               |
+| B3   | Reset `vo_app` password in the Neon Console and discard it (stage 1 retirement)                   | **Pending / deferred** (4D.10R4: not executed; `vo_app` credential still valid)                                                       |
 | B4   | Rotate `neondb_owner` (Neon Console); store nowhere; supply only at the migration prompt          | **Done for production (2026-10-05, R2 fresh attempt #2)** — reset on `main` (human-confirmed), used once by the runner, not persisted |
-| B5   | Optionally delete the six pre-4D.9M deployments in Vercel                                         | Pending, optional                                                                                                                     |
-| B6   | Remove the expired `VERCEL_OIDC_TOKEN` line from the local `.env.local`                           | Pending                                                                                                                               |
-| B7   | After observation, delete the `vo_app` role (Neon Console)                                        | Pending                                                                                                                               |
-| B8   | After B1 is relied on, delete the legacy `pre-4d9m-2026-10-03` branch (Neon Console)              | Pending                                                                                                                               |
+| B5   | Optionally delete the six pre-4D.9M deployments in Vercel                                         | Deferred, optional (4D.10R4)                                                                                                          |
+| B6   | Remove the expired `VERCEL_OIDC_TOKEN` line from the local `.env.local`                           | Deferred (4D.10R4)                                                                                                                    |
+| B7   | After observation, delete the `vo_app` role (Neon Console)                                        | Deferred (4D.10R4)                                                                                                                    |
+| B8   | After B1 is relied on, delete the legacy `pre-4d9m-2026-10-03` branch (Neon Console)              | Deferred (4D.10R4)                                                                                                                    |
 
 Do not change: `vo_runtime` and its grants, the Production variables, the Keychain item, Vercel deployment protection,
 `neondb_owner` ownership, or the Neon integration / store.
+
+Status at 4D.10R4 close (2026-10-06): B1, B2 and B4 complete; B3 and B5–B8 deferred. Deferred local credential
+hygiene: two historical connection strings in the operator's local shell history (an old, now-retired `neondb_owner`
+credential and the still-valid `vo_app` credential) — to be removed alongside B3 / B7. Security B is not complete.
