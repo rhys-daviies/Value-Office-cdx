@@ -1,7 +1,7 @@
 # Production security posture and Security B record
 
-**Status: Security B IN PROGRESS** — B1 done (recovery branch), B2 done (this documentation). B3–B8 pending PMO
-approval. Never print or paste connection strings, passwords, tokens or session secrets.
+**Status: Security B IN PROGRESS** — B1, B2, B3, B4 done; B5–B8 pending PMO decision (4D.11 recommendations
+below). Security B is **not** complete. Never print or paste connection strings, passwords, tokens or session secrets.
 
 ## Current safe runtime architecture
 
@@ -16,11 +16,11 @@ approval. Never print or paste connection strings, passwords, tokens or session 
 
 ## Production roles
 
-| Role           | Purpose                                                      | Notes                                                                                                                                                                                                                                                                               |
-| -------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `vo_runtime`   | **Least-privilege application runtime identity**             | DML only (no audit writes, no report UPDATE/DELETE, no session/credential DELETE, no CREATE, owns nothing); `db:check-role` PASS. Credential: Vercel Production `DATABASE_URL` and the operator Keychain item `value-office-prod-vo_runtime`                                        |
-| `neondb_owner` | **Administrative / migration identity**                      | Owns `neondb`, the `drizzle` schema, all tables, sequences, triggers and audit functions; holds ADMIN over `vo_runtime`. Never in application runtime configuration                                                                                                                 |
-| `vo_app`       | **Legacy — pending retirement; MUST NOT be used by runtime** | Created in the Neon Console, so a member of `neon_superuser` (CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS, `pg_write_all_data`). No sessions, owns nothing, referenced by no runtime config. `neondb_owner` cannot alter it (no ADMIN option): retirement is a Neon Console action |
+| Role           | Purpose                                                                                                             | Notes                                                                                                                                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vo_runtime`   | **Least-privilege application runtime identity**                                                                    | DML only (no audit writes, no report UPDATE/DELETE, no session/credential DELETE, no CREATE, owns nothing); `db:check-role` PASS. Credential: Vercel Production `DATABASE_URL` and the operator Keychain item `value-office-prod-vo_runtime`                                        |
+| `neondb_owner` | **Administrative / migration identity**                                                                             | Owns `neondb`, the `drizzle` schema, all tables, sequences, triggers and audit functions; holds ADMIN over `vo_runtime`. Never in application runtime configuration                                                                                                                 |
+| `vo_app`       | **Legacy — password reset and discarded on `main` (B3, 4D.11); pending deletion (B7); MUST NOT be used by runtime** | Created in the Neon Console, so a member of `neon_superuser` (CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS, `pg_write_all_data`). No sessions, owns nothing, referenced by no runtime config. `neondb_owner` cannot alter it (no ADMIN option): retirement is a Neon Console action |
 
 ## Database administration and migrations
 
@@ -104,20 +104,79 @@ Critical: none. High: none.
 
 ## Security B actions
 
-| Step | Action                                                                                            | Status                                                                                                                                |
-| ---- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| B1   | Create recovery branch `post-4d9n-freeze-2026-10-04` (Neon Console, Rhys)                         | Done (human)                                                                                                                          |
-| B2   | Documentation: rollback policy, canonical roles, migration path, integration warning, this record | Done (local)                                                                                                                          |
-| B3   | Reset `vo_app` password in the Neon Console and discard it (stage 1 retirement)                   | **Pending / deferred** (4D.10R4: not executed; `vo_app` credential still valid)                                                       |
-| B4   | Rotate `neondb_owner` (Neon Console); store nowhere; supply only at the migration prompt          | **Done for production (2026-10-05, R2 fresh attempt #2)** — reset on `main` (human-confirmed), used once by the runner, not persisted |
-| B5   | Optionally delete the six pre-4D.9M deployments in Vercel                                         | Deferred, optional (4D.10R4)                                                                                                          |
-| B6   | Remove the expired `VERCEL_OIDC_TOKEN` line from the local `.env.local`                           | Deferred (4D.10R4)                                                                                                                    |
-| B7   | After observation, delete the `vo_app` role (Neon Console)                                        | Deferred (4D.10R4)                                                                                                                    |
-| B8   | After B1 is relied on, delete the legacy `pre-4d9m-2026-10-03` branch (Neon Console)              | Deferred (4D.10R4)                                                                                                                    |
+| Step | Action                                                                                            | Status                                                                                                                                                                                       |
+| ---- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B1   | Create recovery branch `post-4d9n-freeze-2026-10-04` (Neon Console, Rhys)                         | Done (human)                                                                                                                                                                                 |
+| B2   | Documentation: rollback policy, canonical roles, migration path, integration warning, this record | Done (local)                                                                                                                                                                                 |
+| B3   | Reset `vo_app` password in the Neon Console and discard it (stage 1 retirement)                   | **Done for production (2026-10-06, 4D.11)** — reset on `main` after Rhys confirmed all four `main` identifiers; new password discarded; production unaffected (POST PASS, `vo_runtime` only) |
+| B4   | Rotate `neondb_owner` (Neon Console); store nowhere; supply only at the migration prompt          | **Done for production (2026-10-05, R2 fresh attempt #2)** — reset on `main` (human-confirmed), used once by the runner, not persisted                                                        |
+| B5   | Optionally delete the six pre-4D.9M deployments in Vercel                                         | Deferred, optional — see 4D.11 assessment                                                                                                                                                    |
+| B6   | Remove the expired `VERCEL_OIDC_TOKEN` line from the local `.env.local`                           | Deferred — see 4D.11 assessment                                                                                                                                                              |
+| B7   | After observation, delete the `vo_app` role (Neon Console)                                        | Deferred — see 4D.11 assessment                                                                                                                                                              |
+| B8   | After B1 is relied on, delete the legacy `pre-4d9m-2026-10-03` branch (Neon Console)              | Deferred — see 4D.11 assessment                                                                                                                                                              |
 
 Do not change: `vo_runtime` and its grants, the Production variables, the Keychain item, Vercel deployment protection,
 `neondb_owner` ownership, or the Neon integration / store.
 
-Status at 4D.10R4 close (2026-10-06): B1, B2 and B4 complete; B3 and B5–B8 deferred. Deferred local credential
-hygiene: two historical connection strings in the operator's local shell history (an old, now-retired `neondb_owner`
-credential and the still-valid `vo_app` credential) — to be removed alongside B3 / B7. Security B is not complete.
+Status at 4D.10R4 close (2026-10-06): B1, B2 and B4 complete; B3 and B5–B8 deferred.
+
+## 4D.11 — post-release security and development hygiene (2026-10-06)
+
+### B3 — `vo_app` password reset (done)
+
+Dependency check (read-only, before any action): production `DATABASE_URL` is not `vo_app` — the startup role check
+logs `db-role=provider-managed` for any role with CREATEROLE / BYPASSRLS (both held by `vo_app`) and production logs
+`db-role=least-privilege`; only `vo_runtime` application sessions throughout 4D.10; Vercel holds only the four
+Production variables; migrations use `neondb_owner` via the hardened runner; `vo_app` owns no objects, has no
+members, no sessions, no table privileges (only USAGE on schemas `public` and `drizzle`); no code connects as it.
+Rhys selected `main` and confirmed all four identifiers (`main`, `br-tiny-star-b7b8d3bh`, `ep-old-mode-b7jl3rd0`,
+`delicate-resonance-93129287`), reset `vo_app` with `main` selected throughout and discarded the new password (not
+pasted, stored or kept). Afterwards: `/api/health` ok; `release-check.py post` PASS (0026 / 27, 256 factual rows
+identical, reports identical, `vo_runtime` least privilege); no `vo_app` / `neondb_owner` sessions; `vo_app` still
+exists with login (B7).
+
+### Local credential hygiene — shell history (done)
+
+The two historical connection strings (the `neondb_owner` string retired by B4 and the `vo_app` string retired by B3)
+were in `~/.zsh_history` **and** in 12 macOS Terminal session-restore files (`~/.zsh_sessions/*.history`); no other
+history file held credentials. After both were invalid: backed up the 13 files to
+`~/.cardaxia-4d11-history-backup-20261006T053908Z/` (outside the repository; directory 700, files 600), removed only
+the two lines per file (26 lines), atomically, permissions preserved. Verified without printing secrets: no embedded
+database credential remains; every other line byte-identical and in order. Open shells: none uses the Terminal
+session-restore hook; zsh appends only new commands on exit, so the lines cannot return except by a history-trim
+rewrite after 100+ new commands in a shell started before the cleanup — exit those shells when convenient. Delete the
+backup directory once satisfied (it still contains the two now-invalid strings).
+
+### Local development environment (resolved)
+
+A `next dev` preview (`.claude/launch.json` → `value-office-dev`, started by the Claude app) shared the checkout's
+`.next`; it was killed mid-write when the app quit (~02:03Z on 2026-10-06), leaving a corrupt generated
+`.next/dev/types/validator.ts`, which `tsconfig.json` includes — typecheck and build then failed. The process had
+already exited; only the git-ignored `.next` build output was removed (no source change). From the main checkout:
+typecheck, lint, build, verify:bundle, Vitest 517/517 and db:verify pass. Practice: stop the preview dev server before
+`typecheck` / `build`; if `.next/dev/types` is ever corrupt again, delete `.next` (generated) and rebuild.
+
+### Branch-scoped credentials — new finding
+
+Neon role passwords are per branch, and B3 / B4 reset them on `main` only. Branches created before those resets keep
+the **old** passwords: `post-4d9n-freeze-2026-10-04`, `pre-4d9m-2026-10-03` and `pre-4d10-release-r2-2026-10-05`
+(old `neondb_owner` and `vo_app`), `pre-4d10-release-2026-10-05` (old `vo_app`; its owner was reset in the aborted R2).
+The historical strings name the `main` host, so they no longer work as written, but the same passwords would work
+against a branch's own endpoint. Copies of the old passwords remain in the six pre-4D.9M Vercel deployments' build
+environments (B5) and the local history backup. Inferred from Neon's documented behaviour; **not tested** (testing
+would mean using the credentials). Recommended (PMO): reset `neondb_owner` and `vo_app` on each retained branch
+(passwords discarded; branch data unchanged, so recovery points stay valid), or delete branches that are no longer
+needed.
+
+### B5–B8 assessment (no action taken)
+
+| Step | Purpose / current risk                                                                                                                                                                                                                                                                                            | Assessment                                                                                           | Recommendation                                                                                                                                           |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B5   | Delete the six pre-4D.9M deployments (`m0zhti4s0`, `h1bpup2ha`, `7la0tly73`, `d8jt3kber`, `mbgh505et`, `ofxuxk42a`; all still present). Their environments hold the old owner password (dead on `main` since B4, live on older branches) and pre-0019 code; an accidental Instant Rollback would break production | Still useful; risk reduced by B4; deletion irreversible but removes only unsafe rollback targets     | **Safe to execute** (Vercel, Rhys) — do it with or before the branch-credential resets                                                                   |
+| B6   | Remove the expired `VERCEL_OIDC_TOKEN` line from the local `.env.local` (still present)                                                                                                                                                                                                                           | Still necessary (hygiene); local only; token expired                                                 | **Safe to execute now** — a one-line local edit                                                                                                          |
+| B7   | Delete the `vo_app` role. After B3 nobody holds a valid `main` password; it owns nothing, has no table grants, no sessions, no members; it still holds `neon_superuser` membership and USAGE on `public` / `drizzle`                                                                                              | Now safe on `main`; deletion is branch-scoped (other branches keep their copy)                       | **Safe to execute** (Neon Console on `main`): revoke the two schema USAGE grants (as `neondb_owner`, Console SQL Editor on `main`), then delete the role |
+| B8   | Delete the legacy `pre-4d9m-2026-10-03` branch (migration 0018; a full copy of production data with the old `neondb_owner` and `vo_app` passwords)                                                                                                                                                                | Superseded as a recovery point by `post-4d9n-freeze-2026-10-04` and `pre-4d10-release-r2-2026-10-05` | **Safe to execute** (Neon Console) — removes a stale data copy holding old passwords; irreversible                                                       |
+
+The rollback policy above (safe family 0020-compatible, newest `bc3fdc5`) predates 4D.10: the current rollback target
+is `dpl_6PUBbKWZ2HC6Wb1uju5MRVSdbUvr` (`b7d0c46`, verified healthy on 0026 in 4D.10R2); the older safe-family
+deployments have not been verified against 0026.
